@@ -25,16 +25,16 @@ const Topics = (function () {
   function renderTable(container, topics, opts) {
     opts = opts || {};
     if (!topics.length) {
-      container.innerHTML = UI.emptyState('No knowledge gaps yet.', opts.emptyHint || 'Start by adding the first topic you want to learn.');
+      container.innerHTML = UI.emptyState(I18N.t('topics.empty'), opts.emptyHint || I18N.t('topics.empty_hint'));
       return;
     }
     const catName = (id) => {
       const c = (opts.categories || []).find(c => c.id === id);
-      return c ? c.name_en : '—';
+      return c ? I18N.getCategoryName(c) : '—';
     };
     const modName = (id) => {
       const m = State.modulesCache.find(m => m.id === id);
-      return m ? m.name_en : '—';
+      return m ? I18N.getModuleName(m) : '—';
     };
     const showModuleCol = !!opts.showModule;
 
@@ -42,14 +42,14 @@ const Topics = (function () {
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>Topic</th>
-            ${showModuleCol ? '<th>Module</th>' : ''}
-            <th>Category</th>
-            <th>Status</th>
-            <th>Priority</th>
-            <th>Progress</th>
-            <th>Last Review</th>
-            <th>Next Review</th>
+            <th>${I18N.t('topics.table.topic')}</th>
+            ${showModuleCol ? `<th>${I18N.t('topics.table.module')}</th>` : ''}
+            <th>${I18N.t('topics.table.category')}</th>
+            <th>${I18N.t('topics.table.status')}</th>
+            <th>${I18N.t('topics.table.priority')}</th>
+            <th>${I18N.t('topics.table.progress')}</th>
+            <th>${I18N.t('topics.table.last_review')}</th>
+            <th>${I18N.t('topics.table.next_review')}</th>
           </tr></thead>
           <tbody>
             ${topics.map(t => `
@@ -80,49 +80,49 @@ const Topics = (function () {
     const modules = State.modulesCache;
     const body = `
       <div class="modal-head">
-        <h3>Add Knowledge Gap</h3>
+        <h3>${I18N.t('topics.add_title')}</h3>
         <button class="btn btn-icon btn-ghost" data-close>&times;</button>
       </div>
       <form id="add-topic-form">
         <div class="field">
-          <label>Topic Name</label>
-          <input name="topic" required placeholder="e.g. Stock Valuation">
+          <label>${I18N.t('topics.add_topic_name')}</label>
+          <input name="topic" required placeholder="${I18N.t('topics.add_topic_name_ph')}">
         </div>
         <div class="field-row">
           <div class="field">
-            <label>Module</label>
+            <label>${I18N.t('topics.add_module')}</label>
             <select name="module_id" id="at-module" required>
-              ${modules.map(m => `<option value="${m.id}" ${m.id===defaultModuleId?'selected':''}>${m.name_en}</option>`).join('')}
+              ${modules.map(m => `<option value="${m.id}" ${m.id===defaultModuleId?'selected':''}>${I18N.getModuleName(m)}</option>`).join('')}
             </select>
           </div>
           <div class="field">
-            <label>Category</label>
+            <label>${I18N.t('topics.add_category')}</label>
             <select name="category_id" id="at-category"></select>
           </div>
         </div>
         <div class="field">
-          <label>Description</label>
-          <textarea name="description" placeholder="Short context for this topic"></textarea>
+          <label>${I18N.t('topics.add_description')}</label>
+          <textarea name="description" placeholder="${I18N.t('topics.add_description_ph')}"></textarea>
         </div>
         <div class="field">
-          <label>Priority</label>
+          <label>${I18N.t('topics.add_priority')}</label>
           <select name="priority">
-            ${PRIORITY_VALUES.map(p => `<option ${p==='Medium'?'selected':''}>${p}</option>`).join('')}
+            ${PRIORITY_VALUES.map(p => `<option ${p==='Medium'?'selected':''}>${I18N.priorityLabel(p)}</option>`).join('')}
           </select>
         </div>
         <div class="field">
-          <label>Current Understanding</label>
-          <textarea name="current_understanding" placeholder="What you already understand, if anything"></textarea>
+          <label>${I18N.t('topics.add_current_understanding')}</label>
+          <textarea name="current_understanding" placeholder="${I18N.t('topics.add_current_understanding_ph')}"></textarea>
         </div>
         <div class="field">
-          <label>What I Don't Know</label>
-          <textarea name="what_i_dont_know" placeholder="e.g. الفرق بين FIFO و Average Cost"></textarea>
+          <label>${I18N.t('topics.add_what_dont_know')}</label>
+          <textarea name="what_i_dont_know" placeholder="${I18N.t('topics.add_what_dont_know_ph')}"></textarea>
         </div>
         <div class="field">
-          <label>What I Need To Learn</label>
-          <textarea name="what_i_need_to_learn" placeholder="e.g. إزاي تقييم المخزون بيأثر على القيود المحاسبية"></textarea>
+          <label>${I18N.t('topics.add_what_need_to_learn')}</label>
+          <textarea name="what_i_need_to_learn" placeholder="${I18N.t('topics.add_what_need_to_learn_ph')}"></textarea>
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;">Save</button>
+        <button type="submit" class="btn btn-primary" style="width:100%;">${I18N.t('topics.add_save')}</button>
       </form>
     `;
     const modal = UI.openModal(body);
@@ -180,10 +180,10 @@ const Topics = (function () {
       <div class="modal-head">
         <div>
           <h3>${escapeHtml(t.topic)}</h3>
-          <div class="field-hint">${mod ? mod.name_en : ''} ${cat ? '· ' + cat.name_en : ''}</div>
+          <div class="field-hint">${mod ? I18N.getModuleName(mod) : ''} ${cat ? '· ' + I18N.getCategoryName(cat) : ''}</div>
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="btn btn-danger btn-sm" id="delete-topic-btn">Delete</button>
+          <button class="btn btn-danger btn-sm" id="delete-topic-btn">${I18N.t('general.delete')}</button>
           <button class="btn btn-icon btn-ghost" data-close>&times;</button>
         </div>
       </div>
@@ -192,25 +192,25 @@ const Topics = (function () {
         ${STATUS_VALUES.map((s, i) => {
           const currentIdx = STATUS_VALUES.indexOf(t.status);
           const cls = i < currentIdx ? 'done' : (i === currentIdx ? 'current' : '');
-          return `<button class="status-step ${cls}" data-status="${s}">${s}</button>`;
+          return `<button class="status-step ${cls}" data-status="${s}">${I18N.statusLabel(s)}</button>`;
         }).join('')}
       </div>
 
       <div class="tabs">
-        <button class="tab active" data-tab="knowledge">Knowledge</button>
-        <button class="tab" data-tab="business">Business &amp; ERP</button>
-        <button class="tab" data-tab="practical">Practical</button>
-        <button class="tab" data-tab="reviews">Reviews</button>
+        <button class="tab active" data-tab="knowledge">${I18N.t('knowledge.tab_knowledge')}</button>
+        <button class="tab" data-tab="business">${I18N.t('knowledge.tab_business')}</button>
+        <button class="tab" data-tab="practical">${I18N.t('knowledge.tab_practical')}</button>
+        <button class="tab" data-tab="reviews">${I18N.t('knowledge.tab_reviews')}</button>
       </div>
 
       <div id="tab-panels"></div>
     `;
 
     modal.querySelector('#delete-topic-btn').addEventListener('click', async () => {
-      if (!confirm('Delete this topic? This cannot be undone.')) return;
+      if (!confirm(I18N.t('topics.delete_confirm'))) return;
       try {
         await API.deleteTopic(id);
-        UI.toast('Topic deleted', 'success');
+        UI.toast(I18N.t('toast.topic_deleted'), 'success');
         UI.closeModal();
         Router.reload();
       } catch (err) { UI.toast(err.message, 'error'); }
@@ -220,7 +220,7 @@ const Topics = (function () {
       btn.addEventListener('click', async () => {
         try {
           await API.updateStatus(id, btn.dataset.status);
-          UI.toast('Status updated', 'success');
+          UI.toast(I18N.t('toast.status_updated'), 'success');
           openDetail(id); // re-render with fresh state
         } catch (err) { UI.toast(err.message, 'error'); }
       });
