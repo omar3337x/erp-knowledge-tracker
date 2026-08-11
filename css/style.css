@@ -266,6 +266,64 @@ tbody tr:hover{ background:var(--line-soft); }
 @keyframes spin{ to{ transform:rotate(360deg); } }
 
 /* ---------------------------------------------------------------------- */
+/* RTL / LTR adaptive styles using CSS logical properties               */
+/* ---------------------------------------------------------------------- */
+[dir="rtl"] .sidebar { transform: translateX(104%); }
+.sidebar.open { transform: translateX(0); }
+[dir="ltr"] .sidebar { transform: translateX(-104%); }
+
+/* Mirror sidebar-brand icon position for RTL */
+[dir="rtl"] .sidebar-brand { flex-direction: row-reverse; }
+[dir="rtl"] .sidebar-brand-text { text-align: right; }
+
+/* Flip search box icon position */
+[dir="rtl"] .search-box .icon { left: auto; right: 10px; }
+[dir="rtl"] .search-box input { padding-inline-end: 32px; padding-inline-start: 12px; }
+
+/* Flip menu toggle icon orientation */
+[dir="rtl"] .menu-toggle { transform: scaleX(-1); }
+
+/* Sidebar nav items — indent sub-items from the correct side */
+[dir="rtl"] .nav-module-sub { padding-inline-end: 14px; padding-inline-start: 12px; }
+
+/* Status stepper: flip order visually in RTL */
+[dir="rtl"] .status-stepper { flex-direction: row-reverse; }
+
+/* Gauge ring labels — center aligned in RTL too */
+[dir="rtl"] .module-card-head { flex-direction: row-reverse; }
+
+/* Table header sorting indicators (if any) */
+[dir="rtl"] thead th:first-child { border-start-start-radius: var(--radius-md); }
+[dir="rtl"] thead th:last-child { border-start-end-radius: var(--radius-md); }
+[dir="rtl"] tbody tr:last-child td:first-child { border-end-start-radius: var(--radius-md); }
+[dir="rtl"] tbody tr:last-child td:last-child { border-end-end-radius: var(--radius-md); }
+
+/* Modal close button alignment */
+[dir="rtl"] .modal-head > div:last-child { direction: ltr; }
+
+/* Form labels right-aligned in RTL */
+[dir="rtl"] .field label { text-align: right; }
+
+/* KPI value centering */
+[dir="rtl"] .kpi-card { text-align: center; }
+[dir="rtl"] .kpi-label { text-align: center; }
+
+/* Toast stack position flips */
+[dir="rtl"] .toast-stack { left: 20px; right: auto; }
+
+/* Module card stats — flip flex direction if needed */
+[dir="rtl"] .module-stats { justify-content: flex-start; }
+
+/* Toolbar filter selects — ensure proper spacing in RTL */
+[dir="rtl"] .toolbar .field { margin-inline-end: 0; margin-inline-start: 10px; }
+
+/* Status stepper buttons — RTL friendly */
+[dir="rtl"] .status-step { direction: rtl; }
+
+/* Button icon positioning in RTL modals */
+[dir="rtl"] .modal-head button[data-close] { margin-inline-start: 0; margin-inline-end: 8px; }
+
+/* ---------------------------------------------------------------------- */
 /* Skeleton loading placeholders                                          */
 /* ---------------------------------------------------------------------- */
 .skeleton{
