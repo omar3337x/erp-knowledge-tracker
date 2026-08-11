@@ -142,6 +142,11 @@ const API = (function () {
     currentUser: () => call('currentUser', {}),
     updateProfile: (payload) => call('updateProfile', payload).then(d => {
       invalidateGetCache(['dashboard']);
+      // Update current user language if changed
+      if (d && d.language) {
+        I18N.setLocale(d.language);
+        if (window.__updateUIStrings) window.__updateUIStrings();
+      }
       return d;
     }),
     changePassword: (payload) => call('changePassword', payload),
@@ -149,6 +154,11 @@ const API = (function () {
     // Reference data
     modules: () => cachedGet('modules', 'modules', {}),
     categories: (moduleId) => call('categories', { module_id: moduleId }),
+    // Category management
+    createCategory: (payload) => call('createCategory', payload),
+    updateCategory: (payload) => call('updateCategory', payload),
+    deleteCategory: (id) => call('deleteCategory', { id }),
+    toggleCategoryStatus: (id) => call('toggleCategoryStatus', { id }),
 
     // Topics
     topics: (filters) => cachedGet('topics', 'topics', filters || {}),

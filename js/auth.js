@@ -93,6 +93,11 @@ const Auth = (function () {
     try {
       const data = await API.validateSession();
       State.currentUser = data.user;
+      // Restore user's language preference
+      if (data.user && data.user.language) {
+        I18N.setLocale(data.user.language);
+        if (window.__updateUIStrings) window.__updateUIStrings();
+      }
       return true;
     } catch (err) {
       API.clearToken();

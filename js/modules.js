@@ -1,12 +1,11 @@
 /**
- * js/modules.js
- * Renders a single Module's dashboard: stats + filterable Topics table.
+ * js/modules.js — Renders a single Module's dashboard with stats, filterable Topics, and Category Management.
  */
 
 const Modules = (function () {
 
   async function render(container, moduleId) {
-    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading module...</div>`;
+    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_module')}</div>`;
 
     let mod = State.modulesCache.find(m => m.id === moduleId);
     let topics, categories;
@@ -19,45 +18,48 @@ const Modules = (function () {
       container.innerHTML = UI.errorState(err.message);
       return;
     }
-    if (!mod) { container.innerHTML = UI.errorState('Module not found.'); return; }
+    if (!mod) { container.innerHTML = UI.errorState(I18N.t('general.page_not_found')); return; }
 
     State.categoriesCache[moduleId] = categories;
     const stats = computeStats(topics);
 
     container.innerHTML = `
       <div class="grid grid-kpi" style="margin-bottom:20px;">
-        <div class="card kpi-card"><div class="kpi-label">Module Progress</div><div class="kpi-value brass">${stats.progress}%</div></div>
-        <div class="card kpi-card"><div class="kpi-label">Total Topics</div><div class="kpi-value">${topics.length}</div></div>
-        <div class="card kpi-card"><div class="kpi-label">Completed</div><div class="kpi-value teal">${stats.mastered}</div></div>
-        <div class="card kpi-card"><div class="kpi-label">Learning</div><div class="kpi-value">${stats.learning}</div></div>
-        <div class="card kpi-card"><div class="kpi-label">Knowledge Gaps</div><div class="kpi-value rust">${stats.gaps}</div></div>
-        <div class="card kpi-card"><div class="kpi-label">Mastered</div><div class="kpi-value teal">${stats.mastered}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.progress')}</div><div class="kpi-value brass">${stats.progress}%</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.total_topics')}</div><div class="kpi-value">${topics.length}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.completed')}</div><div class="kpi-value teal">${stats.mastered}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.learning')}</div><div class="kpi-value">${stats.learning}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.gaps')}</div><div class="kpi-value rust">${stats.gaps}</div></div>
       </div>
 
       <div class="toolbar">
         <div class="field">
           <select id="filter-category">
-            <option value="">All Categories</option>
-            ${categories.map(c => `<option value="${c.id}">${c.name_en}</option>`).join('')}
+            <option value="">${I18N.t('module.all_categories')}</option>
+            ${categories.map(c => `<option value="${c.id}">${I18N.getCategoryName(c)}</option>`).join('')}
           </select>
         </div>
         <div class="field">
           <select id="filter-status">
-            <option value="">All Statuses</option>
-            ${Topics.STATUS_VALUES.map(s => `<option value="${s}">${s}</option>`).join('')}
+            <option value="">${I18N.t('module.all_statuses')}</option>
+            ${Topics.STATUS_VALUES.map(s => `<option value="${s}">${I18N.statusLabel(s)}</option>`).join('')}
           </select>
         </div>
         <div class="field">
           <select id="filter-priority">
-            <option value="">All Priorities</option>
-            ${Topics.PRIORITY_VALUES.map(p => `<option value="${p}">${p}</option>`).join('')}
+            <option value="">${I18N.t('module.all_priorities')}</option>
+            ${Topics.PRIORITY_VALUES.map(p => `<option value="${p}">${I18N.priorityLabel(p)}</option>`).join('')}
           </select>
         </div>
         <div style="flex:1;"></div>
-        <button class="btn btn-primary" id="add-gap-btn">+ Add Knowledge Gap</button>
+        <button class="btn btn-primary" id="add-gap-btn">${I18N.t('module.add_gap')}</button>
       </div>
 
       <div id="topics-table-wrap"></div>
+
+      <!-- Category Management Section -->
+      <div id="categories-section" style="margin-top:40px; padding-top:24px; border-top:1px solid var(--line);">
+      </div>
     `;
 
     const tableWrap = container.querySelector('#topics-table-wrap');
@@ -69,16 +71,25 @@ const Modules = (function () {
       if (catF) filtered = filtered.filter(t => t.category_id === catF);
       if (statF) filtered = filtered.filter(t => t.status === statF);
       if (prioF) filtered = filtered.filter(t => t.priority === prioF);
-      Topics.renderTable(tableWrap, filtered, { categories, emptyHint: 'Start by adding the first topic you want to learn.' });
+      Topics.renderTable(tableWrap, filtered, { categories, emptyHint: I18N.t('module.no_data') });
     };
     draw();
     container.querySelectorAll('#filter-category,#filter-status,#filter-priority').forEach(el => el.addEventListener('change', draw));
 
     container.querySelector('#add-gap-btn').addEventListener('click', () => {
       Topics.openAddModal(moduleId, categories, async () => {
-        Router.go('module', { id: moduleId }); // reload
+        Router.go('module', { id: moduleId });
       });
     });
+
+    // Render Category Management
+    Categories.renderTable(
+      container.querySelector('#categories-section'),
+      moduleId,
+      State.modulesCache,
+      categories,
+      topics
+    );
   }
 
   function computeStats(topics) {

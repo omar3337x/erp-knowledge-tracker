@@ -1,12 +1,5 @@
 /**
- * js/app.js — Optimized bootstrap with smart initial load and improved loading UX.
- *
- * Improvements:
- *   - Smart initial load: only fetches dashboard data after login
- *   - Categories loaded lazily (on first module view or topic creation)
- *   - Skeleton loading states instead of spinner-only
- *   - Request deduplication via API layer
- *   - Pre-caches modules before rendering sidebar
+ * js/app.js — Optimized bootstrap with smart initial load, i18n, and improved loading UX.
  */
 
 // ---------------------------------------------------------------------------
@@ -50,7 +43,7 @@ const UI = (function () {
   }
 
   function errorState(message) {
-    return `<div class="empty-state"><h3>Something went wrong</h3><p>${message}</p></div>`;
+    return `<div class="empty-state"><h3>${message}</h3></div>`;
   }
 
   function fmtDate(iso) {
@@ -80,7 +73,6 @@ const UI = (function () {
     localStorage.setItem('erp_tracker_theme', theme);
   }
 
-  // Skeleton loading placeholders for various grid layouts
   function skeletonCards(count) {
     let html = '<div class="grid grid-kpi">';
     for (let i = 0; i < count; i++) {
@@ -112,17 +104,25 @@ const State = {
   initialized: false
 };
 
+// Make updateUIStrings accessible globally for i18n callbacks
+window.__updateUIStrings = updateUIStrings;
+
 // ---------------------------------------------------------------------------
-// Router (hash based — works natively on GitHub Pages, no server config)
+// ROUTER
 // ---------------------------------------------------------------------------
 const Router = (function () {
 
   let current = { route: 'dashboard', params: {} };
 
   const titles = {
-    dashboard: 'Dashboard', module: 'Module', gaps: 'Knowledge Gaps',
-    review: 'Review Center', analytics: 'Analytics', profile: 'My Profile',
-    admin: 'Administration', search: 'Search Results'
+    dashboard: 'dashboard.title',
+    module: 'module.progress',
+    gaps: 'nav.gaps',
+    review: 'nav.review',
+    analytics: 'nav.analytics',
+    profile: 'nav.profile',
+    admin: 'nav.admin',
+    search: 'search.results_for'
   };
 
   function encodeHash(route, params) {
@@ -156,97 +156,67 @@ const Router = (function () {
     const content = document.getElementById('content');
     const titleEl = document.getElementById('page-title');
 
-    // Show skeleton immediately for visual feedback
+    // Update page title
+    const titleKey = titles[route] || route;
+    titleEl.textContent = I18N.t(titleKey);
+
     if (route === 'dashboard') {
-      titleEl.textContent = 'Dashboard';
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading dashboard...</div>`;
-      try {
-        await Dashboard.render(content);
-      } catch (err) {
-        content.innerHTML = UI.errorState(err.message);
-      }
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_dashboard')}</div>`;
+      try { await Dashboard.render(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
 
     if (route === 'module') {
-      const mod = State.modulesCache.find(m => m.id === params.id);
-      titleEl.textContent = mod ? mod.name_en : 'Module';
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading module...</div>`;
-      try {
-        await Modules.render(content, params.id);
-      } catch (err) {
-        content.innerHTML = UI.errorState(err.message);
-      }
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_module')}</div>`;
+      try { await Modules.render(content, params.id); } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
 
     if (route === 'gaps') {
-      titleEl.textContent = 'Knowledge Gaps';
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading knowledge gaps...</div>`;
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_gaps')}</div>`;
       try {
         const topics = await API.topics({});
         const gaps = topics.filter(t => t.status !== 'Mastered' && t.status !== 'Practiced');
-        Topics.renderTable(content, gaps, { showModule: true, emptyHint: 'No open knowledge gaps right now — nice work.' });
+        Topics.renderTable(content, gaps, { showModule: true, emptyHint: I18N.t('topics.empty_hint') });
       } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
 
     if (route === 'review') {
-      titleEl.textContent = 'Review Center';
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading review center...</div>`;
-      try {
-        await Reviews.renderCenter(content);
-      } catch (err) {
-        content.innerHTML = UI.errorState(err.message);
-      }
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_review')}</div>`;
+      try { await Reviews.renderCenter(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
 
     if (route === 'analytics') {
-      titleEl.textContent = 'Analytics';
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading analytics...</div>`;
-      try {
-        await Analytics.render(content);
-      } catch (err) {
-        content.innerHTML = UI.errorState(err.message);
-      }
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('analytics.loading')}</div>`;
+      try { await Analytics.render(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
 
     if (route === 'profile') {
-      titleEl.textContent = 'My Profile';
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading profile...</div>`;
-      try {
-        await Profile.render(content);
-      } catch (err) {
-        content.innerHTML = UI.errorState(err.message);
-      }
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_profile')}</div>`;
+      try { await Profile.render(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
 
     if (route === 'admin') {
-      titleEl.textContent = 'Administration';
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading administration...</div>`;
-      try {
-        await Profile.renderAdmin(content);
-      } catch (err) {
-        content.innerHTML = UI.errorState(err.message);
-      }
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('admin.loading')}</div>`;
+      try { await Profile.renderAdmin(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
 
     if (route === 'search') {
-      titleEl.textContent = `Search: "${params.q}"`;
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Searching...</div>`;
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.searching')}</div>`;
       try {
         const topics = await API.topics({ search: params.q });
-        Topics.renderTable(content, topics, { showModule: true, emptyHint: 'Try a different search term.' });
+        Topics.renderTable(content, topics, { showModule: true, emptyHint: I18N.t('search.empty_hint') });
       } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
 
-    titleEl.textContent = 'Not Found';
-    content.innerHTML = UI.emptyState('Page not found', 'Use the sidebar to navigate.');
+    titleEl.textContent = I18N.t('general.page_not_found');
+    content.innerHTML = UI.emptyState(I18N.t('general.page_not_found'), I18N.t('general.use_sidebar'));
   }
 
   function init() {
@@ -257,7 +227,7 @@ const Router = (function () {
 })();
 
 // ---------------------------------------------------------------------------
-// App bootstrap — optimized initial load
+// APP BOOTSTRAP
 // ---------------------------------------------------------------------------
 const App = (function () {
 
@@ -265,12 +235,58 @@ const App = (function () {
     const nav = document.getElementById('nav-modules');
     nav.innerHTML = State.modulesCache.map(m => `
       <button class="nav-item nav-module-sub" data-route="module" data-module-id="${m.id}">
-        <span class="dot"></span>${m.name_en}
+        <span class="dot"></span>${I18N.getModuleName(m)}
       </button>
     `).join('');
     nav.querySelectorAll('.nav-item').forEach(btn => {
       btn.addEventListener('click', () => Router.go('module', { id: btn.dataset.moduleId }));
     });
+  }
+
+  function updateUIStrings() {
+    // Update static UI elements
+    document.getElementById('tab-login').textContent = I18N.t('auth.login');
+    document.getElementById('tab-signup').textContent = I18N.t('auth.signup');
+    document.querySelector('#login-form label[for="login-identifier"]').textContent = I18N.t('auth.username_or_email');
+    document.querySelector('#login-form label[for="login-password"]').textContent = I18N.t('auth.password');
+    document.querySelector('#login-form button[type="submit"]').textContent = I18N.t('auth.login');
+    document.querySelector('#login-form .checkbox-row label').textContent = I18N.t('auth.remember_me');
+
+    document.querySelector('#signup-form label[for="signup-fullname"]').textContent = I18N.t('auth.full_name');
+    document.querySelector('#signup-form label[for="signup-username"]').textContent = I18N.t('auth.username');
+    document.querySelector('#signup-form label[for="signup-email"]').textContent = I18N.t('auth.email');
+    document.querySelector('#signup-form label[for="signup-password"]').textContent = I18N.t('auth.password');
+    document.querySelector('#signup-form label[for="signup-confirm"]').textContent = I18N.t('auth.confirm_password');
+    document.querySelector('#signup-form button[type="submit"]').textContent = I18N.t('auth.create_account');
+
+    // Nav items
+    document.querySelector('[data-route="dashboard"]').textContent = I18N.t('nav.dashboard');
+    document.querySelector('[data-route="gaps"]').textContent = I18N.t('nav.gaps');
+    document.querySelector('[data-route="review"]').textContent = I18N.t('nav.review');
+    document.querySelector('[data-route="analytics"]').textContent = I18N.t('nav.analytics');
+    document.querySelector('[data-route="profile"]').textContent = I18N.t('nav.profile');
+    const adminNav = document.getElementById('nav-admin');
+    if (adminNav) adminNav.textContent = I18N.t('nav.admin');
+
+    // Search placeholder
+    const searchInput = document.getElementById('global-search');
+    if (searchInput) searchInput.placeholder = I18N.t('search.placeholder');
+
+    // Quick add button
+    const quickAddBtn = document.getElementById('quick-add-btn');
+    if (quickAddBtn) quickAddBtn.textContent = I18N.t('module.add_gap');
+
+    // Logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) logoutBtn.textContent = I18N.t('auth.logout') || 'Logout';
+
+    // Page title
+    const titleEl = document.getElementById('page-title');
+    if (titleEl) titleEl.textContent = I18N.t('nav.dashboard');
+
+    // Language switcher
+    const langSwitcher = document.getElementById('lang-switcher');
+    if (langSwitcher) langSwitcher.value = I18N.getLocale();
   }
 
   function bindStaticNav() {
@@ -296,25 +312,37 @@ const App = (function () {
     search.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && search.value.trim()) Router.go('search', { q: search.value.trim() });
     });
+
+    // Language switcher
+    const langSwitcher = document.getElementById('lang-switcher');
+    if (langSwitcher) {
+      langSwitcher.addEventListener('change', async (e) => {
+        const locale = e.target.value;
+        I18N.setLocale(locale);
+        updateUIStrings();
+        // Save language preference to user profile if logged in
+        if (State.currentUser && API.getToken()) {
+          try { await API.updateProfile({ language: locale }); } catch (err) { /* ignore */ }
+        }
+        // Re-render current route
+        Router.reload();
+      });
+    }
   }
 
-  // Pre-load modules (shared reference data) and then render current route.
-  // This avoids the dashboard making a redundant modules call since we already have it cached.
   async function boot() {
     Auth.showApp();
 
-    // Load modules once if not already cached
     if (!State.modulesCache.length) {
       try {
         State.modulesCache = await API.modules();
       } catch (err) {
-        UI.toast('Failed to load modules: ' + err.message, 'error');
+        UI.toast(err.message, 'error');
       }
     }
 
     buildSidebarModules();
 
-    // Show admin nav if needed
     if (State.currentUser && State.currentUser.role === 'Admin') {
       document.getElementById('nav-admin').classList.remove('hidden');
     }
@@ -328,13 +356,21 @@ const App = (function () {
     const savedTheme = localStorage.getItem('erp_tracker_theme') || 'light';
     UI.applyTheme(savedTheme);
 
+    // Initialize i18n
+    I18N.init();
+    updateUIStrings();
+
     Auth.init();
     bindStaticNav();
     Router.init();
 
     const restored = await Auth.tryRestoreSession();
     if (restored) {
-      // Small delay to let DOM settle, then boot with pre-loaded modules
+      // Load user's language preference from profile
+      if (State.currentUser && State.currentUser.language) {
+        I18N.setLocale(State.currentUser.language);
+        updateUIStrings();
+      }
       await boot();
     }
   }
