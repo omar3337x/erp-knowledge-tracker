@@ -104,9 +104,6 @@ const State = {
   initialized: false
 };
 
-// Make updateUIStrings accessible globally for i18n callbacks
-window.__updateUIStrings = updateUIStrings;
-
 // ---------------------------------------------------------------------------
 // ROUTER
 // ---------------------------------------------------------------------------
@@ -374,6 +371,9 @@ const App = (function () {
       await boot();
     }
   }
+
+  // Expose for external access (e.g., from auth.js on session restore)
+  window.__updateUIStrings = updateUIStrings;
 
   return { init, boot };
 })();
