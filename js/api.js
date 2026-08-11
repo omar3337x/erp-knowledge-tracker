@@ -1,16 +1,20 @@
 /**
- * js/api.js
- * Thin wrapper around the Google Apps Script Web App API.
+ * js/api.js — Optimized API wrapper with request deduplication & caching.
  *
- * We always POST as text/plain (not application/json) so the browser does
- * NOT send a CORS preflight OPTIONS request — Apps Script web apps cannot
- * reliably handle preflight, so this is the standard workaround. The Apps
- * Script side still parses the body as JSON.
+ * Key improvements:
+ *   - Request deduplication: same in-flight request returns same Promise
+ *   - In-memory cache for GET endpoints (dashboard, modules, topics, analytics)
+ *   - Stale-while-revalidate pattern for cached GET data
+ *   - Cache invalidation on mutations (topics, reviews, knowledge, profile)
  */
 
 const SESSION_KEY = 'erp_tracker_session_token';
 
 const API = (function () {
+
+  // ---------------------------------------------------------------------------
+  // TOKEN STORE
+  // ---------------------------------------------------------------------------
 
   function getToken() {
     return localStorage.getItem(SESSION_KEY) || '';
@@ -23,6 +27,41 @@ const API = (function () {
   function clearToken() {
     localStorage.removeItem(SESSION_KEY);
   }
+
+  // ---------------------------------------------------------------------------
+  // IN-MEMORY CACHE (stale-while-revalidate)
+  // ---------------------------------------------------------------------------
+
+  const getCache = {
+    dashboard:  { data: null, promise: null, ts: 0 },
+    modules:    { data: null, promise: null, ts: 0 },
+    topics:     { data: null, promise: null, ts: 0 },
+    analytics:  { data: null, promise: null, ts: 0 }
+  };
+
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  function invalidateGetCache(keys) {
+    if (!keys) keys = Object.keys(getCache);
+    keys.forEach(k => { getCache[k].data = null; getCache[k].promise = null; getCache[k].ts = 0; });
+  }
+
+  // ---------------------------------------------------------------------------
+  // REQUEST DEDUPLICATION
+  // ---------------------------------------------------------------------------
+
+  const inflight = {};
+
+  function dedup(key, fn) {
+    if (inflight[key]) return inflight[key];
+    const p = fn().finally(() => { delete inflight[key]; });
+    inflight[key] = p;
+    return p;
+  }
+
+  // ---------------------------------------------------------------------------
+  // CORE CALL
+  // ---------------------------------------------------------------------------
 
   async function call(action, payload) {
     if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') {
@@ -58,6 +97,40 @@ const API = (function () {
     return json.data;
   }
 
+  // ---------------------------------------------------------------------------
+  // WRAPPED CALLS WITH DEDUPLICATION & CACHING
+  // ---------------------------------------------------------------------------
+
+  async function cachedGet(cacheKey, action, payload) {
+    const entry = getCache[cacheKey];
+    const now = Date.now();
+
+    // Return stale data immediately if available and not too old
+    if (entry.data && now - entry.ts < CACHE_TTL) {
+      // Fire background refresh but don't block
+      if (!entry.promise) {
+        entry.promise = call(action, payload).then(d => {
+          entry.data = d;
+          entry.ts = now;
+          entry.promise = null;
+        }).catch(() => { entry.promise = null; });
+      }
+      return entry.data;
+    }
+
+    // Cache miss or expired — deduplicated fetch
+    return dedup(`get:${cacheKey}`, async () => {
+      const data = await call(action, payload);
+      entry.data = data;
+      entry.ts = now;
+      return data;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------------------------------------
+
   return {
     getToken, setToken, clearToken,
 
@@ -67,34 +140,53 @@ const API = (function () {
     logout: () => call('logout', {}),
     validateSession: () => call('validateSession', {}),
     currentUser: () => call('currentUser', {}),
-    updateProfile: (payload) => call('updateProfile', payload),
+    updateProfile: (payload) => call('updateProfile', payload).then(d => {
+      invalidateGetCache(['dashboard']);
+      return d;
+    }),
     changePassword: (payload) => call('changePassword', payload),
 
     // Reference data
-    modules: () => call('modules', {}),
+    modules: () => cachedGet('modules', 'modules', {}),
     categories: (moduleId) => call('categories', { module_id: moduleId }),
 
     // Topics
-    topics: (filters) => call('topics', filters || {}),
+    topics: (filters) => cachedGet('topics', 'topics', filters || {}),
     topic: (id) => call('topic', { id }),
-    createTopic: (payload) => call('createTopic', payload),
-    updateTopic: (payload) => call('updateTopic', payload),
-    deleteTopic: (id) => call('deleteTopic', { id }),
-    updateStatus: (id, status) => call('updateStatus', { id, status }),
-    updateProgress: (id, progress) => call('updateProgress', { id, progress }),
+    createTopic: (payload) => call('createTopic', payload).then(() => {
+      invalidateGetCache(['topics', 'dashboard', 'analytics']);
+    }),
+    updateTopic: (payload) => call('updateTopic', payload).then(() => {
+      invalidateGetCache(['topics', 'dashboard', 'analytics']);
+    }),
+    deleteTopic: (id) => call('deleteTopic', { id }).then(() => {
+      invalidateGetCache(['topics', 'dashboard', 'analytics']);
+    }),
+    updateStatus: (id, status) => call('updateStatus', { id, status }).then(() => {
+      invalidateGetCache(['topics', 'dashboard', 'analytics']);
+    }),
+    updateProgress: (id, progress) => call('updateProgress', { id, progress }).then(() => {
+      invalidateGetCache(['topics', 'dashboard', 'analytics']);
+    }),
 
     // Knowledge
     knowledge: (topicId) => call('knowledge', { topic_id: topicId }),
-    saveKnowledge: (payload) => call('saveKnowledge', payload),
+    saveKnowledge: (payload) => call('saveKnowledge', payload).then(() => {
+      invalidateGetCache(['topics']);
+    }),
 
     // Reviews
     reviews: (topicId) => call('reviews', topicId ? { topic_id: topicId } : {}),
-    addReview: (payload) => call('addReview', payload),
-    markReviewed: (id, payload) => call('markReviewed', Object.assign({ id }, payload || {})),
+    addReview: (payload) => call('addReview', payload).then(() => {
+      invalidateGetCache(['topics', 'dashboard', 'analytics']);
+    }),
+    markReviewed: (id, payload) => call('markReviewed', Object.assign({ id }, payload || {})).then(() => {
+      invalidateGetCache(['topics', 'dashboard', 'analytics']);
+    }),
 
     // Dashboard / analytics
-    dashboard: () => call('dashboard', {}),
-    analytics: () => call('analytics', {}),
+    dashboard: () => cachedGet('dashboard', 'dashboard', {}),
+    analytics: () => cachedGet('analytics', 'analytics', {}),
 
     // Admin
     adminUsers: () => call('adminUsers', {})

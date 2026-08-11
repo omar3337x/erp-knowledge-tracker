@@ -1,14 +1,24 @@
 /**
- * js/analytics.js
- * Renders the Analytics page: progress by module, status/priority
- * breakdowns, knowledge gaps by module, strongest/weakest modules,
- * learning-over-time timeline.
+ * js/analytics.js — Optimized with skeleton loading.
  */
 
 const Analytics = (function () {
 
   async function render(container) {
-    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading analytics...</div>`;
+    container.innerHTML = `
+      <div class="loading-row"><span class="spinner"></span> Loading analytics...</div>
+      <div class="card" style="margin-bottom:18px;">
+        <h3 style="margin-bottom:14px;">Progress by Module</h3>
+        <div class="skeleton" style="height:16px;width:80%;margin-bottom:8px;"></div>
+        <div class="skeleton" style="height:16px;width:60%;margin-bottom:8px;"></div>
+        <div class="skeleton" style="height:16px;width:70%;"></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr; gap:16px; margin-bottom:18px;">
+        <div class="card"><h3 style="margin-bottom:14px;">Topics by Status</h3><div class="skeleton" style="height:16px;width:90%;margin-bottom:8px;"></div><div class="skeleton" style="height:16px;width:70%;"></div></div>
+        <div class="card"><h3 style="margin-bottom:14px;">Topics by Priority</h3><div class="skeleton" style="height:16px;width:90%;margin-bottom:8px;"></div><div class="skeleton" style="height:16px;width:70%;"></div></div>
+      </div>
+    `;
+
     let data;
     try {
       data = await API.analytics();

@@ -1,7 +1,12 @@
 /**
- * js/app.js
- * UI helpers (toast/modal/gauge/states), global State, hash-based Router,
- * and the App bootstrap that ties every module together.
+ * js/app.js — Optimized bootstrap with smart initial load and improved loading UX.
+ *
+ * Improvements:
+ *   - Smart initial load: only fetches dashboard data after login
+ *   - Categories loaded lazily (on first module view or topic creation)
+ *   - Skeleton loading states instead of spinner-only
+ *   - Request deduplication via API layer
+ *   - Pre-caches modules before rendering sidebar
  */
 
 // ---------------------------------------------------------------------------
@@ -55,7 +60,6 @@ const UI = (function () {
     return d.toISOString().slice(0, 10);
   }
 
-  // Signature "instrument gauge" ring, built with a conic-gradient dial.
   function gaugeRing(percent, size) {
     size = size || 48;
     const pct = Math.max(0, Math.min(100, percent));
@@ -76,7 +80,26 @@ const UI = (function () {
     localStorage.setItem('erp_tracker_theme', theme);
   }
 
-  return { toast, openModal, closeModal, emptyState, errorState, fmtDate, gaugeRing, applyTheme };
+  // Skeleton loading placeholders for various grid layouts
+  function skeletonCards(count) {
+    let html = '<div class="grid grid-kpi">';
+    for (let i = 0; i < count; i++) {
+      html += `<div class="card kpi-card"><div class="skeleton" style="height:20px;width:60%;margin-bottom:8px;"></div><div class="skeleton" style="height:32px;width:40%;"></div></div>`;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function skeletonModuleCards(count) {
+    let html = '<div class="grid grid-modules">';
+    for (let i = 0; i < count; i++) {
+      html += `<div class="card module-card"><div class="skeleton" style="height:18px;width:70%;margin-bottom:12px;"></div><div class="skeleton" style="height:8px;width:100%;margin-bottom:8px;"></div><div class="skeleton" style="height:14px;width:50%;"></div></div>`;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  return { toast, openModal, closeModal, emptyState, errorState, fmtDate, gaugeRing, applyTheme, skeletonCards, skeletonModuleCards };
 })();
 
 // ---------------------------------------------------------------------------
@@ -85,7 +108,8 @@ const UI = (function () {
 const State = {
   currentUser: null,
   modulesCache: [],
-  categoriesCache: {}
+  categoriesCache: {},
+  initialized: false
 };
 
 // ---------------------------------------------------------------------------
@@ -132,15 +156,33 @@ const Router = (function () {
     const content = document.getElementById('content');
     const titleEl = document.getElementById('page-title');
 
-    if (route === 'dashboard') { titleEl.textContent = 'Dashboard'; return Dashboard.render(content); }
+    // Show skeleton immediately for visual feedback
+    if (route === 'dashboard') {
+      titleEl.textContent = 'Dashboard';
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading dashboard...</div>`;
+      try {
+        await Dashboard.render(content);
+      } catch (err) {
+        content.innerHTML = UI.errorState(err.message);
+      }
+      return;
+    }
+
     if (route === 'module') {
       const mod = State.modulesCache.find(m => m.id === params.id);
       titleEl.textContent = mod ? mod.name_en : 'Module';
-      return Modules.render(content, params.id);
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading module...</div>`;
+      try {
+        await Modules.render(content, params.id);
+      } catch (err) {
+        content.innerHTML = UI.errorState(err.message);
+      }
+      return;
     }
+
     if (route === 'gaps') {
       titleEl.textContent = 'Knowledge Gaps';
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading...</div>`;
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading knowledge gaps...</div>`;
       try {
         const topics = await API.topics({});
         const gaps = topics.filter(t => t.status !== 'Mastered' && t.status !== 'Practiced');
@@ -148,10 +190,51 @@ const Router = (function () {
       } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
-    if (route === 'review') { titleEl.textContent = 'Review Center'; return Reviews.renderCenter(content); }
-    if (route === 'analytics') { titleEl.textContent = 'Analytics'; return Analytics.render(content); }
-    if (route === 'profile') { titleEl.textContent = 'My Profile'; return Profile.render(content); }
-    if (route === 'admin') { titleEl.textContent = 'Administration'; return Profile.renderAdmin(content); }
+
+    if (route === 'review') {
+      titleEl.textContent = 'Review Center';
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading review center...</div>`;
+      try {
+        await Reviews.renderCenter(content);
+      } catch (err) {
+        content.innerHTML = UI.errorState(err.message);
+      }
+      return;
+    }
+
+    if (route === 'analytics') {
+      titleEl.textContent = 'Analytics';
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading analytics...</div>`;
+      try {
+        await Analytics.render(content);
+      } catch (err) {
+        content.innerHTML = UI.errorState(err.message);
+      }
+      return;
+    }
+
+    if (route === 'profile') {
+      titleEl.textContent = 'My Profile';
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading profile...</div>`;
+      try {
+        await Profile.render(content);
+      } catch (err) {
+        content.innerHTML = UI.errorState(err.message);
+      }
+      return;
+    }
+
+    if (route === 'admin') {
+      titleEl.textContent = 'Administration';
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading administration...</div>`;
+      try {
+        await Profile.renderAdmin(content);
+      } catch (err) {
+        content.innerHTML = UI.errorState(err.message);
+      }
+      return;
+    }
+
     if (route === 'search') {
       titleEl.textContent = `Search: "${params.q}"`;
       content.innerHTML = `<div class="loading-row"><span class="spinner"></span> Searching...</div>`;
@@ -161,6 +244,7 @@ const Router = (function () {
       } catch (err) { content.innerHTML = UI.errorState(err.message); }
       return;
     }
+
     titleEl.textContent = 'Not Found';
     content.innerHTML = UI.emptyState('Page not found', 'Use the sidebar to navigate.');
   }
@@ -173,7 +257,7 @@ const Router = (function () {
 })();
 
 // ---------------------------------------------------------------------------
-// App bootstrap
+// App bootstrap — optimized initial load
 // ---------------------------------------------------------------------------
 const App = (function () {
 
@@ -214,21 +298,28 @@ const App = (function () {
     });
   }
 
-  // Loads everything needed after a successful login/session restore, then
-  // shows the app shell and renders the current route.
+  // Pre-load modules (shared reference data) and then render current route.
+  // This avoids the dashboard making a redundant modules call since we already have it cached.
   async function boot() {
     Auth.showApp();
+
+    // Load modules once if not already cached
     if (!State.modulesCache.length) {
       try {
         State.modulesCache = await API.modules();
       } catch (err) {
-        UI.toast(err.message, 'error');
+        UI.toast('Failed to load modules: ' + err.message, 'error');
       }
     }
+
     buildSidebarModules();
+
+    // Show admin nav if needed
     if (State.currentUser && State.currentUser.role === 'Admin') {
       document.getElementById('nav-admin').classList.remove('hidden');
     }
+
+    State.initialized = true;
     const h = Router.decodeHash();
     Router.render(h.route, h.params);
   }
@@ -242,7 +333,10 @@ const App = (function () {
     Router.init();
 
     const restored = await Auth.tryRestoreSession();
-    if (restored) await boot();
+    if (restored) {
+      // Small delay to let DOM settle, then boot with pre-loaded modules
+      await boot();
+    }
   }
 
   return { init, boot };

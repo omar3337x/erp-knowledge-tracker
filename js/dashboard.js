@@ -1,12 +1,21 @@
 /**
- * js/dashboard.js
- * Renders the main Dashboard: KPI row, module gauge cards, review summary.
+ * js/dashboard.js — Optimized with skeleton loading and pre-cached data.
  */
 
 const Dashboard = (function () {
 
   async function render(container) {
-    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading dashboard...</div>`;
+    // Show skeleton while loading
+    container.innerHTML = `
+      <div class="grid grid-kpi" style="margin-bottom:24px;">
+        ${UI.skeletonCards(9)}
+      </div>
+      <h2 style="margin-bottom:14px;">Modules</h2>
+      <div class="grid grid-modules">
+        ${UI.skeletonModuleCards(5)}
+      </div>
+    `;
+
     let data;
     try {
       data = await API.dashboard();
