@@ -117,7 +117,7 @@ const State = {
 };
 
 const REF_CACHE_KEY = 'erp_tracker_ref_cache_v1';
-const REF_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 h — reference data changes rarely
+const REF_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min TTL — auto expires quickly if DB is modified externally
 
 const DEFAULT_MODULES = [
   { id: 'MOD-1', name_en: 'Inventory', name_ar: 'المخزون' },
@@ -315,6 +315,44 @@ const App = (function () {
     document.getElementById('theme-toggle').addEventListener('click', () => {
       const next = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
       UI.applyTheme(next);
+    });
+
+    const globalSyncBtn = document.getElementById('global-sync-btn');
+    if (globalSyncBtn) {
+      globalSyncBtn.addEventListener('click', async () => {
+        globalSyncBtn.disabled = true;
+        globalSyncBtn.style.transform = 'rotate(360deg)';
+        globalSyncBtn.style.transition = 'transform 0.5s ease';
+
+        invalidateReferenceCache();
+        API.cacheBustAll();
+
+        UI.toast(I18n.getLang() === 'ar' ? 'جاري مزامنة الداتا بيز بالكامل...' : 'Syncing database...', 'info');
+
+        try {
+          await loadReferenceData();
+          buildSidebarModules();
+          Router.reload();
+          UI.toast(I18n.getLang() === 'ar' ? 'تمت مزامنة الداتا بيز بنجاح' : 'Database synced successfully', 'success');
+        } catch (err) {
+          UI.toastError(err);
+        } finally {
+          globalSyncBtn.disabled = false;
+          globalSyncBtn.style.transform = 'none';
+        }
+      });
+    }
+
+    // Auto-sync when user returns from editing Google Sheets in another tab
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && API.getToken()) {
+        invalidateReferenceCache();
+        API.cacheBustAll();
+        loadReferenceData().then(() => {
+          buildSidebarModules();
+          Router.reload();
+        }).catch(() => {});
+      }
     });
 
     document.getElementById('quick-add-btn').addEventListener('click', () => {
