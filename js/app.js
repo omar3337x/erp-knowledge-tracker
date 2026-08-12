@@ -117,34 +117,40 @@ const State = {
 };
 
 const REF_CACHE_KEY = 'erp_tracker_ref_cache_v1';
-const REF_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12h — reference data changes rarely
+const REF_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 h — reference data changes rarely
 
-// Loads Modules + ALL Categories in parallel, ONCE per browser session,
-// with a localStorage cache so a page refresh doesn't even hit the backend
-// for this near-static reference data until the cache goes stale.
+/**
+ * Loads Modules + ALL Categories in parallel.
+ * Uses a localStorage layer (12 h TTL) as the outermost cache so a hard
+ * refresh or new tab still feels instant. The in-memory API cache handles
+ * all navigations within the same tab.
+ */
 async function loadReferenceData() {
+  // Fast path: localStorage cache still fresh
   try {
     const raw = localStorage.getItem(REF_CACHE_KEY);
     if (raw) {
       const cached = JSON.parse(raw);
       if (Date.now() - cached.savedAt < REF_CACHE_TTL_MS) {
-        State.modulesCache = cached.modules;
+        State.modulesCache  = cached.modules;
         State.allCategories = cached.categories;
         return;
       }
     }
-  } catch (e) { /* corrupt cache, ignore */ }
+  } catch (e) { /* corrupt cache — fall through to network */ }
 
+  // Slow path: fetch both in parallel
   const [modules, categories] = await Promise.all([API.modules(), API.categories()]);
-  State.modulesCache = modules;
+  State.modulesCache  = modules;
   State.allCategories = categories;
   try {
     localStorage.setItem(REF_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), modules, categories }));
-  } catch (e) { /* storage full/unavailable, non-fatal */ }
+  } catch (e) { /* storage full/unavailable — non-fatal */ }
 }
 
 function invalidateReferenceCache() {
   localStorage.removeItem(REF_CACHE_KEY);
+  API.cacheBust('modules', 'categories');
 }
 
 // ---------------------------------------------------------------------------
@@ -295,9 +301,8 @@ const App = (function () {
     if (State.currentUser && State.currentUser.language && State.currentUser.language !== I18n.getLang()) {
       I18n.setLang(State.currentUser.language);
     }
-    if (!State.modulesCache.length) {
-      try { await loadReferenceData(); } catch (err) { UI.toastError(err); }
-    }
+    // Always ensure reference data is loaded (uses LS + memory cache — fast).
+    try { await loadReferenceData(); } catch (err) { UI.toastError(err); }
     buildSidebarModules();
     if (State.currentUser && State.currentUser.role === 'Admin') {
       document.getElementById('nav-admin').classList.remove('hidden');
@@ -323,8 +328,17 @@ const App = (function () {
     bindLanguageSwitch();
     Router.init();
 
+    // Kick off session restore. While that round-trip is in-flight, also
+    // prefetch reference data speculatively if a token exists — the two
+    // requests run in parallel and the data is ready before boot() is called.
+    const token = API.getToken();
+    const refPrefetch = token ? loadReferenceData().catch(() => {}) : Promise.resolve();
+
     const restored = await Auth.tryRestoreSession();
-    if (restored) await boot();
+    if (restored) {
+      await refPrefetch; // already resolved if it finished first
+      await boot();
+    }
   }
 
   return { init, boot };

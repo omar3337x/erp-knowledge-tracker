@@ -77,7 +77,10 @@ const Auth = (function () {
   async function logout() {
     try { await API.logout(); } catch (e) { /* ignore */ }
     API.clearToken();
-    State.currentUser = null;
+    API.cacheBustAll();             // wipe in-memory cache
+    State.currentUser  = null;
+    State.modulesCache = [];
+    State.allCategories = [];
     showAuthScreen();
   }
 

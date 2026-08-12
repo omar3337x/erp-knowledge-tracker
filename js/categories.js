@@ -2,12 +2,11 @@
  * js/categories.js
  * Fully dynamic Category management for a Module: list, add, edit, delete
  * (guarded against categories that still have topics), activate/deactivate.
- * Categories are global reference data shared by every user, so mutation
- * is restricted to Admins — everyone can see the list.
  *
- * After any mutation, the shared reference-data cache (modules+categories)
- * is refreshed from the server and the module view re-renders in place —
- * no full page reload.
+ * Performance: after any mutation, only the categories section and the
+ * filter-dropdown are re-rendered in place — no full Router.reload() needed.
+ *
+ * UX: the section is collapsible so it doesn't dominate the screen.
  */
 
 const Categories = (function () {
@@ -17,95 +16,172 @@ const Categories = (function () {
   }
 
   async function refreshCategoriesFromServer() {
+    // Bust the cache so the next call to API.categories() hits the network
+    API.cacheBust('categories');
     const fresh = await API.categories();
     State.allCategories = fresh;
     try {
       const raw = localStorage.getItem(REF_CACHE_KEY);
       const cached = raw ? JSON.parse(raw) : { modules: State.modulesCache };
-      localStorage.setItem(REF_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), modules: cached.modules || State.modulesCache, categories: fresh }));
+      localStorage.setItem(REF_CACHE_KEY, JSON.stringify({
+        savedAt: Date.now(),
+        modules: cached.modules || State.modulesCache,
+        categories: fresh
+      }));
     } catch (e) { /* non-fatal */ }
   }
 
-  function renderSection(container, moduleId, topics) {
+  /**
+   * Renders the categories accordion section.
+   *
+   * @param {Element}  container  - the div that wraps this section
+   * @param {string}   moduleId
+   * @param {Array}    topics     - current topics array (for topic counts)
+   * @param {Function} [onCategoryChange]
+   *          Called after any mutation so the parent view can refresh
+   *          the filter dropdown and re-filter the topics table without
+   *          doing a full Router.reload().
+   */
+  function renderSection(container, moduleId, topics, onCategoryChange) {
     const categories = State.categoriesForModule(moduleId, { includeInactive: true });
     const countFor = (catId) => topics.filter(t => t.category_id === catId).length;
 
-    container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-        <h2>${I18n.t('module.categoriesSection')}</h2>
-        ${isAdmin() ? `<button class="btn btn-sm btn-primary" id="add-category-btn">${I18n.t('module.addCategory')}</button>` : ''}
-      </div>
-      <p class="field-hint" style="margin-bottom:12px;">${I18n.t('module.manageCategoriesHint')}</p>
+    // Persist open/close state across re-renders
+    const PREF_KEY = `cat_section_open_${moduleId}`;
+    const isOpen = sessionStorage.getItem(PREF_KEY) !== 'false'; // default open
 
-      ${categories.length ? `
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>${I18n.t('table.category')}</th>
-              <th>${I18n.t('common.description')}</th>
-              <th>${I18n.t('table.topicsCount')}</th>
-              <th>${I18n.t('common.status')}</th>
-              ${isAdmin() ? `<th>${I18n.t('common.actions')}</th>` : ''}
-            </tr></thead>
-            <tbody>
-              ${categories.map(c => `
-                <tr>
-                  <td><strong>${Topics.escapeHtml(I18n.localizedName(c))}</strong></td>
-                  <td>${Topics.escapeHtml(c.description || '—')}</td>
-                  <td class="mono">${countFor(c.id)}</td>
-                  <td><span class="badge ${(c.active === true || c.active === 'TRUE') ? 'badge-status-mastered' : 'badge-status-not-started'}">
-                    ${(c.active === true || c.active === 'TRUE') ? I18n.t('categories.active') : I18n.t('categories.inactive')}
-                  </span></td>
-                  ${isAdmin() ? `
-                  <td style="display:flex; gap:6px; flex-wrap:wrap;">
-                    <button class="btn btn-sm" data-edit="${c.id}">${I18n.t('common.edit')}</button>
-                    <button class="btn btn-sm" data-toggle="${c.id}">${(c.active === true || c.active === 'TRUE') ? I18n.t('common.deactivate') : I18n.t('common.activate')}</button>
-                    <button class="btn btn-sm btn-danger" data-delete="${c.id}">${I18n.t('common.delete')}</button>
-                  </td>` : ''}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+    container.innerHTML = `
+      <div class="cat-section-header" id="cat-section-toggle" role="button" tabindex="0"
+           aria-expanded="${isOpen}" style="display:flex; align-items:center; justify-content:space-between;
+           cursor:pointer; padding:10px 0; margin-bottom:0; user-select:none;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="cat-chevron" style="display:inline-block; transition:transform .2s; transform:rotate(${isOpen ? 0 : -90}deg);">&#9660;</span>
+          <h2 style="margin:0; font-size:16px;">${I18n.t('module.categoriesSection')}</h2>
+          <span class="badge badge-status-not-started" style="font-size:11px;">${categories.length}</span>
         </div>
-      ` : `<p class="field-hint">${I18n.t('categories.noCategories')}</p>`}
+        ${isAdmin() ? `<button class="btn btn-sm btn-primary" id="add-category-btn" style="flex-shrink:0;"
+          onclick="event.stopPropagation();">${I18n.t('module.addCategory')}</button>` : ''}
+      </div>
+
+      <div id="cat-section-body" style="display:${isOpen ? 'block' : 'none'}; margin-top:8px;">
+        <p class="field-hint" style="margin-bottom:12px;">${I18n.t('module.manageCategoriesHint')}</p>
+
+        ${categories.length ? `
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>${I18n.t('table.category')}</th>
+                <th>${I18n.t('common.description')}</th>
+                <th>${I18n.t('table.topicsCount')}</th>
+                <th>${I18n.t('common.status')}</th>
+                ${isAdmin() ? `<th>${I18n.t('common.actions')}</th>` : ''}
+              </tr></thead>
+              <tbody>
+                ${categories.map(c => `
+                  <tr>
+                    <td><strong>${Topics.escapeHtml(I18n.localizedName(c))}</strong></td>
+                    <td>${Topics.escapeHtml(c.description || '—')}</td>
+                    <td class="mono">${countFor(c.id)}</td>
+                    <td><span class="badge ${(c.active === true || c.active === 'TRUE') ? 'badge-status-mastered' : 'badge-status-not-started'}">
+                      ${(c.active === true || c.active === 'TRUE') ? I18n.t('categories.active') : I18n.t('categories.inactive')}
+                    </span></td>
+                    ${isAdmin() ? `
+                    <td style="display:flex; gap:6px; flex-wrap:wrap;">
+                      <button class="btn btn-sm" data-edit="${c.id}">${I18n.t('common.edit')}</button>
+                      <button class="btn btn-sm" data-toggle="${c.id}">${(c.active === true || c.active === 'TRUE') ? I18n.t('common.deactivate') : I18n.t('common.activate')}</button>
+                      <button class="btn btn-sm btn-danger" data-delete="${c.id}">${I18n.t('common.delete')}</button>
+                    </td>` : ''}
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : `<p class="field-hint">${I18n.t('categories.noCategories')}</p>`}
+      </div>
     `;
 
-    if (!isAdmin()) return; // read-only for non-admins, nothing more to bind
+    // Toggle collapse
+    const header = container.querySelector('#cat-section-toggle');
+    const body   = container.querySelector('#cat-section-body');
+    const chevron = container.querySelector('.cat-chevron');
+    const toggle = () => {
+      const open = body.style.display === 'none';
+      body.style.display  = open ? 'block' : 'none';
+      chevron.style.transform = open ? 'rotate(0deg)' : 'rotate(-90deg)';
+      header.setAttribute('aria-expanded', String(open));
+      sessionStorage.setItem(PREF_KEY, String(open));
+    };
+    header.addEventListener('click', toggle);
+    header.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
 
-    container.querySelector('#add-category-btn').addEventListener('click', () => openFormModal(moduleId));
-    container.querySelectorAll('[data-edit]').forEach(btn => {
-      btn.addEventListener('click', () => openFormModal(moduleId, categories.find(c => c.id === btn.dataset.edit)));
+    if (!isAdmin()) return;
+
+    // Add category
+    container.querySelector('#add-category-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFormModal(moduleId, null, () => {
+        _rebuildSection(container, moduleId, topics, onCategoryChange);
+        if (onCategoryChange) onCategoryChange();
+      });
     });
+
+    // Edit
+    container.querySelectorAll('[data-edit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cat = categories.find(c => c.id === btn.dataset.edit);
+        openFormModal(moduleId, cat, () => {
+          _rebuildSection(container, moduleId, topics, onCategoryChange);
+          if (onCategoryChange) onCategoryChange();
+        });
+      });
+    });
+
+    // Toggle active/inactive
     container.querySelectorAll('[data-toggle]').forEach(btn => {
       btn.addEventListener('click', async () => {
+        btn.disabled = true;
         try {
           await API.toggleCategoryStatus(btn.dataset.toggle);
           UI.toast(I18n.t('categories.statusUpdated'), 'success');
           await refreshCategoriesFromServer();
-          Router.reload();
-        } catch (err) { UI.toastError(err); }
+          _rebuildSection(container, moduleId, topics, onCategoryChange);
+          if (onCategoryChange) onCategoryChange();
+        } catch (err) {
+          UI.toastError(err);
+          btn.disabled = false;
+        }
       });
     });
+
+    // Delete
     container.querySelectorAll('[data-delete]').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm(I18n.t('categories.confirmDelete'))) return;
+        btn.disabled = true;
         try {
           await API.deleteCategory(btn.dataset.delete);
           UI.toast(I18n.t('categories.deleted'), 'success');
           await refreshCategoriesFromServer();
-          Router.reload();
+          _rebuildSection(container, moduleId, topics, onCategoryChange);
+          if (onCategoryChange) onCategoryChange();
         } catch (err) {
           if (err.code === 'CATEGORY_HAS_TOPICS') {
             UI.toast(`${I18n.errorMessage(err)} ${I18n.t('categories.deactivateInstead')}`, 'error');
           } else {
             UI.toastError(err);
           }
+          btn.disabled = false;
         }
       });
     });
   }
 
-  function openFormModal(moduleId, existing) {
+  // Re-render only the category section in place (no full reload)
+  function _rebuildSection(container, moduleId, topics, onCategoryChange) {
+    renderSection(container, moduleId, topics, onCategoryChange);
+  }
+
+  function openFormModal(moduleId, existing, onSaved) {
     const isEdit = !!existing;
     const body = `
       <div class="modal-head">
@@ -139,7 +215,7 @@ const Categories = (function () {
       const payload = Object.fromEntries(fd.entries());
       payload.active = modal.querySelector('#cat-active').checked;
       if (!isEdit) payload.module_id = moduleId;
-      else payload.id = existing.id;
+      else         payload.id = existing.id;
 
       const btn = e.target.querySelector('button[type="submit"]');
       btn.disabled = true;
@@ -153,10 +229,9 @@ const Categories = (function () {
         }
         await refreshCategoriesFromServer();
         UI.closeModal();
-        Router.reload();
+        if (onSaved) onSaved();
       } catch (err) {
         UI.toastError(err);
-      } finally {
         btn.disabled = false;
       }
     });
