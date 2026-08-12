@@ -53,6 +53,8 @@ const API = (function () {
     dashboard      : 3  * 60 * 1000,
     analytics      : 10 * 60 * 1000,
     adminUsers     : 3  * 60 * 1000,
+    notes          : 5  * 60 * 1000,
+    note           : 5  * 60 * 1000,
   };
   function memGet(key) {
     const e = _mem.get(key);
@@ -67,12 +69,13 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   /* localStorage cache (survives page refresh)                         */
   /* ------------------------------------------------------------------ */
-  const LS_ACTIONS = new Set(['topics', 'reviews', 'dashboard', 'analytics']);
+  const LS_ACTIONS = new Set(['topics', 'reviews', 'dashboard', 'analytics', 'notes']);
   const LS_TTL = {
     topics   : 10 * 60 * 1000,
     reviews  : 10 * 60 * 1000,
     dashboard:  5 * 60 * 1000,
     analytics: 15 * 60 * 1000,
+    notes    : 10 * 60 * 1000,
   };
   const LS_PREFIX = 'erp_api_v2:';
 
@@ -198,7 +201,7 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   const READ_ACTIONS = new Set([
     'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
-    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers'
+    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note'
   ]);
 
   async function call(action, payload) {
@@ -291,6 +294,13 @@ const API = (function () {
     // Knowledge
     knowledge    : (topicId) => call('knowledge', { topic_id: topicId }),
     saveKnowledge: async (p) => { const r = await rawCall('saveKnowledge', p); cacheBust('knowledge', 'topic'); return r; },
+
+    // Notes
+    notes     : (moduleId, search) => call('notes', { module_id: moduleId || '', search: search || '' }),
+    note      : (id) => call('note', { id }),
+    createNote: async (p) => { const r = await rawCall('createNote', p); cacheBust('notes'); return r; },
+    updateNote: async (p) => { const r = await rawCall('updateNote', p); cacheBust('notes', 'note'); return r; },
+    deleteNote: async (id) => { const r = await rawCall('deleteNote', { id }); cacheBust('notes', 'note'); return r; },
 
     // Reviews
     reviews  : (topicId) => call('reviews', topicId ? { topic_id: topicId } : {}),

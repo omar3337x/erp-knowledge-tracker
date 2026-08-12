@@ -70,6 +70,8 @@ const Modules = (function () {
 
       <div id="topics-table-wrap"></div>
 
+      <div id="notes-section-wrap-module"></div>
+
       <div id="categories-section-wrap" style="margin-top:32px;"></div>
     `;
 
@@ -96,6 +98,10 @@ const Modules = (function () {
         Router.go('module', { id: moduleId });
       });
     });
+
+    // ---- notes section ----
+    const notesWrap = container.querySelector('#notes-section-wrap-module');
+    Notes.renderSection(notesWrap, moduleId);
 
     // ---- categories section ----
     const catWrap = container.querySelector('#categories-section-wrap');

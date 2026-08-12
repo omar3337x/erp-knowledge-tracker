@@ -125,6 +125,19 @@ const I18N_DICT = {
       deleted: 'Category deleted.', statusUpdated: 'Category status updated.', noCategories: 'No categories in this module yet.'
     },
 
+    notes: {
+      title: 'Module Notes', notesSection: 'Notes', addNote: '+ Add Note', editNote: 'Edit Note', deleteNote: 'Delete Note', viewNote: 'View Note',
+      noteTitle: 'Note Title', sectionName: 'Section Name', content: 'Note Content',
+      noteTitlePlaceholder: 'e.g. Stock Valuation Summary', sectionNamePlaceholder: 'e.g. Sales Cycle, Inventory Settings',
+      contentPlaceholder: 'Write your note here...', searchPlaceholder: 'Search notes by title, section, or content...',
+      noNotes: 'No notes in this module yet.', addFirstNote: 'Add your first note to capture key knowledge for this module.',
+      noSearchResults: 'No notes match your search criteria.',
+      confirmDelete: 'Are you sure you want to delete this note? This cannot be undone.',
+      created: 'Note saved successfully.', updated: 'Note updated successfully.', deleted: 'Note deleted successfully.',
+      createdAt: 'Created', updatedAt: 'Updated', uncategorized: 'General Notes',
+      view: 'View', edit: 'Edit', delete: 'Delete', search: 'Search Notes'
+    },
+
     empty: {
       noKnowledgeGaps: 'No knowledge gaps yet.', startAdding: 'Start by adding the first topic you want to learn.',
       noOpenGaps: 'No open knowledge gaps right now — nice work.', tryDifferentSearch: 'Try a different search term.'
@@ -134,10 +147,12 @@ const I18N_DICT = {
       loginSuccessful: 'Login successful', topicAdded: 'Topic added successfully', topicDeleted: 'Topic deleted',
       statusUpdated: 'Status updated', progressUpdated: 'Progress updated', knowledgeUpdated: 'Knowledge updated successfully',
       reviewCompleted: 'Review completed', profileUpdated: 'Profile updated successfully', passwordChanged: 'Password changed successfully',
-      accountCreated: 'Account created. Logging you in...'
+      accountCreated: 'Account created. Logging you in...', noteSaved: 'Note saved successfully', noteUpdated: 'Note updated successfully',
+      noteDeleted: 'Note deleted'
     },
 
     errors: {
+      NOTE_NOT_FOUND: 'Note not found.', NOTE_FIELDS_REQUIRED: 'Title and content are required.',
       SESSION_EXPIRED: 'Session expired. Please log in again.', ACCOUNT_DISABLED: 'Account is not active.',
       REQUIRED_FIELDS: 'All fields are required.', PASSWORDS_MISMATCH: 'Passwords do not match.',
       WEAK_PASSWORD: 'Password must be at least 8 characters.', INVALID_EMAIL: 'Invalid email address.',
@@ -270,6 +285,19 @@ const I18N_DICT = {
       deleted: 'تم حذف الفئة.', statusUpdated: 'تم تحديث حالة الفئة.', noCategories: 'لا توجد فئات في هذا الموديول بعد.'
     },
 
+    notes: {
+      title: 'ملاحظات الموديول', notesSection: 'الملاحظات', addNote: '+ إضافة ملاحظة', editNote: 'تعديل الملاحظة', deleteNote: 'حذف الملاحظة', viewNote: 'عرض الملاحظة',
+      noteTitle: 'عنوان الملاحظة', sectionName: 'اسم القسم', content: 'محتوى الملاحظة',
+      noteTitlePlaceholder: 'مثال: ملخص تقييم المخزون', sectionNamePlaceholder: 'مثال: دورة المبيعات، إعدادات المخزون',
+      contentPlaceholder: 'اكتب ملاحظتك هنا...', searchPlaceholder: 'بحث في الملاحظات بالعنوان أو القسم أو المحتوى...',
+      noNotes: 'لا توجد ملاحظات لهذا الموديول بعد.', addFirstNote: 'أضف أول ملاحظة لتسجيل المعرفة المهمة لهذا الموديول.',
+      noSearchResults: 'لا توجد ملاحظات تطابق معايير البحث.',
+      confirmDelete: 'هل أنت تأكد من رغبتك في حذف هذه الملاحظة؟ لا يمكن التراجع عن هذا الإجراء.',
+      created: 'تم حفظ الملاحظة بنجاح.', updated: 'تم تحديث الملاحظة بنجاح.', deleted: 'تم حذف الملاحظة بنجاح.',
+      createdAt: 'تاريخ الإنشاء', updatedAt: 'تاريخ التحديث', uncategorized: 'ملاحظات عامة',
+      view: 'عرض', edit: 'تعديل', delete: 'حذف', search: 'بحث الملاحظات'
+    },
+
     empty: {
       noKnowledgeGaps: 'لا توجد فجوات معرفية بعد.', startAdding: 'ابدأ بإضافة أول موضوع تريد تعلّمه.',
       noOpenGaps: 'لا توجد فجوات معرفية مفتوحة حالياً — عمل رائع.', tryDifferentSearch: 'جرّب كلمة بحث مختلفة.'
@@ -279,10 +307,12 @@ const I18N_DICT = {
       loginSuccessful: 'تم تسجيل الدخول بنجاح', topicAdded: 'تمت إضافة الموضوع بنجاح', topicDeleted: 'تم حذف الموضوع',
       statusUpdated: 'تم تحديث الحالة', progressUpdated: 'تم تحديث التقدم', knowledgeUpdated: 'تم تحديث المعرفة بنجاح',
       reviewCompleted: 'تمت المراجعة بنجاح', profileUpdated: 'تم تحديث الملف الشخصي بنجاح', passwordChanged: 'تم تغيير كلمة المرور بنجاح',
-      accountCreated: 'تم إنشاء الحساب. جاري تسجيل الدخول...'
+      accountCreated: 'تم إنشاء الحساب. جاري تسجيل الدخول...', noteSaved: 'تم حفظ الملاحظة بنجاح', noteUpdated: 'تم تحديث الملاحظة بنجاح',
+      noteDeleted: 'تم حذف الملاحظة'
     },
 
     errors: {
+      NOTE_NOT_FOUND: 'الملاحظة غير موجودة.', NOTE_FIELDS_REQUIRED: 'العنوان والمحتوى مطلوبان.',
       SESSION_EXPIRED: 'انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.', ACCOUNT_DISABLED: 'الحساب غير مفعّل.',
       REQUIRED_FIELDS: 'جميع الحقول مطلوبة.', PASSWORDS_MISMATCH: 'كلمتا المرور غير متطابقتين.',
       WEAK_PASSWORD: 'يجب أن تتكون كلمة المرور من ٨ أحرف على الأقل.', INVALID_EMAIL: 'البريد الإلكتروني غير صالح.',
