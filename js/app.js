@@ -323,6 +323,14 @@ const App = (function () {
     const savedTheme = localStorage.getItem('erp_tracker_theme') || 'light';
     UI.applyTheme(savedTheme);
 
+    // ── RADICAL SPEED FIX ──────────────────────────────────────────────
+    // Fire a warmup ping to GAS immediately — before Auth.init() even runs.
+    // GAS cold start takes ~14s. The user spends ~10-30s on the login screen
+    // typing credentials. By the time they click "Login", GAS is already warm
+    // and their first real request responds in 1-2s instead of 14s.
+    API.warmup();
+    // ──────────────────────────────────────────────────────────────────
+
     Auth.init();
     bindStaticNav();
     bindLanguageSwitch();

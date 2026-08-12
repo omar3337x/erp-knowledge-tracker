@@ -30,22 +30,40 @@ const Auth = (function () {
     const errEl = document.getElementById('login-error');
     errEl.textContent = '';
     const btn = e.target.querySelector('button[type="submit"]');
+    const origText = btn.textContent;
     btn.disabled = true;
+
+    // Animated status so the user knows something is happening during cold start
+    const statusMsgs = [
+      I18n.t('auth.loginButton'),
+      '⏳ ' + (I18n.getLang() === 'ar' ? 'جاري الاتصال...' : 'Connecting...'),
+      '⏳ ' + (I18n.getLang() === 'ar' ? 'جاري التحقق...' : 'Authenticating...'),
+      '⏳ ' + (I18n.getLang() === 'ar' ? 'تحضير البيانات...' : 'Loading data...'),
+    ];
+    let msgIdx = 0;
+    const statusInterval = setInterval(() => {
+      msgIdx = (msgIdx + 1) % statusMsgs.length;
+      btn.textContent = statusMsgs[msgIdx];
+    }, 3000);
+
     try {
       const data = await API.login({
         identifier: document.getElementById('login-identifier').value.trim(),
         password: document.getElementById('login-password').value,
         remember_me: document.getElementById('login-remember').checked
       });
+      clearInterval(statusInterval);
       API.setToken(data.token);
       State.currentUser = data.user;
       UI.toast(I18n.t('toast.loginSuccessful'), 'success');
       API.startKeepalive();
       await App.boot();
     } catch (err) {
+      clearInterval(statusInterval);
       errEl.textContent = I18n.errorMessage(err);
     } finally {
       btn.disabled = false;
+      btn.textContent = origText;
     }
   }
 

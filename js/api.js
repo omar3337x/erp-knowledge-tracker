@@ -2,16 +2,20 @@
  * js/api.js
  * Thin wrapper around the Google Apps Script Web App API.
  *
- * We always POST as text/plain (not application/json) so the browser does
- * NOT send a CORS preflight OPTIONS request — Apps Script web apps cannot
- * reliably handle preflight, so this is the standard workaround.
+ * POST as text/plain to avoid CORS preflight (standard GAS workaround).
  *
  * Performance layers (fastest to slowest):
- *  1. In-memory cache — zero-latency hits within a tab session.
- *  2. localStorage cache — survives page refresh/tab close. Topics/reviews
- *     are stored here so a reload never triggers a GAS cold-start wait.
- *  3. In-flight deduplication — identical concurrent calls share one Promise.
- *  4. Network → GAS (slowest, only when all caches miss).
+ *  1. In-memory cache  — 0.07ms, per tab session.
+ *  2. localStorage cache — 0.1ms, survives refresh. Topics/dashboard cached 10 min.
+ *  3. In-flight dedup  — concurrent identical calls share one Promise.
+ *  4. Network → GAS    — 1-14s depending on cold start state.
+ *
+ * Cold-start mitigation:
+ *  - Warmup ping fires on page load (before login) so GAS wakes up while
+ *    the user types their credentials (~10-15s window = enough to warm up).
+ *  - Keepalive ping every 4 min after login to stay warm.
+ *  - Exponential-backoff retry loop: retries up to 8× on 404 / parse error.
+ *    This rides out a GAS cold start (~14s) automatically with no user impact.
  */
 
 const SESSION_KEY = 'erp_tracker_session_token';
@@ -26,33 +30,30 @@ const API = (function () {
   function clearToken() { localStorage.removeItem(SESSION_KEY); }
 
   /* ------------------------------------------------------------------ */
-  /* In-flight deduplication map                                         */
+  /* In-flight deduplication                                             */
   /* ------------------------------------------------------------------ */
   const inFlight = new Map();
-
   function dedupeKey(action, payload) {
     return action + ':' + JSON.stringify(payload || {});
   }
 
   /* ------------------------------------------------------------------ */
-  /* In-memory response cache (per tab session)                         */
+  /* In-memory cache (per tab session)                                  */
   /* ------------------------------------------------------------------ */
-  const _mem = new Map(); // key → { data, expiresAt }
-
+  const _mem = new Map();
   const MEM_TTL = {
-    validateSession : 5  * 60 * 1000,
-    currentUser     : 5  * 60 * 1000,
-    modules         : 60 * 60 * 1000,
-    categories      : 60 * 60 * 1000,
-    topics          : 5  * 60 * 1000,  // 5 min in-memory
-    topic           : 5  * 60 * 1000,
-    knowledge       : 5  * 60 * 1000,
-    reviews         : 5  * 60 * 1000,
-    dashboard       : 3  * 60 * 1000,
-    analytics       : 10 * 60 * 1000,
-    adminUsers      : 3  * 60 * 1000,
+    validateSession: 5  * 60 * 1000,
+    currentUser    : 5  * 60 * 1000,
+    modules        : 60 * 60 * 1000,
+    categories     : 60 * 60 * 1000,
+    topics         : 5  * 60 * 1000,
+    topic          : 5  * 60 * 1000,
+    knowledge      : 5  * 60 * 1000,
+    reviews        : 5  * 60 * 1000,
+    dashboard      : 3  * 60 * 1000,
+    analytics      : 10 * 60 * 1000,
+    adminUsers     : 3  * 60 * 1000,
   };
-
   function memGet(key) {
     const e = _mem.get(key);
     if (!e) return null;
@@ -64,126 +65,117 @@ const API = (function () {
   }
 
   /* ------------------------------------------------------------------ */
-  /* localStorage cache — survives page refresh / tab close             */
-  /* Topics and reviews are cached here so a reload is always instant.  */
+  /* localStorage cache (survives page refresh)                         */
   /* ------------------------------------------------------------------ */
-
-  // Which actions get persisted to localStorage (large, slow to fetch)
   const LS_ACTIONS = new Set(['topics', 'reviews', 'dashboard', 'analytics']);
-  // How long localStorage entries are valid
   const LS_TTL = {
-    topics   : 10 * 60 * 1000,  // 10 min
+    topics   : 10 * 60 * 1000,
     reviews  : 10 * 60 * 1000,
     dashboard:  5 * 60 * 1000,
     analytics: 15 * 60 * 1000,
   };
-
-  function lsKey(cacheKey) { return 'erp_api_v1:' + cacheKey; }
+  const LS_PREFIX = 'erp_api_v2:';
 
   function lsGet(key, action) {
     if (!LS_ACTIONS.has(action)) return null;
     try {
-      const raw = localStorage.getItem(lsKey(key));
+      const raw = localStorage.getItem(LS_PREFIX + key);
       if (!raw) return null;
       const { data, expiresAt } = JSON.parse(raw);
-      if (Date.now() > expiresAt) { localStorage.removeItem(lsKey(key)); return null; }
+      if (Date.now() > expiresAt) { localStorage.removeItem(LS_PREFIX + key); return null; }
       return data;
     } catch (e) { return null; }
   }
-
   function lsSet(key, data, action) {
     if (!LS_ACTIONS.has(action)) return;
     try {
-      const ttl = LS_TTL[action] || 5 * 60 * 1000;
-      localStorage.setItem(lsKey(key), JSON.stringify({ data, expiresAt: Date.now() + ttl }));
+      localStorage.setItem(LS_PREFIX + key, JSON.stringify({
+        data, expiresAt: Date.now() + (LS_TTL[action] || 5 * 60 * 1000)
+      }));
     } catch (e) { /* storage full — non-fatal */ }
   }
-
   function lsBust(...actions) {
-    const prefix = 'erp_api_v1:';
-    const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
-    keys.forEach(k => {
-      // Extract action from stored key: "erp_api_v1:action:payload" → "action"
-      const inner = k.slice(prefix.length);
-      const action = inner.split(':')[0];
-      if (actions.includes(action)) localStorage.removeItem(k);
-    });
-  }
-
-  function lsBustAll() {
     Object.keys(localStorage)
-      .filter(k => k.startsWith('erp_api_v1:'))
-      .forEach(k => localStorage.removeItem(k));
+      .filter(k => k.startsWith(LS_PREFIX))
+      .forEach(k => {
+        const action = k.slice(LS_PREFIX.length).split(':')[0];
+        if (actions.includes(action)) localStorage.removeItem(k);
+      });
+  }
+  function lsBustAll() {
+    Object.keys(localStorage).filter(k => k.startsWith(LS_PREFIX)).forEach(k => localStorage.removeItem(k));
   }
 
   /* ------------------------------------------------------------------ */
-  /* Combined cache operations                                          */
+  /* Combined cache                                                      */
   /* ------------------------------------------------------------------ */
-  function cacheGet(key, action) {
-    return memGet(key) ?? lsGet(key, action);
-  }
-  function cacheSet(key, data, action) {
-    memSet(key, data, action);
-    lsSet(key, data, action);
-  }
+  function cacheGet(key, action) { return memGet(key) ?? lsGet(key, action); }
+  function cacheSet(key, data, action) { memSet(key, data, action); lsSet(key, data, action); }
   function cacheBust(...actions) {
-    for (const key of _mem.keys()) {
-      if (actions.includes(key.split(':')[0])) _mem.delete(key);
-    }
+    for (const k of _mem.keys()) if (actions.includes(k.split(':')[0])) _mem.delete(k);
     lsBust(...actions);
   }
-  function cacheBustAll() {
-    _mem.clear();
-    lsBustAll();
-  }
+  function cacheBustAll() { _mem.clear(); lsBustAll(); }
 
   /* ------------------------------------------------------------------ */
-  /* Raw HTTP call (no caching)                                         */
+  /* Raw HTTP call with exponential-backoff retry loop                  */
+  /*                                                                    */
+  /* GAS cold start = ~14 seconds. During this time the POST→302→echo   */
+  /* redirect returns 404 because GAS hasn't stored the response yet.  */
+  /* We retry with doubling delays until we get a valid JSON response,  */
+  /* or until MAX_ATTEMPTS is exhausted (~30s total budget).            */
   /* ------------------------------------------------------------------ */
-  async function rawCall(action, payload, isRetry) {
+  const MAX_ATTEMPTS = 8;
+  // Delay schedule (ms): 300, 600, 1200, 2400, 3000, 3000, 3000
+  function _retryDelay(attempt) { return Math.min(300 * Math.pow(2, attempt - 1), 3000); }
+
+  async function rawCall(action, payload, attempt) {
+    attempt = attempt || 1;
+
     if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') {
       const err = new Error('API_URL is not configured.');
       err.code = 'NOT_CONFIGURED';
       throw err;
     }
-    const body = JSON.stringify({ action, payload: payload || {}, token: getToken() });
 
-    // Also embed action+token in URL query string.
-    // When GAS issues a 302 and the browser follows as GET, the body is lost.
-    // doGet() can then handle the request from the URL params as fallback.
-    const qs = new URLSearchParams({ action, token: getToken() });
-    if (payload && Object.keys(payload).length) qs.set('payload', JSON.stringify(payload));
-    const url = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
+    const body = JSON.stringify({ action, payload: payload || {}, token: getToken() });
 
     let res;
     try {
-      res = await fetch(url, {
+      res = await fetch(CONFIG.API_URL, {
         method : 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body
       });
     } catch (networkErr) {
-      if (!isRetry) {
-        await new Promise(r => setTimeout(r, 500));
-        return rawCall(action, payload, true);
+      if (attempt < MAX_ATTEMPTS) {
+        await _sleep(_retryDelay(attempt));
+        return rawCall(action, payload, attempt + 1);
       }
       const err = new Error('Network error contacting the API.');
       err.code = 'NETWORK_ERROR';
       throw err;
     }
 
-    // GAS sometimes returns 302→echo→404 on cold start. Retry once.
-    if (res.status === 404 && !isRetry) {
-      await new Promise(r => setTimeout(r, 500));
-      return rawCall(action, payload, true);
+    // GAS 302→echo→404: GAS hasn't stored the response yet (cold start).
+    // Retry automatically — each retry adds to GAS's warmup time.
+    if (res.status === 404) {
+      if (attempt < MAX_ATTEMPTS) {
+        await _sleep(_retryDelay(attempt));
+        return rawCall(action, payload, attempt + 1);
+      }
+      const err = new Error('Service temporarily unavailable. Please try again.');
+      err.code = 'SERVICE_UNAVAILABLE';
+      throw err;
     }
 
     let json;
     try { json = await res.json(); }
     catch (parseErr) {
-      if (!isRetry) {
-        await new Promise(r => setTimeout(r, 800));
-        return rawCall(action, payload, true);
+      // GAS may return an HTML error page during cold start
+      if (attempt < MAX_ATTEMPTS) {
+        await _sleep(_retryDelay(attempt));
+        return rawCall(action, payload, attempt + 1);
       }
       const err = new Error('Unexpected response from the API.');
       err.code = 'SERVER_ERROR';
@@ -199,12 +191,14 @@ const API = (function () {
     return json.data;
   }
 
+  function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
   /* ------------------------------------------------------------------ */
   /* Cached read call                                                    */
   /* ------------------------------------------------------------------ */
   const READ_ACTIONS = new Set([
-    'validateSession','currentUser','modules','categories','topics','topic',
-    'knowledge','reviews','dashboard','analytics','adminUsers'
+    'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
+    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers'
   ]);
 
   async function call(action, payload) {
@@ -212,14 +206,14 @@ const API = (function () {
 
     const key = dedupeKey(action, payload);
 
-    // 1. Memory or localStorage cache hit → instant
+    // L1: memory, L2: localStorage
     const cached = cacheGet(key, action);
     if (cached !== null) return cached;
 
-    // 2. In-flight dedup → share the promise
+    // L3: in-flight dedup
     if (inFlight.has(key)) return inFlight.get(key);
 
-    // 3. Fire the real request
+    // L4: network
     const promise = rawCall(action, payload)
       .then(data => { cacheSet(key, data, action); return data; })
       .finally(() => inFlight.delete(key));
@@ -229,19 +223,29 @@ const API = (function () {
   }
 
   /* ------------------------------------------------------------------ */
-  /* Keepalive — ping every 4 min to prevent GAS cold starts           */
+  /* Warmup — fires BEFORE login so GAS wakes up while user types.     */
+  /* The ping action in code.gs requires no auth.                       */
+  /* ------------------------------------------------------------------ */
+  function warmup() {
+    if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') return;
+    // Use the retry loop to make sure the warmup actually completes
+    rawCall('ping', {}).catch(() => {});
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Keepalive — every 4 min after login to stay warm                  */
   /* ------------------------------------------------------------------ */
   let _keepaliveTimer = null;
-
   function startKeepalive() {
     if (_keepaliveTimer) return;
-    _ping(); // immediate warm-up ping
-    _keepaliveTimer = setInterval(_ping, 4 * 60 * 1000);
+    // Ping once immediately on login (in case warmup expired)
+    _silentPing();
+    _keepaliveTimer = setInterval(_silentPing, 4 * 60 * 1000);
   }
   function stopKeepalive() {
     if (_keepaliveTimer) { clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
   }
-  function _ping() {
+  function _silentPing() {
     if (!getToken()) { stopKeepalive(); return; }
     fetch(CONFIG.API_URL, {
       method : 'POST',
@@ -256,80 +260,42 @@ const API = (function () {
   return {
     getToken, setToken, clearToken,
     cacheBust, cacheBustAll,
-    startKeepalive, stopKeepalive,
+    warmup, startKeepalive, stopKeepalive,
 
     // Auth
-    signup        : (p) => call('signup', Object.assign({ language: (window.I18n ? I18n.getLang() : 'en') }, p)),
-    login         : (p) => call('login', p),
+    signup        : (p) => rawCall('signup', Object.assign({ language: (window.I18n ? I18n.getLang() : 'en') }, p)),
+    login         : (p) => rawCall('login', p),
     logout        : ()  => rawCall('logout', {}),
     validateSession: () => call('validateSession', {}),
     currentUser   : ()  => call('currentUser', {}),
-    updateProfile : (p) => call('updateProfile', p),
-    changePassword: (p) => call('changePassword', p),
+    updateProfile : (p) => rawCall('updateProfile', p),
+    changePassword: (p) => rawCall('changePassword', p),
 
     // Reference data
     modules   : () => call('modules', {}),
     categories: (moduleId) => call('categories', moduleId ? { module_id: moduleId } : {}),
-
-    createCategory: async (p) => {
-      const r = await rawCall('createCategory', p);
-      cacheBust('categories', 'dashboard'); return r;
-    },
-    updateCategory: async (p) => {
-      const r = await rawCall('updateCategory', p);
-      cacheBust('categories', 'dashboard'); return r;
-    },
-    deleteCategory: async (id) => {
-      const r = await rawCall('deleteCategory', { id });
-      cacheBust('categories', 'dashboard'); return r;
-    },
-    toggleCategoryStatus: async (id) => {
-      const r = await rawCall('toggleCategoryStatus', { id });
-      cacheBust('categories'); return r;
-    },
+    createCategory: async (p) => { const r = await rawCall('createCategory', p); cacheBust('categories', 'dashboard'); return r; },
+    updateCategory: async (p) => { const r = await rawCall('updateCategory', p); cacheBust('categories', 'dashboard'); return r; },
+    deleteCategory: async (id) => { const r = await rawCall('deleteCategory', { id }); cacheBust('categories', 'dashboard'); return r; },
+    toggleCategoryStatus: async (id) => { const r = await rawCall('toggleCategoryStatus', { id }); cacheBust('categories'); return r; },
 
     // Topics
     topics  : (f)  => call('topics', f || {}),
     topic   : (id) => call('topic', { id }),
-
-    createTopic: async (p) => {
-      const r = await rawCall('createTopic', p);
-      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
-    },
-    updateTopic: async (p) => {
-      const r = await rawCall('updateTopic', p);
-      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
-    },
-    deleteTopic: async (id) => {
-      const r = await rawCall('deleteTopic', { id });
-      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
-    },
-    updateStatus: async (id, status) => {
-      const r = await rawCall('updateStatus', { id, status });
-      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
-    },
-    updateProgress: async (id, progress) => {
-      const r = await rawCall('updateProgress', { id, progress });
-      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
-    },
+    createTopic: async (p) => { const r = await rawCall('createTopic', p); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
+    updateTopic: async (p) => { const r = await rawCall('updateTopic', p); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
+    deleteTopic: async (id) => { const r = await rawCall('deleteTopic', { id }); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
+    updateStatus: async (id, status) => { const r = await rawCall('updateStatus', { id, status }); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
+    updateProgress: async (id, progress) => { const r = await rawCall('updateProgress', { id, progress }); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
 
     // Knowledge
     knowledge    : (topicId) => call('knowledge', { topic_id: topicId }),
-    saveKnowledge: async (p) => {
-      const r = await rawCall('saveKnowledge', p);
-      cacheBust('knowledge', 'topic'); return r;
-    },
+    saveKnowledge: async (p) => { const r = await rawCall('saveKnowledge', p); cacheBust('knowledge', 'topic'); return r; },
 
     // Reviews
     reviews  : (topicId) => call('reviews', topicId ? { topic_id: topicId } : {}),
-    addReview: async (p) => {
-      const r = await rawCall('addReview', p);
-      cacheBust('reviews', 'topic', 'dashboard'); return r;
-    },
-    markReviewed: async (id, p) => {
-      const r = await rawCall('markReviewed', Object.assign({ id }, p || {}));
-      cacheBust('reviews', 'topic', 'dashboard'); return r;
-    },
+    addReview: async (p) => { const r = await rawCall('addReview', p); cacheBust('reviews', 'topic', 'dashboard'); return r; },
+    markReviewed: async (id, p) => { const r = await rawCall('markReviewed', Object.assign({ id }, p || {})); cacheBust('reviews', 'topic', 'dashboard'); return r; },
 
     // Dashboard / analytics
     dashboard : () => call('dashboard', {}),

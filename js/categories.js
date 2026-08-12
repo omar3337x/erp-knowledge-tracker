@@ -48,7 +48,7 @@ const Categories = (function () {
 
     // Persist open/close state across re-renders
     const PREF_KEY = `cat_section_open_${moduleId}`;
-    const isOpen = sessionStorage.getItem(PREF_KEY) !== 'false'; // default open
+    const isOpen = sessionStorage.getItem(PREF_KEY) === 'true'; // default CLOSED
 
     container.innerHTML = `
       <div class="cat-section-header" id="cat-section-toggle" role="button" tabindex="0"
