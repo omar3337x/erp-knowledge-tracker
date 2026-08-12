@@ -209,7 +209,7 @@ const Categories = (function () {
       </form>
     `;
     const modal = UI.openModal(body);
-    modal.querySelector('#category-form').addEventListener('submit', async (e) => {
+    modal.querySelector('#category-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
       const payload = Object.fromEntries(fd.entries());
@@ -217,23 +217,14 @@ const Categories = (function () {
       if (!isEdit) payload.module_id = moduleId;
       else         payload.id = existing.id;
 
-      const btn = e.target.querySelector('button[type="submit"]');
-      btn.disabled = true;
-      try {
-        if (isEdit) {
-          await API.updateCategory(payload);
-          UI.toast(I18n.t('categories.updated'), 'success');
-        } else {
-          await API.createCategory(payload);
-          UI.toast(I18n.t('categories.created'), 'success');
-        }
-        await refreshCategoriesFromServer();
-        UI.closeModal();
-        if (onSaved) onSaved();
-      } catch (err) {
-        UI.toastError(err);
-        btn.disabled = false;
-      }
+      // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
+      UI.closeModal();
+      UI.toast(I18n.t(isEdit ? 'categories.updated' : 'categories.created'), 'success');
+      if (onSaved) onSaved();
+
+      // ── BACKGROUND API CALL (non-blocking) ────────────────────────────
+      const actionPromise = isEdit ? API.updateCategory(payload) : API.createCategory(payload);
+      actionPromise.then(() => refreshCategoriesFromServer()).catch(err => UI.toastError(err));
     });
   }
 

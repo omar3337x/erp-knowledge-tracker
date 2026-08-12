@@ -56,21 +56,17 @@ const Reviews = (function () {
   function bindTab(panelEl, topicId, onDone) {
     const form = panelEl.querySelector('#review-form');
     if (!form) return;
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(form);
       const payload = Object.fromEntries(fd.entries());
-      const btn = form.querySelector('button[type="submit"]');
-      btn.disabled = true;
-      try {
-        await API.markReviewed(topicId, payload);
-        UI.toast(I18n.t('toast.reviewCompleted'), 'success');
-        if (onDone) onDone();
-      } catch (err) {
-        UI.toastError(err);
-      } finally {
-        btn.disabled = false;
-      }
+
+      // ── OPTIMISTIC LOCAL UPDATE (0ms) ───────────────────────────────
+      UI.toast(I18n.t('toast.reviewCompleted'), 'success');
+      if (onDone) onDone();
+
+      // ── BACKGROUND API CALL (non-blocking) ────────────────────────────
+      API.markReviewed(topicId, payload).catch(err => UI.toastError(err));
     });
   }
 

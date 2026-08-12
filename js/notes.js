@@ -2,9 +2,10 @@
  * js/notes.js
  * Module Notes section renderer + Add, Edit, View, Delete modals + Live Search.
  *
- * Each note is associated with user_id and module_id.
- * Notes are loaded ONLY when opening a module (performance requirement).
- * Notes are grouped and rendered by Section Name.
+ * OPTIMISTIC UI UPDATES:
+ *   All user actions (Add, Edit, Delete) update the local UI and local state
+ *   INSTANTLY (0ms perception), then sync with the Google Apps Script API
+ *   asynchronously in the background.
  */
 
 const Notes = (function () {
@@ -48,7 +49,7 @@ const Notes = (function () {
     const badgeEl = container.querySelector('#notes-count-badge');
 
     addBtn.addEventListener('click', () => {
-      openAddModal(moduleId, () => reloadNotes(listWrap, badgeEl, searchInput.value));
+      openAddModal(moduleId, listWrap, badgeEl, searchInput);
     });
 
     searchInput.addEventListener('input', () => {
@@ -137,23 +138,16 @@ const Notes = (function () {
         const note = _currentNotes.find(n => n.id === noteId);
         if (!note) return;
 
+        const badgeEl = document.querySelector('#notes-count-badge');
+        const searchInput = document.querySelector('#notes-search-input');
+
         if (action === 'view') openViewModal(note);
-        else if (action === 'edit') openEditModal(note, () => {
-          const listWrapEl = document.querySelector('#notes-list-wrap');
-          const badgeEl = document.querySelector('#notes-count-badge');
-          const searchInput = document.querySelector('#notes-search-input');
-          reloadNotes(listWrapEl, badgeEl, searchInput ? searchInput.value : '');
-        });
-        else if (action === 'delete') openDeleteConfirmModal(note, () => {
-          const listWrapEl = document.querySelector('#notes-list-wrap');
-          const badgeEl = document.querySelector('#notes-count-badge');
-          const searchInput = document.querySelector('#notes-search-input');
-          reloadNotes(listWrapEl, badgeEl, searchInput ? searchInput.value : '');
-        });
+        else if (action === 'edit') openEditModal(note, listWrap, badgeEl, searchInput);
+        else if (action === 'delete') openDeleteConfirmModal(note, listWrap, badgeEl, searchInput);
       });
     });
 
-    // Also clicking anywhere on card opens View modal
+    // Clicking anywhere on card opens View modal
     listWrap.querySelectorAll('.note-card').forEach(card => {
       card.addEventListener('click', (e) => {
         if (e.target.closest('.note-action-btn')) return;
@@ -189,10 +183,10 @@ const Notes = (function () {
   }
 
   // --------------------------------------------------------------------
-  // MODALS: Add, Edit, View, Delete Confirmation
+  // MODALS WITH OPTIMISTIC (0ms) UI UPDATES
   // --------------------------------------------------------------------
 
-  function openAddModal(moduleId, onSaved) {
+  function openAddModal(moduleId, listWrap, badgeEl, searchInput) {
     const html = `
       <div class="modal-head">
         <h3>${I18n.t('notes.addNote')}</h3>
@@ -221,7 +215,7 @@ const Notes = (function () {
     UI.openModal(html);
 
     const form = document.getElementById('add-note-form');
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
       const title = form.elements['title'].value.trim();
       const sectionName = form.elements['section_name'].value.trim();
@@ -232,30 +226,50 @@ const Notes = (function () {
         return;
       }
 
-      const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.disabled = true;
-      submitBtn.textContent = I18n.t('common.saving');
+      // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
+      const tempId = 'NOTE-temp-' + Date.now();
+      const now = new Date().toISOString();
+      const tempNote = {
+        id: tempId,
+        module_id: moduleId,
+        title: title,
+        section_name: sectionName,
+        content: content,
+        created_at: now,
+        updated_at: now
+      };
 
-      try {
-        await API.createNote({
-          module_id: moduleId,
-          title: title,
-          section_name: sectionName,
-          content: content
-        });
-        UI.closeModal();
-        UI.toast(I18n.t('toast.noteSaved'), 'success');
-        if (typeof onSaved === 'function') onSaved();
-      } catch (err) {
+      _currentNotes.unshift(tempNote);
+      if (badgeEl) badgeEl.textContent = _currentNotes.length;
+      renderNotesList(listWrap, searchInput ? searchInput.value : '');
+
+      UI.closeModal();
+      UI.toast(I18n.t('toast.noteSaved'), 'success');
+
+      // ── BACKGROUND API CALL (non-blocking) ────────────────────────────
+      API.createNote({
+        module_id: moduleId,
+        title: title,
+        section_name: sectionName,
+        content: content
+      }).then(realNote => {
+        // Swap temp note with real server note
+        const idx = _currentNotes.findIndex(n => n.id === tempId);
+        if (idx !== -1 && realNote && realNote.id) {
+          _currentNotes[idx] = realNote;
+          renderNotesList(listWrap, searchInput ? searchInput.value : '');
+        }
+      }).catch(err => {
+        // Revert local optimistic addition on error
+        _currentNotes = _currentNotes.filter(n => n.id !== tempId);
+        if (badgeEl) badgeEl.textContent = _currentNotes.length;
+        renderNotesList(listWrap, searchInput ? searchInput.value : '');
         UI.toast(I18n.errorMessage(err), 'error');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = I18n.t('common.save');
-      }
+      });
     });
   }
 
-  function openEditModal(note, onSaved) {
+  function openEditModal(note, listWrap, badgeEl, searchInput) {
     const html = `
       <div class="modal-head">
         <h3>${I18n.t('notes.editNote')}</h3>
@@ -284,7 +298,7 @@ const Notes = (function () {
     UI.openModal(html);
 
     const form = document.getElementById('edit-note-form');
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
       const title = form.elements['title'].value.trim();
       const sectionName = form.elements['section_name'].value.trim();
@@ -295,26 +309,38 @@ const Notes = (function () {
         return;
       }
 
-      const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.disabled = true;
-      submitBtn.textContent = I18n.t('common.saving');
+      // Preserve previous values in case of rollback
+      const prevTitle = note.title;
+      const prevSection = note.section_name;
+      const prevContent = note.content;
+      const prevUpdated = note.updated_at;
 
-      try {
-        await API.updateNote({
-          id: note.id,
-          title: title,
-          section_name: sectionName,
-          content: content
-        });
-        UI.closeModal();
-        UI.toast(I18n.t('toast.noteUpdated'), 'success');
-        if (typeof onSaved === 'function') onSaved();
-      } catch (err) {
+      // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
+      note.title = title;
+      note.section_name = sectionName;
+      note.content = content;
+      note.updated_at = new Date().toISOString();
+
+      renderNotesList(listWrap, searchInput ? searchInput.value : '');
+
+      UI.closeModal();
+      UI.toast(I18n.t('toast.noteUpdated'), 'success');
+
+      // ── BACKGROUND API CALL (non-blocking) ────────────────────────────
+      API.updateNote({
+        id: note.id,
+        title: title,
+        section_name: sectionName,
+        content: content
+      }).catch(err => {
+        // Rollback on error
+        note.title = prevTitle;
+        note.section_name = prevSection;
+        note.content = prevContent;
+        note.updated_at = prevUpdated;
+        renderNotesList(listWrap, searchInput ? searchInput.value : '');
         UI.toast(I18n.errorMessage(err), 'error');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = I18n.t('common.save');
-      }
+      });
     });
   }
 
@@ -341,7 +367,7 @@ const Notes = (function () {
     UI.openModal(html);
   }
 
-  function openDeleteConfirmModal(note, onDeleted) {
+  function openDeleteConfirmModal(note, listWrap, badgeEl, searchInput) {
     const html = `
       <div class="modal-head">
         <h3>${I18n.t('notes.deleteNote')}</h3>
@@ -361,18 +387,28 @@ const Notes = (function () {
     UI.openModal(html);
 
     const deleteBtn = document.getElementById('confirm-delete-note-btn');
-    deleteBtn.addEventListener('click', async () => {
-      deleteBtn.disabled = true;
-      try {
-        await API.deleteNote(note.id);
-        UI.closeModal();
-        UI.toast(I18n.t('toast.noteDeleted'), 'success');
-        if (typeof onDeleted === 'function') onDeleted();
-      } catch (err) {
-        UI.toast(I18n.errorMessage(err), 'error');
-      } finally {
-        deleteBtn.disabled = false;
+    deleteBtn.addEventListener('click', () => {
+      // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
+      const deletedIdx = _currentNotes.findIndex(n => n.id === note.id);
+      if (deletedIdx !== -1) {
+        _currentNotes.splice(deletedIdx, 1);
       }
+      if (badgeEl) badgeEl.textContent = _currentNotes.length;
+      renderNotesList(listWrap, searchInput ? searchInput.value : '');
+
+      UI.closeModal();
+      UI.toast(I18n.t('toast.noteDeleted'), 'success');
+
+      // ── BACKGROUND API CALL (non-blocking) ────────────────────────────
+      API.deleteNote(note.id).catch(err => {
+        // Rollback on error
+        if (deletedIdx !== -1) {
+          _currentNotes.splice(deletedIdx, 0, note);
+        }
+        if (badgeEl) badgeEl.textContent = _currentNotes.length;
+        renderNotesList(listWrap, searchInput ? searchInput.value : '');
+        UI.toast(I18n.errorMessage(err), 'error');
+      });
     });
   }
 

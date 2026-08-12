@@ -137,22 +137,20 @@ const Topics = (function () {
     paintCategories(defaultModuleId);
     modal.querySelector('#at-module').addEventListener('change', (e) => paintCategories(e.target.value));
 
-    modal.querySelector('#add-topic-form').addEventListener('submit', async (e) => {
+    modal.querySelector('#add-topic-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
       const payload = Object.fromEntries(fd.entries());
-      const btn = e.target.querySelector('button[type="submit"]');
-      btn.disabled = true;
-      try {
-        await API.createTopic(payload);
-        UI.toast(I18n.t('toast.topicAdded'), 'success');
-        UI.closeModal();
-        if (onSaved) onSaved();
-      } catch (err) {
+
+      // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
+      UI.closeModal();
+      UI.toast(I18n.t('toast.topicAdded'), 'success');
+      if (onSaved) onSaved();
+
+      // ── BACKGROUND API CALL (non-blocking) ────────────────────────────
+      API.createTopic(payload).catch(err => {
         UI.toastError(err);
-      } finally {
-        btn.disabled = false;
-      }
+      });
     });
   }
 
@@ -185,12 +183,8 @@ const Topics = (function () {
         </div>
       </div>
 
-      <div class="status-stepper" style="margin-bottom:18px;">
-        ${STATUS_VALUES.map((s, i) => {
-          const currentIdx = STATUS_VALUES.indexOf(t.status);
-          const cls = i < currentIdx ? 'done' : (i === currentIdx ? 'current' : '');
-          return `<button class="status-step ${cls}" data-status="${s}">${I18n.statusLabel(s)}</button>`;
-        }).join('')}
+      <div class="status-stepper" id="topic-status-stepper" style="margin-bottom:18px;">
+        ${_renderStepperHtml(t.status)}
       </div>
 
       <div class="tabs">
@@ -203,25 +197,16 @@ const Topics = (function () {
       <div id="tab-panels"></div>
     `;
 
-    modal.querySelector('#delete-topic-btn').addEventListener('click', async () => {
+    modal.querySelector('#delete-topic-btn').addEventListener('click', () => {
       if (!confirm(I18n.t('topicDetail.confirmDeleteTopic'))) return;
-      try {
-        await API.deleteTopic(id);
-        UI.toast(I18n.t('toast.topicDeleted'), 'success');
-        UI.closeModal();
-        Router.reload();
-      } catch (err) { UI.toastError(err); }
+      // ── OPTIMISTIC DELETE (0ms) ────────────────────────────────────────
+      UI.closeModal();
+      UI.toast(I18n.t('toast.topicDeleted'), 'success');
+      Router.reload();
+      API.deleteTopic(id).catch(err => UI.toastError(err));
     });
 
-    modal.querySelectorAll('.status-step').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        try {
-          await API.updateStatus(id, btn.dataset.status);
-          UI.toast(I18n.t('toast.statusUpdated'), 'success');
-          openDetail(id); // re-render with fresh state
-        } catch (err) { UI.toastError(err); }
-      });
-    });
+    _bindStepper(modal, t, id);
 
     const panels = modal.querySelector('#tab-panels');
     function paintTab(tab) {
@@ -235,6 +220,34 @@ const Topics = (function () {
     }
     modal.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => paintTab(b.dataset.tab)));
     paintTab('knowledge');
+  }
+
+  function _renderStepperHtml(currentStatus) {
+    const currentIdx = STATUS_VALUES.indexOf(currentStatus);
+    return STATUS_VALUES.map((s, i) => {
+      const cls = i < currentIdx ? 'done' : (i === currentIdx ? 'current' : '');
+      return `<button class="status-step ${cls}" data-status="${s}">${I18n.statusLabel(s)}</button>`;
+    }).join('');
+  }
+
+  function _bindStepper(modal, t, id) {
+    const stepperContainer = modal.querySelector('#topic-status-stepper');
+    if (!stepperContainer) return;
+    stepperContainer.querySelectorAll('.status-step').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newStatus = btn.dataset.status;
+        if (t.status === newStatus) return;
+
+        // ── OPTIMISTIC STATUS UPDATE (0ms) ───────────────────────────────
+        t.status = newStatus;
+        stepperContainer.innerHTML = _renderStepperHtml(newStatus);
+        _bindStepper(modal, t, id);
+        UI.toast(I18n.t('toast.statusUpdated'), 'success');
+
+        // ── BACKGROUND API CALL ──────────────────────────────────────────
+        API.updateStatus(id, newStatus).catch(err => UI.toastError(err));
+      });
+    });
   }
 
   function escapeHtml(str) {

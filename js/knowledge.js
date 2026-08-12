@@ -56,21 +56,17 @@ const Knowledge = (function () {
     ].filter(Boolean);
 
     forms.forEach(form => {
-      form.addEventListener('submit', async (e) => {
+      form.addEventListener('submit', (e) => {
         e.preventDefault();
         const fd = new FormData(form);
         const payload = Object.fromEntries(fd.entries());
         payload.topic_id = topicId;
-        const btn = form.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        try {
-          await API.saveKnowledge(payload);
-          UI.toast(I18n.t('toast.knowledgeUpdated'), 'success');
-        } catch (err) {
-          UI.toastError(err);
-        } finally {
-          btn.disabled = false;
-        }
+
+        // ── OPTIMISTIC LOCAL UPDATE (0ms) ───────────────────────────────
+        UI.toast(I18n.t('toast.knowledgeUpdated'), 'success');
+
+        // ── BACKGROUND API CALL (non-blocking) ────────────────────────────
+        API.saveKnowledge(payload).catch(err => UI.toastError(err));
       });
     });
   }
