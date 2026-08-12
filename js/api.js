@@ -141,15 +141,28 @@ const API = (function () {
       throw err;
     }
 
-    const body = JSON.stringify({ action, payload: payload || {}, token: getToken() });
+    const token = getToken();
+    const isRead = READ_ACTIONS.has(action) || action === 'ping';
+
+    // Embed action, token, and payload in query string parameters.
+    // When GAS redirects (302), query parameters on the URL survive intact.
+    const qs = new URLSearchParams({ action, token });
+    if (payload && Object.keys(payload).length) {
+      qs.set('payload', JSON.stringify(payload));
+    }
+    const url = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
+
+    const fetchOpts = isRead
+      ? { method: 'GET' }
+      : {
+          method : 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body   : JSON.stringify({ action, payload: payload || {}, token })
+        };
 
     let res;
     try {
-      res = await fetch(CONFIG.API_URL, {
-        method : 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body
-      });
+      res = await fetch(url, fetchOpts);
     } catch (networkErr) {
       if (attempt < MAX_ATTEMPTS) {
         await _sleep(_retryDelay(attempt));
