@@ -80,7 +80,7 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   /* Raw HTTP call (no caching)                                         */
   /* ------------------------------------------------------------------ */
-  async function rawCall(action, payload) {
+  async function rawCall(action, payload, isRetry) {
     if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') {
       const err = new Error('API_URL is not configured.');
       err.code = 'NOT_CONFIGURED';
@@ -96,14 +96,31 @@ const API = (function () {
         body
       });
     } catch (networkErr) {
+      // Network hiccup — retry once after a short delay
+      if (!isRetry) {
+        await new Promise(r => setTimeout(r, 400));
+        return rawCall(action, payload, true);
+      }
       const err = new Error('Network error contacting the API.');
       err.code = 'NETWORK_ERROR';
       throw err;
     }
 
+    // Google Apps Script sometimes returns a 302 redirect that the browser
+    // follows as a GET → 404. Detect this and retry with the original POST.
+    if (res.status === 404 && !isRetry) {
+      await new Promise(r => setTimeout(r, 400));
+      return rawCall(action, payload, true);
+    }
+
     let json;
     try { json = await res.json(); }
     catch (parseErr) {
+      // Could be a GAS HTML error page on cold start — retry once
+      if (!isRetry) {
+        await new Promise(r => setTimeout(r, 600));
+        return rawCall(action, payload, true);
+      }
       const err = new Error('Unexpected response from the API.');
       err.code = 'SERVER_ERROR';
       throw err;
@@ -148,11 +165,35 @@ const API = (function () {
   }
 
   /* ------------------------------------------------------------------ */
-  /* Public API                                                         */
+  /* Keepalive — fire a lightweight ping every 4 min while the tab is   */
+  /* open + the user is logged in. Prevents GAS cold starts (10-15 s).  */
   /* ------------------------------------------------------------------ */
+  let _keepaliveTimer = null;
+
+  function startKeepalive() {
+    if (_keepaliveTimer) return; // already running
+    // Fire once immediately to warm up the instance right after login
+    _ping();
+    _keepaliveTimer = setInterval(_ping, 4 * 60 * 1000); // every 4 min
+  }
+
+  function stopKeepalive() {
+    if (_keepaliveTimer) { clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
+  }
+
+  function _ping() {
+    if (!getToken()) { stopKeepalive(); return; }
+    // Best-effort silent ping — never blocks the UI, never retries
+    fetch(CONFIG.API_URL, {
+      method : 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body   : JSON.stringify({ action: 'ping', payload: {}, token: getToken() })
+    }).catch(() => {}); // silently ignore errors
+  }
   return {
     getToken, setToken, clearToken,
     cacheBust, cacheBustAll,
+    startKeepalive, stopKeepalive,
 
     // Auth
     signup        : (p) => call('signup', Object.assign({ language: (window.I18n ? I18n.getLang() : 'en') }, p)),

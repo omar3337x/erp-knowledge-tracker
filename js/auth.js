@@ -40,6 +40,7 @@ const Auth = (function () {
       API.setToken(data.token);
       State.currentUser = data.user;
       UI.toast(I18n.t('toast.loginSuccessful'), 'success');
+      API.startKeepalive();
       await App.boot();
     } catch (err) {
       errEl.textContent = I18n.errorMessage(err);
@@ -78,6 +79,7 @@ const Auth = (function () {
     try { await API.logout(); } catch (e) { /* ignore */ }
     API.clearToken();
     API.cacheBustAll();             // wipe in-memory cache
+    API.stopKeepalive();            // stop ping
     State.currentUser  = null;
     State.modulesCache = [];
     State.allCategories = [];
@@ -96,6 +98,7 @@ const Auth = (function () {
     try {
       const data = await API.validateSession();
       State.currentUser = data.user;
+      API.startKeepalive();
       return true;
     } catch (err) {
       API.clearToken();
