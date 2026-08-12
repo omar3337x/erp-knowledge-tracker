@@ -6,12 +6,12 @@
  * NOT send a CORS preflight OPTIONS request — Apps Script web apps cannot
  * reliably handle preflight, so this is the standard workaround.
  *
- * Performance features:
- *  1. In-flight deduplication — identical concurrent read calls share one Promise.
- *  2. In-memory response cache — read results are cached for their TTL so
- *     navigating back to a page is instant (no extra round-trip).
- *  3. Fine-grained cache invalidation — a write action only busts the cache
- *     entries it actually affects, not the whole cache.
+ * Performance layers (fastest to slowest):
+ *  1. In-memory cache — zero-latency hits within a tab session.
+ *  2. localStorage cache — survives page refresh/tab close. Topics/reviews
+ *     are stored here so a reload never triggers a GAS cold-start wait.
+ *  3. In-flight deduplication — identical concurrent calls share one Promise.
+ *  4. Network → GAS (slowest, only when all caches miss).
  */
 
 const SESSION_KEY = 'erp_tracker_session_token';
@@ -35,47 +35,107 @@ const API = (function () {
   }
 
   /* ------------------------------------------------------------------ */
-  /* In-memory response cache                                            */
+  /* In-memory response cache (per tab session)                         */
   /* ------------------------------------------------------------------ */
-  // Cache entries: { data, expiresAt }
-  const _cache = new Map();
+  const _mem = new Map(); // key → { data, expiresAt }
 
-  // TTLs in milliseconds
-  const CACHE_TTL = {
-    validateSession : 5  * 60 * 1000,  // 5 min
+  const MEM_TTL = {
+    validateSession : 5  * 60 * 1000,
     currentUser     : 5  * 60 * 1000,
-    modules         : 60 * 60 * 1000,  // 1 hr (rarely changes)
+    modules         : 60 * 60 * 1000,
     categories      : 60 * 60 * 1000,
-    topics          : 2  * 60 * 1000,  // 2 min (changes more)
-    topic           : 2  * 60 * 1000,
+    topics          : 5  * 60 * 1000,  // 5 min in-memory
+    topic           : 5  * 60 * 1000,
     knowledge       : 5  * 60 * 1000,
-    reviews         : 2  * 60 * 1000,
-    dashboard       : 2  * 60 * 1000,
-    analytics       : 5  * 60 * 1000,
-    adminUsers      : 2  * 60 * 1000,
+    reviews         : 5  * 60 * 1000,
+    dashboard       : 3  * 60 * 1000,
+    analytics       : 10 * 60 * 1000,
+    adminUsers      : 3  * 60 * 1000,
   };
 
-  function cacheGet(key) {
-    const entry = _cache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) { _cache.delete(key); return null; }
-    return entry.data;
+  function memGet(key) {
+    const e = _mem.get(key);
+    if (!e) return null;
+    if (Date.now() > e.expiresAt) { _mem.delete(key); return null; }
+    return e.data;
+  }
+  function memSet(key, data, action) {
+    _mem.set(key, { data, expiresAt: Date.now() + (MEM_TTL[action] || 60000) });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* localStorage cache — survives page refresh / tab close             */
+  /* Topics and reviews are cached here so a reload is always instant.  */
+  /* ------------------------------------------------------------------ */
+
+  // Which actions get persisted to localStorage (large, slow to fetch)
+  const LS_ACTIONS = new Set(['topics', 'reviews', 'dashboard', 'analytics']);
+  // How long localStorage entries are valid
+  const LS_TTL = {
+    topics   : 10 * 60 * 1000,  // 10 min
+    reviews  : 10 * 60 * 1000,
+    dashboard:  5 * 60 * 1000,
+    analytics: 15 * 60 * 1000,
+  };
+
+  function lsKey(cacheKey) { return 'erp_api_v1:' + cacheKey; }
+
+  function lsGet(key, action) {
+    if (!LS_ACTIONS.has(action)) return null;
+    try {
+      const raw = localStorage.getItem(lsKey(key));
+      if (!raw) return null;
+      const { data, expiresAt } = JSON.parse(raw);
+      if (Date.now() > expiresAt) { localStorage.removeItem(lsKey(key)); return null; }
+      return data;
+    } catch (e) { return null; }
+  }
+
+  function lsSet(key, data, action) {
+    if (!LS_ACTIONS.has(action)) return;
+    try {
+      const ttl = LS_TTL[action] || 5 * 60 * 1000;
+      localStorage.setItem(lsKey(key), JSON.stringify({ data, expiresAt: Date.now() + ttl }));
+    } catch (e) { /* storage full — non-fatal */ }
+  }
+
+  function lsBust(...actions) {
+    const prefix = 'erp_api_v1:';
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+    keys.forEach(k => {
+      // Extract action from stored key: "erp_api_v1:action:payload" → "action"
+      const inner = k.slice(prefix.length);
+      const action = inner.split(':')[0];
+      if (actions.includes(action)) localStorage.removeItem(k);
+    });
+  }
+
+  function lsBustAll() {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('erp_api_v1:'))
+      .forEach(k => localStorage.removeItem(k));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Combined cache operations                                          */
+  /* ------------------------------------------------------------------ */
+  function cacheGet(key, action) {
+    return memGet(key) ?? lsGet(key, action);
+  }
   function cacheSet(key, data, action) {
-    const ttl = CACHE_TTL[action] || 60000;
-    _cache.set(key, { data, expiresAt: Date.now() + ttl });
+    memSet(key, data, action);
+    lsSet(key, data, action);
   }
-
-  // Bust all cache keys whose action matches any of the given prefixes
   function cacheBust(...actions) {
-    for (const key of _cache.keys()) {
-      const action = key.split(':')[0];
-      if (actions.includes(action)) _cache.delete(key);
+    for (const key of _mem.keys()) {
+      if (actions.includes(key.split(':')[0])) _mem.delete(key);
     }
+    lsBust(...actions);
   }
-
-  function cacheBustAll() { _cache.clear(); }
+  function cacheBustAll() {
+    _mem.clear();
+    lsBustAll();
+  }
 
   /* ------------------------------------------------------------------ */
   /* Raw HTTP call (no caching)                                         */
@@ -88,28 +148,23 @@ const API = (function () {
     }
     const body = JSON.stringify({ action, payload: payload || {}, token: getToken() });
 
-    // Include action + token in the URL query string as a fallback.
-    // When GAS issues a 302 redirect and the browser follows it as GET,
-    // the body is lost — but the query params survive, so doGet() can still
-    // handle the request. For READ actions we also include the payload so
-    // the GET fallback returns the right filtered data.
+    // Also embed action+token in URL query string.
+    // When GAS issues a 302 and the browser follows as GET, the body is lost.
+    // doGet() can then handle the request from the URL params as fallback.
     const qs = new URLSearchParams({ action, token: getToken() });
-    if (payload && Object.keys(payload).length) {
-      qs.set('payload', JSON.stringify(payload));
-    }
-    const urlWithParams = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
+    if (payload && Object.keys(payload).length) qs.set('payload', JSON.stringify(payload));
+    const url = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
 
     let res;
     try {
-      res = await fetch(urlWithParams, {
+      res = await fetch(url, {
         method : 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body
       });
     } catch (networkErr) {
-      // Network hiccup — retry once after a short delay
       if (!isRetry) {
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 500));
         return rawCall(action, payload, true);
       }
       const err = new Error('Network error contacting the API.');
@@ -117,19 +172,17 @@ const API = (function () {
       throw err;
     }
 
-    // Google Apps Script sometimes returns a 302 redirect that the browser
-    // follows as a GET → 404. Detect this and retry with the original POST.
+    // GAS sometimes returns 302→echo→404 on cold start. Retry once.
     if (res.status === 404 && !isRetry) {
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 500));
       return rawCall(action, payload, true);
     }
 
     let json;
     try { json = await res.json(); }
     catch (parseErr) {
-      // Could be a GAS HTML error page on cold start — retry once
       if (!isRetry) {
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 800));
         return rawCall(action, payload, true);
       }
       const err = new Error('Unexpected response from the API.');
@@ -159,8 +212,8 @@ const API = (function () {
 
     const key = dedupeKey(action, payload);
 
-    // 1. Memory cache hit → instant return
-    const cached = cacheGet(key);
+    // 1. Memory or localStorage cache hit → instant
+    const cached = cacheGet(key, action);
     if (cached !== null) return cached;
 
     // 2. In-flight dedup → share the promise
@@ -176,31 +229,30 @@ const API = (function () {
   }
 
   /* ------------------------------------------------------------------ */
-  /* Keepalive — fire a lightweight ping every 4 min while the tab is   */
-  /* open + the user is logged in. Prevents GAS cold starts (10-15 s).  */
+  /* Keepalive — ping every 4 min to prevent GAS cold starts           */
   /* ------------------------------------------------------------------ */
   let _keepaliveTimer = null;
 
   function startKeepalive() {
-    if (_keepaliveTimer) return; // already running
-    // Fire once immediately to warm up the instance right after login
-    _ping();
-    _keepaliveTimer = setInterval(_ping, 4 * 60 * 1000); // every 4 min
+    if (_keepaliveTimer) return;
+    _ping(); // immediate warm-up ping
+    _keepaliveTimer = setInterval(_ping, 4 * 60 * 1000);
   }
-
   function stopKeepalive() {
     if (_keepaliveTimer) { clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
   }
-
   function _ping() {
     if (!getToken()) { stopKeepalive(); return; }
-    // Best-effort silent ping — never blocks the UI, never retries
     fetch(CONFIG.API_URL, {
       method : 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body   : JSON.stringify({ action: 'ping', payload: {}, token: getToken() })
-    }).catch(() => {}); // silently ignore errors
+    }).catch(() => {});
   }
+
+  /* ------------------------------------------------------------------ */
+  /* Public API                                                         */
+  /* ------------------------------------------------------------------ */
   return {
     getToken, setToken, clearToken,
     cacheBust, cacheBustAll,
@@ -209,27 +261,27 @@ const API = (function () {
     // Auth
     signup        : (p) => call('signup', Object.assign({ language: (window.I18n ? I18n.getLang() : 'en') }, p)),
     login         : (p) => call('login', p),
-    logout        : ()  => call('logout', {}),
+    logout        : ()  => rawCall('logout', {}),
     validateSession: () => call('validateSession', {}),
     currentUser   : ()  => call('currentUser', {}),
     updateProfile : (p) => call('updateProfile', p),
     changePassword: (p) => call('changePassword', p),
 
     // Reference data
-    modules  : () => call('modules', {}),
+    modules   : () => call('modules', {}),
     categories: (moduleId) => call('categories', moduleId ? { module_id: moduleId } : {}),
 
     createCategory: async (p) => {
       const r = await rawCall('createCategory', p);
-      cacheBust('categories','dashboard'); return r;
+      cacheBust('categories', 'dashboard'); return r;
     },
     updateCategory: async (p) => {
       const r = await rawCall('updateCategory', p);
-      cacheBust('categories','dashboard'); return r;
+      cacheBust('categories', 'dashboard'); return r;
     },
     deleteCategory: async (id) => {
       const r = await rawCall('deleteCategory', { id });
-      cacheBust('categories','dashboard'); return r;
+      cacheBust('categories', 'dashboard'); return r;
     },
     toggleCategoryStatus: async (id) => {
       const r = await rawCall('toggleCategoryStatus', { id });
@@ -242,41 +294,41 @@ const API = (function () {
 
     createTopic: async (p) => {
       const r = await rawCall('createTopic', p);
-      cacheBust('topics','topic','dashboard','analytics'); return r;
+      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
     },
     updateTopic: async (p) => {
       const r = await rawCall('updateTopic', p);
-      cacheBust('topics','topic','dashboard','analytics'); return r;
+      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
     },
     deleteTopic: async (id) => {
       const r = await rawCall('deleteTopic', { id });
-      cacheBust('topics','topic','dashboard','analytics'); return r;
+      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
     },
     updateStatus: async (id, status) => {
       const r = await rawCall('updateStatus', { id, status });
-      cacheBust('topics','topic','dashboard','analytics'); return r;
+      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
     },
     updateProgress: async (id, progress) => {
       const r = await rawCall('updateProgress', { id, progress });
-      cacheBust('topics','topic','dashboard','analytics'); return r;
+      cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r;
     },
 
     // Knowledge
     knowledge    : (topicId) => call('knowledge', { topic_id: topicId }),
     saveKnowledge: async (p) => {
       const r = await rawCall('saveKnowledge', p);
-      cacheBust('knowledge','topic'); return r;
+      cacheBust('knowledge', 'topic'); return r;
     },
 
     // Reviews
     reviews  : (topicId) => call('reviews', topicId ? { topic_id: topicId } : {}),
     addReview: async (p) => {
       const r = await rawCall('addReview', p);
-      cacheBust('reviews','topic','dashboard'); return r;
+      cacheBust('reviews', 'topic', 'dashboard'); return r;
     },
     markReviewed: async (id, p) => {
       const r = await rawCall('markReviewed', Object.assign({ id }, p || {}));
-      cacheBust('reviews','topic','dashboard'); return r;
+      cacheBust('reviews', 'topic', 'dashboard'); return r;
     },
 
     // Dashboard / analytics
