@@ -77,7 +77,7 @@ const API = (function () {
     analytics: 15 * 60 * 1000,
     notes    : 10 * 60 * 1000,
   };
-  const LS_PREFIX = 'erp_api_v2:';
+  const LS_PREFIX = 'erp_api_v3:';
 
   function lsGet(key, action) {
     if (!LS_ACTIONS.has(action)) return null;

@@ -59,13 +59,27 @@ const Notes = (function () {
     await reloadNotes(listWrap, badgeEl, '');
   }
 
+  function normalizeNote(n) {
+    if (!n || typeof n !== 'object') return null;
+    return {
+      id: String(n.id || ''),
+      user_id: String(n.user_id || ''),
+      module_id: String(n.module_id || ''),
+      title: String(n.title || '').trim(),
+      section_name: String(n.section_name || '').trim(),
+      content: String(n.content || ''),
+      created_at: n.created_at || new Date().toISOString(),
+      updated_at: n.updated_at || n.created_at || new Date().toISOString()
+    };
+  }
+
   /**
    * Fetches fresh notes for the current module from API and updates UI.
    */
   async function reloadNotes(listWrap, badgeEl, searchQuery) {
     try {
-      _currentNotes = await API.notes(_currentModuleId);
-      if (!Array.isArray(_currentNotes)) _currentNotes = [];
+      const raw = await API.notes(_currentModuleId);
+      _currentNotes = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
       if (badgeEl) badgeEl.textContent = _currentNotes.length;
       renderNotesList(listWrap, searchQuery);
     } catch (err) {
