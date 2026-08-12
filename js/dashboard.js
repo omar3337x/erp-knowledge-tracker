@@ -20,8 +20,12 @@ const Dashboard = (function () {
     const k = data.kpis;
     const isAr = I18n.getLang() === 'ar';
 
-    // Fetch pre-cached topics for Pinned & Goals widgets
-    const allTopics = await API.topics({}).catch(() => []);
+    // Non-blocking cached topics for Pinned & Goals widgets
+    let allTopics = [];
+    try {
+      const cached = API.topics ? API.topics({}).catch(() => []) : [];
+      allTopics = Array.isArray(cached) ? cached : [];
+    } catch(e) {}
 
     const pinnedTopics = (allTopics || []).filter(t => t.pinned === true || t.pinned === 'TRUE' || t.pinned === 'true' || t.pinned === 1);
     const goalsTopics = (allTopics || []).filter(t => t.target_date && t.status !== 'Mastered');

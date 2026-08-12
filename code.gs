@@ -647,7 +647,11 @@ function actionValidateSession(token) {
   if (!session) return errorResponse('No valid session.', 'SESSION_EXPIRED');
   var user = getUserCached(session.user_id);
   if (!user) return errorResponse('No valid session.', 'SESSION_EXPIRED');
-  return successResponse({ user: publicUser(user) });
+  return successResponse({
+    user: publicUser(user),
+    modules: getModulesRows(),
+    categories: getCategoriesRows()
+  });
 }
 
 function actionUpdateProfile(user, payload) {

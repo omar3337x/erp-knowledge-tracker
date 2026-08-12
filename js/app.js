@@ -163,18 +163,21 @@ const DEFAULT_MODULES = [
  * refresh or new tab still feels instant. The in-memory API cache handles
  * all navigations within the same tab. Guaranteed fallback if offline/empty.
  */
-async function loadReferenceData() {
-  try {
-    const raw = localStorage.getItem(REF_CACHE_KEY);
-    if (raw) {
-      const cached = JSON.parse(raw);
-      if (Date.now() - cached.savedAt < REF_CACHE_TTL_MS && Array.isArray(cached.modules) && cached.modules.length > 0) {
-        State.modulesCache  = cached.modules;
-        State.allCategories = cached.categories || [];
-        return;
-      }
+  async function loadReferenceData() {
+    if (Array.isArray(State.modulesCache) && State.modulesCache.length > 0 && Array.isArray(State.allCategories) && State.allCategories.length > 0) {
+      return;
     }
-  } catch (e) { /* corrupt cache — fall through to network */ }
+    try {
+      const raw = localStorage.getItem(REF_CACHE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (Date.now() - cached.savedAt < REF_CACHE_TTL_MS && Array.isArray(cached.modules) && cached.modules.length > 0) {
+          State.modulesCache  = cached.modules;
+          State.allCategories = cached.categories || [];
+          return;
+        }
+      }
+    } catch (e) { /* corrupt cache — fall through to network */ }
 
   try {
     const [modules, categories] = await Promise.all([
@@ -421,28 +424,13 @@ const App = (function () {
     const savedTheme = localStorage.getItem('erp_tracker_theme') || 'light';
     UI.applyTheme(savedTheme);
 
-    // ── RADICAL SPEED FIX ──────────────────────────────────────────────
-    // Fire a warmup ping to GAS immediately — before Auth.init() even runs.
-    // GAS cold start takes ~14s. The user spends ~10-30s on the login screen
-    // typing credentials. By the time they click "Login", GAS is already warm
-    // and their first real request responds in 1-2s instead of 14s.
-    API.warmup();
-    // ──────────────────────────────────────────────────────────────────
-
     Auth.init();
     bindStaticNav();
     bindLanguageSwitch();
     Router.init();
 
-    // Kick off session restore. While that round-trip is in-flight, also
-    // prefetch reference data speculatively if a token exists — the two
-    // requests run in parallel and the data is ready before boot() is called.
-    const token = API.getToken();
-    const refPrefetch = token ? loadReferenceData().catch(() => {}) : Promise.resolve();
-
     const restored = await Auth.tryRestoreSession();
     if (restored) {
-      await refPrefetch; // already resolved if it finished first
       await boot();
     }
   }

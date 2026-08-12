@@ -116,6 +116,8 @@ const Auth = (function () {
     try {
       const data = await API.validateSession();
       State.currentUser = data.user;
+      if (data.modules && data.modules.length) State.modulesCache = data.modules;
+      if (data.categories && data.categories.length) State.allCategories = data.categories;
       API.startKeepalive();
       return true;
     } catch (err) {
