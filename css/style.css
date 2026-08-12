@@ -321,3 +321,19 @@ tbody tr:hover{ background:var(--line-soft); }
   .main{ margin-inline-start:0; }
   .menu-toggle{ display:inline-flex; }
 }
+
+/* ---------------------------------------------------------------------- */
+/* Collapsible categories section                                         */
+/* ---------------------------------------------------------------------- */
+.cat-section-header{
+  border-top:1px solid var(--line);
+  padding:12px 0 !important;
+  transition:background .12s;
+  border-radius:var(--radius-sm);
+}
+.cat-section-header:hover{ background:var(--line-soft); padding-inline:8px; }
+.cat-chevron{
+  color:var(--ink-soft); font-size:12px; line-height:1;
+  transition:transform .2s ease;
+}
+
