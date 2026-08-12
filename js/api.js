@@ -88,9 +88,20 @@ const API = (function () {
     }
     const body = JSON.stringify({ action, payload: payload || {}, token: getToken() });
 
+    // Include action + token in the URL query string as a fallback.
+    // When GAS issues a 302 redirect and the browser follows it as GET,
+    // the body is lost — but the query params survive, so doGet() can still
+    // handle the request. For READ actions we also include the payload so
+    // the GET fallback returns the right filtered data.
+    const qs = new URLSearchParams({ action, token: getToken() });
+    if (payload && Object.keys(payload).length) {
+      qs.set('payload', JSON.stringify(payload));
+    }
+    const urlWithParams = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
+
     let res;
     try {
-      res = await fetch(CONFIG.API_URL, {
+      res = await fetch(urlWithParams, {
         method : 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body

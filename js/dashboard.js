@@ -2,9 +2,16 @@
  * js/dashboard.js
  * Renders the main Dashboard: KPI row, module gauge cards, review summary.
  * ONE API call (API.dashboard()) provides everything on this page.
+ *
+ * Background prefetch: after rendering, silently kicks off topics fetch for
+ * every module so that navigating to any module is instant (cache hit).
+ * Uses staggered batches to avoid hammering the GAS endpoint.
  */
 
 const Dashboard = (function () {
+
+  // Track whether we've already prefetched in this session
+  let _prefetchDone = false;
 
   async function render(container) {
     container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
@@ -47,6 +54,37 @@ const Dashboard = (function () {
     });
     const reviewBtn = container.querySelector('[data-route="review"]');
     if (reviewBtn) reviewBtn.addEventListener('click', () => Router.go('review'));
+
+    // ----------------------------------------------------------------
+    // Background prefetch — fire after a short idle delay so we don't
+    // compete with any pending renders. Stagger one module per request
+    // so we don't queue up 10 simultaneous GAS calls.
+    // ----------------------------------------------------------------
+    if (!_prefetchDone && State.modulesCache.length) {
+      _prefetchDone = true;
+      _prefetchAllModuleTopics(State.modulesCache.map(m => m.id));
+    }
+  }
+
+  /**
+   * Sequentially (staggered) prefetch topics for each module.
+   * Each call goes through API.topics() which populates the in-memory cache,
+   * so when the user navigates to a module the data is already there.
+   *
+   * We use a 700ms gap between requests to be gentle on GAS concurrency.
+   */
+  async function _prefetchAllModuleTopics(moduleIds) {
+    for (const moduleId of moduleIds) {
+      // Small delay before each prefetch to avoid hammering the API
+      await new Promise(r => setTimeout(r, 700));
+      // Only prefetch if we don't already have it cached
+      API.topics({ module_id: moduleId }).catch(() => {}); // silent failure
+    }
+    // Also prefetch all topics (for gaps/search pages) and reviews
+    await new Promise(r => setTimeout(r, 700));
+    API.topics({}).catch(() => {});
+    await new Promise(r => setTimeout(r, 700));
+    API.reviews().catch(() => {});
   }
 
   function kpiCard(label, value, tone) {
