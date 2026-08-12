@@ -21,9 +21,10 @@ const I18N_DICT = {
     },
 
     nav: {
-      dashboard: 'Dashboard', modules: 'Modules', knowledgeGaps: 'Knowledge Gaps',
-      reviewCenter: 'Review Center', analytics: 'Analytics', myProfile: 'My Profile',
-      administration: 'Administration', account: 'Account', learning: 'Learning', logout: 'Logout',
+      dashboard: 'Dashboard', modules: 'Modules', learning: 'Learning',
+      allNotes: 'All Notes',
+      knowledgeGaps: 'Knowledge Gaps', reviewCenter: 'Review Center', analytics: 'Analytics',
+      account: 'Account', myProfile: 'My Profile', administration: 'Administration', logout: 'Logout',
       searchPlaceholder: 'Search topics across all modules...', quickAdd: '+ Quick Add'
     },
 
@@ -181,9 +182,10 @@ const I18N_DICT = {
     },
 
     nav: {
-      dashboard: 'لوحة التحكم', modules: 'الموديولات', knowledgeGaps: 'فجوات المعرفة',
-      reviewCenter: 'مركز المراجعة', analytics: 'التحليلات', myProfile: 'ملفي الشخصي',
-      administration: 'الإدارة', account: 'الحساب', learning: 'التعلّم', logout: 'تسجيل الخروج',
+      dashboard: 'لوحة التحكم', modules: 'الموديولات', learning: 'التعلّم',
+      allNotes: 'جميع الملاحظات',
+      knowledgeGaps: 'فجوات المعرفة', reviewCenter: 'مركز المراجعة', analytics: 'التحليلات',
+      myProfile: 'ملفي الشخصي', administration: 'الإدارة', account: 'الحساب', logout: 'تسجيل الخروج',
       searchPlaceholder: 'ابحث عن أي موضوع في كل الموديولات...', quickAdd: '+ إضافة سريعة'
     },
 

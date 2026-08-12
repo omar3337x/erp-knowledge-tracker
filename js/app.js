@@ -194,7 +194,7 @@ const Router = (function () {
       return mod ? I18n.localizedName(mod) : I18n.t('nav.modules');
     }
     const map = {
-      dashboard: 'dashboard.title', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
+      dashboard: 'dashboard.title', notes: 'nav.allNotes', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
       analytics: 'analytics.title', profile: 'nav.myProfile', admin: 'admin.title'
     };
     return map[route] ? I18n.t(map[route]) : I18n.t('common.notFound');
@@ -233,6 +233,7 @@ const Router = (function () {
     titleEl.textContent = titleFor(route, params);
 
     if (route === 'dashboard') return Dashboard.render(content);
+    if (route === 'notes') return Notes.renderAllNotesPage(content);
     if (route === 'module') return Modules.render(content, params.id);
     if (route === 'gaps') {
       content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
