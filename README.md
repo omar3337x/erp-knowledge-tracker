@@ -131,16 +131,18 @@ erp-knowledge-tracker/
 ├── css/
 │   └── style.css             Design system, layout, dark mode
 ├── js/
-│   ├── api.js                 Fetch wrapper around the Apps Script API
-│   ├── auth.js                 Sign up / log in / log out / session restore
-│   ├── app.js                   UI helpers, global state, router, bootstrap
-│   ├── dashboard.js             Dashboard: KPIs + module gauge cards
-│   ├── modules.js                Per-module dashboard + topics table
-│   ├── topics.js                  Topics table, Add/Detail modals, status lifecycle
-│   ├── knowledge.js                Knowledge tab (know / don't know / need to learn, business & ERP understanding, practical experience)
-│   ├── reviews.js                   Review Center + per-topic review history
-│   ├── analytics.js                  Analytics page
-│   └── profile.js                     My Profile + Administration
+│   ├── i18n.js                 Centralized EN/AR translation dictionary + RTL
+│   ├── api.js                   Fetch wrapper (+ request de-duplication)
+│   ├── auth.js                    Sign up / log in / log out / session restore
+│   ├── app.js                       UI helpers, global state, router, i18n bootstrap
+│   ├── dashboard.js                  Dashboard: KPIs + module gauge cards
+│   ├── modules.js                     Per-module dashboard + topics table + categories section
+│   ├── categories.js                   Category management: add/edit/delete/toggle (Admin)
+│   ├── topics.js                        Topics table, Add/Detail modals, status lifecycle
+│   ├── knowledge.js                      Knowledge tab (know / don't know / need to learn, business & ERP understanding, practical experience)
+│   ├── reviews.js                         Review Center + per-topic review history
+│   ├── analytics.js                        Analytics page
+│   └── profile.js                           My Profile + Administration
 └── google-apps-script/
     └── Code.gs               Backend: auth, sessions, CRUD, dashboard, analytics
 ```
@@ -153,7 +155,28 @@ erp-knowledge-tracker/
 - **Global search** (top bar) searches topic name/description across all of
   your modules.
 - **Light/Dark mode** toggle is in the top bar and persists per browser.
+- **Language (English/Arabic + RTL)**: switch with the EN/AR toggle in the
+  top bar (or on the login screen). The choice is saved to your browser
+  immediately and, once you're logged in, synced to your account
+  (`Users.language`) so it's remembered on your next login from anywhere.
+  See `PERFORMANCE_REPORT.md` for how the translation system works.
+- **Category management**: each module's page has a "Categories" section.
+  Admins can add/edit/deactivate/delete categories there; a category that
+  still has topics attached can't be deleted (deactivate it instead). All
+  users can see the category list; only Admins can change it, since
+  categories are shared reference data across every account.
+- **Upgrading from an earlier version of this project**: just paste the
+  new `Code.gs` over the old one and redeploy — `ensureSchema()` safely
+  adds the new `Categories.description/created_at/updated_at` and
+  `Users.language` columns to your existing sheet on the first request,
+  without touching any existing data. See `PERFORMANCE_REPORT.md` §8.
 - If you want per-field password rules, rate limiting, or email verification
   beyond what's described in the brief, extend `actionSignup` /
   `actionLogin` in `Code.gs` — the brief explicitly excludes OTP/email
   confirmation, so none is implemented.
+
+## Performance
+
+See `PERFORMANCE_REPORT.md` for the full before/after breakdown of Google
+Sheets calls, the caching layers added, and what was deferred/lazy-loaded
+on the frontend.
