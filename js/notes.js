@@ -33,9 +33,14 @@ const Notes = (function () {
             <input type="text" id="notes-search-input" class="notes-search-input"
                    placeholder="${I18n.t('notes.searchPlaceholder')}" autocomplete="off">
           </div>
-          <button class="btn btn-primary btn-sm" id="add-note-btn">
-            ${I18n.t('notes.addNote')}
-          </button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary btn-sm" id="sync-notes-btn" title="Sync from Sheets">
+              🔄 ${I18n.getLang() === 'ar' ? 'مزامنة' : 'Sync'}
+            </button>
+            <button class="btn btn-primary btn-sm" id="add-note-btn">
+              ${I18n.t('notes.addNote')}
+            </button>
+          </div>
         </div>
         <div id="notes-list-wrap">
           <div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>
@@ -46,10 +51,20 @@ const Notes = (function () {
     const listWrap = container.querySelector('#notes-list-wrap');
     const searchInput = container.querySelector('#notes-search-input');
     const addBtn = container.querySelector('#add-note-btn');
+    const syncBtn = container.querySelector('#sync-notes-btn');
     const badgeEl = container.querySelector('#notes-count-badge');
 
     addBtn.addEventListener('click', () => {
       openAddModal(moduleId, listWrap, badgeEl, searchInput);
+    });
+
+    syncBtn.addEventListener('click', async () => {
+      syncBtn.disabled = true;
+      API.cacheBust('notes');
+      UI.toast(I18n.getLang() === 'ar' ? 'جاري المزامنة مع الجدول...' : 'Syncing from Sheets...', 'info');
+      await reloadNotes(listWrap, badgeEl, searchInput.value);
+      syncBtn.disabled = false;
+      UI.toast(I18n.getLang() === 'ar' ? 'تمت المزامنة بنجاح' : 'Synced successfully', 'success');
     });
 
     searchInput.addEventListener('input', () => {
