@@ -10,6 +10,33 @@ const Notes = (function () {
   let _currentModuleId = '';
   let _activeTagFilter = '';
 
+  function compressImage(dataUrl, maxWidth, quality, callback) {
+    maxWidth = maxWidth || 600;
+    quality = quality || 0.6;
+    if (!dataUrl || !dataUrl.startsWith('data:image')) {
+      callback(dataUrl || '');
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const compressed = canvas.toDataURL('image/jpeg', quality);
+      callback(compressed);
+    };
+    img.onerror = () => callback(dataUrl);
+    img.src = dataUrl;
+  }
+
   function normalizeNote(n) {
     if (!n || typeof n !== 'object') return null;
     const rawTags = n.tags || '';
@@ -561,14 +588,17 @@ const Notes = (function () {
     const removeBtn = modalEl.querySelector('#btn-remove-img');
 
     const updateImage = (url) => {
-      currentImageData = url || '';
-      if (currentImageData) {
-        previewSrc.src = currentImageData;
-        previewWrap.classList.remove('hidden');
-      } else {
+      if (!url) {
+        currentImageData = '';
         previewSrc.src = '';
         previewWrap.classList.add('hidden');
+        return;
       }
+      compressImage(url, 600, 0.6, (compressedUrl) => {
+        currentImageData = compressedUrl;
+        previewSrc.src = compressedUrl;
+        previewWrap.classList.remove('hidden');
+      });
     };
 
     dropzone.addEventListener('click', () => fileInput.click());
@@ -748,14 +778,17 @@ const Notes = (function () {
     const removeBtn = modalEl.querySelector('#btn-remove-img');
 
     const updateImage = (url) => {
-      currentImageData = url || '';
-      if (currentImageData) {
-        previewSrc.src = currentImageData;
-        previewWrap.classList.remove('hidden');
-      } else {
+      if (!url) {
+        currentImageData = '';
         previewSrc.src = '';
         previewWrap.classList.add('hidden');
+        return;
       }
+      compressImage(url, 600, 0.6, (compressedUrl) => {
+        currentImageData = compressedUrl;
+        previewSrc.src = compressedUrl;
+        previewWrap.classList.remove('hidden');
+      });
     };
 
     dropzone.addEventListener('click', () => fileInput.click());
