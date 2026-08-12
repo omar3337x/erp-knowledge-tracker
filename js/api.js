@@ -244,12 +244,11 @@ const API = (function () {
 
   /* ------------------------------------------------------------------ */
   /* Warmup — fires BEFORE login so GAS wakes up while user types.     */
-  /* The ping action in code.gs requires no auth.                       */
+  /* Uses call() so in-flight deduplication prevents duplicate pings.  */
   /* ------------------------------------------------------------------ */
   function warmup() {
     if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') return;
-    // Use the retry loop to make sure the warmup actually completes
-    rawCall('ping', {}).catch(() => {});
+    call('ping', {}).catch(() => {});
   }
 
   /* ------------------------------------------------------------------ */
@@ -258,8 +257,7 @@ const API = (function () {
   let _keepaliveTimer = null;
   function startKeepalive() {
     if (_keepaliveTimer) return;
-    // Ping once immediately on login (in case warmup expired)
-    _silentPing();
+    // Set 4-min recurring ping (warmup/session-restore already handled startup)
     _keepaliveTimer = setInterval(_silentPing, 4 * 60 * 1000);
   }
   function stopKeepalive() {
@@ -267,7 +265,7 @@ const API = (function () {
   }
   function _silentPing() {
     if (!getToken()) { stopKeepalive(); return; }
-    rawCall('ping', {}).catch(() => {});
+    call('ping', {}).catch(() => {});
   }
 
   /* ------------------------------------------------------------------ */
