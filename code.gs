@@ -56,7 +56,7 @@ var STATUS_VALUES = ['Not Started', 'Learning', 'Understood', 'Practiced', 'Mast
 var PRIORITY_VALUES = ['Low', 'Medium', 'High', 'Critical'];
 var LANGUAGE_VALUES = ['en', 'ar'];
 
-var SCHEMA_VERSION_TARGET = '3';
+var SCHEMA_VERSION_TARGET = '4';
 
 // Actions that mutate data. Only these acquire the script lock — read
 // actions run without locking so parallel requests from the same page
@@ -811,7 +811,8 @@ function actionCreateTopic(user, payload) {
     id: id, user_id: user.id, module_id: payload.module_id, category_id: payload.category_id || '',
     topic: String(payload.topic).trim(), description: payload.description || '', priority: priority,
     status: 'Not Started', progress: 0, created_at: nowIso(), updated_at: nowIso(),
-    completed_at: '', last_review: '', next_review: ''
+    completed_at: '', last_review: '', next_review: '',
+    tags: payload.tags || '', pinned: !!payload.pinned, target_date: payload.target_date || ''
   };
   appendRow(SHEET_NAMES.TOPICS, topic);
 
@@ -832,9 +833,10 @@ function actionUpdateTopic(user, payload) {
   var topic = getTopicById(payload.id);
   if (!topic || topic.user_id !== user.id) return errorResponse('Topic not found.', 'TOPIC_NOT_FOUND');
   var updates = { updated_at: nowIso() };
-  ['topic', 'description', 'module_id', 'category_id'].forEach(function(f) {
+  ['topic', 'description', 'module_id', 'category_id', 'tags', 'target_date'].forEach(function(f) {
     if (payload[f] !== undefined) updates[f] = payload[f];
   });
+  if (payload.pinned !== undefined) updates.pinned = !!payload.pinned;
   if (payload.priority && PRIORITY_VALUES.indexOf(payload.priority) !== -1) updates.priority = payload.priority;
   var updated = updateRowByObj(SHEET_NAMES.TOPICS, topic, updates);
   return successResponse(stripRow(updated), 'Topic updated successfully.');
@@ -984,6 +986,9 @@ function actionCreateNote(user, payload) {
   var sectionName = String(payload.section_name || '').trim();
   var content = String(payload.content || '').trim();
   var moduleId = String(payload.module_id || '').trim();
+  var tags = String(payload.tags || '').trim();
+  var pinned = !!payload.pinned;
+  var imageUrl = String(payload.image_url || payload.image_data || '').trim();
 
   if (!title || !content || !moduleId) return errorResponse('Title, content, and module are required.', 'NOTE_FIELDS_REQUIRED');
 
@@ -995,6 +1000,9 @@ function actionCreateNote(user, payload) {
     title: title,
     section_name: sectionName,
     content: content,
+    tags: tags,
+    pinned: pinned,
+    image_url: imageUrl,
     created_at: nowIso(),
     updated_at: nowIso()
   };
@@ -1009,15 +1017,21 @@ function actionUpdateNote(user, payload) {
   var title = payload.title !== undefined ? String(payload.title).trim() : note.title;
   var sectionName = payload.section_name !== undefined ? String(payload.section_name).trim() : note.section_name;
   var content = payload.content !== undefined ? String(payload.content).trim() : note.content;
+  var moduleId = payload.module_id !== undefined ? String(payload.module_id).trim() : note.module_id;
 
   if (!title || !content) return errorResponse('Title and content are required.', 'NOTE_FIELDS_REQUIRED');
 
   var updates = {
+    module_id: moduleId,
     title: title,
     section_name: sectionName,
     content: content,
     updated_at: nowIso()
   };
+  if (payload.tags !== undefined) updates.tags = String(payload.tags).trim();
+  if (payload.pinned !== undefined) updates.pinned = !!payload.pinned;
+  if (payload.image_url !== undefined) updates.image_url = String(payload.image_url).trim();
+
   var updated = updateRowByObj(SHEET_NAMES.NOTES, note, updates);
   return successResponse(stripRow(updated), 'Note updated successfully.');
 }
@@ -1207,10 +1221,10 @@ function createSheetsIfMissing() {
     Sessions: ['session_id', 'user_id', 'created_at', 'expires_at', 'active', 'last_activity'],
     Modules: ['id', 'name_ar', 'name_en', 'description', 'active'],
     Categories: ['id', 'module_id', 'name_ar', 'name_en', 'description', 'active', 'created_at', 'updated_at'],
-    Topics: ['id', 'user_id', 'module_id', 'category_id', 'topic', 'description', 'priority', 'status', 'progress', 'created_at', 'updated_at', 'completed_at', 'last_review', 'next_review'],
+    Topics: ['id', 'user_id', 'module_id', 'category_id', 'topic', 'description', 'priority', 'status', 'progress', 'created_at', 'updated_at', 'completed_at', 'last_review', 'next_review', 'tags', 'pinned', 'target_date'],
     Knowledge: ['id', 'user_id', 'topic_id', 'what_i_know', 'what_i_dont_know', 'what_i_need_to_learn', 'business_understanding', 'erp_understanding', 'practical_experience', 'notes', 'updated_at'],
     Reviews: ['id', 'user_id', 'topic_id', 'review_date', 'understanding', 'notes'],
-    Notes: ['id', 'user_id', 'module_id', 'title', 'section_name', 'content', 'created_at', 'updated_at']
+    Notes: ['id', 'user_id', 'module_id', 'title', 'section_name', 'content', 'created_at', 'updated_at', 'tags', 'pinned', 'image_url']
   };
   Object.keys(schemas).forEach(function(name) {
     var sheet = spreadsheet.getSheetByName(name);
@@ -1261,10 +1275,13 @@ function ensureSchema() {
   createSheetsIfMissing();
   migrateAddMissingColumns(SHEET_NAMES.USERS, ['language'], { language: 'en' });
   migrateAddMissingColumns(SHEET_NAMES.CATEGORIES, ['description', 'created_at', 'updated_at'], { description: '', created_at: '', updated_at: '' });
+  migrateAddMissingColumns(SHEET_NAMES.NOTES, ['tags', 'pinned', 'image_url'], { tags: '', pinned: false, image_url: '' });
+  migrateAddMissingColumns(SHEET_NAMES.TOPICS, ['tags', 'pinned', 'target_date'], { tags: '', pinned: false, target_date: '' });
 
   invalidateHeadersCache(SHEET_NAMES.USERS);
   invalidateHeadersCache(SHEET_NAMES.CATEGORIES);
   invalidateHeadersCache(SHEET_NAMES.NOTES);
+  invalidateHeadersCache(SHEET_NAMES.TOPICS);
   invalidateUsersIndex();
   invalidateCategoriesCache();
 

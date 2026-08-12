@@ -152,8 +152,14 @@ const API = (function () {
     }
     const url = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
 
-    // Use GET strictly for read actions and ping. Write actions must use POST.
-    const isGet = READ_ACTIONS.has(action) || action === 'ping';
+  const READ_ACTIONS = new Set([
+    'validateSession', 'currentUser', 'modules', 'categories',
+    'topics', 'topic', 'knowledge', 'notes', 'note',
+    'reviews', 'dashboard', 'analytics', 'adminUsers', 'ping'
+  ]);
+
+  // Use GET strictly for read actions and ping. Write actions must use POST.
+  const isGet = READ_ACTIONS.has(action);
 
     const fetchUrl = isGet ? url : CONFIG.API_URL;
     const fetchOpts = isGet
