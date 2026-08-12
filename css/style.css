@@ -78,10 +78,7 @@ button{ font-family:inherit; cursor:pointer; }
   width:var(--sidebar-w); flex-shrink:0;
   background:var(--ink); color:var(--paper);
   display:flex; flex-direction:column;
-  position:fixed;
-  left: 0;
-  right: auto;
-  top:0; bottom:0;
+  position:fixed; inset-inline-start:0; top:0; bottom:0;
   z-index:20; transition:transform .2s ease;
 }
 [data-theme="dark"] .sidebar{ background:#0B0E13; }
@@ -112,13 +109,7 @@ button{ font-family:inherit; cursor:pointer; }
 .sidebar-footer{ padding:12px; border-top:1px solid rgba(255,255,255,.08); }
 
 /* --- Main --------------------------------------------------------------- */
-.main{
-  margin-inline-start: var(--sidebar-w);
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
+.main{ margin-inline-start:var(--sidebar-w); flex:1; min-width:0; display:flex; flex-direction:column; }
 .topbar{
   display:flex; align-items:center; justify-content:space-between;
   padding:16px 28px; border-bottom:1px solid var(--line);
@@ -275,144 +266,40 @@ tbody tr:hover{ background:var(--line-soft); }
 @keyframes spin{ to{ transform:rotate(360deg); } }
 
 /* ---------------------------------------------------------------------- */
-/* RTL / LTR adaptive styles using CSS logical properties               */
+/* Auth screens                                                          */
 /* ---------------------------------------------------------------------- */
-
-/* LTR default: sidebar on left, visible */
-[dir="ltr"] .sidebar {
-  left: 0;
-  right: auto;
-  transform: translateX(0);
+.auth-wrap{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(181,119,46,.10), transparent 40%),
+    var(--paper);
+  padding:20px; position:relative;
 }
 
-/* RTL default: sidebar on right, visible */
-[dir="rtl"] .sidebar {
-  right: 0;
-  left: auto;
-  transform: translateX(0);
-}
+/* --- Language switcher --------------------------------------------------- */
+.lang-switch{ display:flex; gap:2px; background:var(--line-soft); padding:3px; border-radius:8px; flex-shrink:0; }
+.lang-btn{ padding:5px 10px; border:none; background:none; border-radius:6px; font-size:11.5px; font-weight:700; color:var(--ink-soft); font-family:var(--font-mono); }
+.lang-btn.active{ background:var(--paper-raised); color:var(--brass-deep); box-shadow:0 1px 2px rgba(0,0,0,.08); }
+.lang-switch-floating{ position:absolute; top:20px; inset-inline-end:20px; }
 
-/* Mirror sidebar-brand icon position for RTL */
-[dir="rtl"] .sidebar-brand {
-  flex-direction: row-reverse;
+/* --- Arabic type: swap in a font with proper Arabic glyph coverage ------- */
+[dir="rtl"] body{ font-family:'Cairo', 'Inter', 'Segoe UI', sans-serif; }
+[dir="rtl"] h1,[dir="rtl"] h2,[dir="rtl"] h3,[dir="rtl"] h4,
+[dir="rtl"] .sidebar-brand-text,[dir="rtl"] .auth-brand-text,[dir="rtl"] .kpi-value{
+  font-family:'Cairo', 'Space Grotesk', sans-serif;
 }
-[dir="rtl"] .sidebar-brand-text {
-  text-align: right;
-}
-
-/* Flip search box icon position */
-[dir="rtl"] .search-box .icon {
-  left: auto;
-  right: 10px;
-}
-[dir="rtl"] .search-box input {
-  padding-inline-end: 32px;
-  padding-inline-start: 12px;
-}
-
-/* Flip menu toggle icon orientation */
-[dir="rtl"] .menu-toggle {
-  transform: scaleX(-1);
-}
-
-/* Sidebar nav items — indent sub-items from the correct side */
-[dir="rtl"] .nav-module-sub {
-  padding-inline-end: 14px;
-  padding-inline-start: 12px;
-}
-
-/* Status stepper: flip order visually in RTL */
-[dir="rtl"] .status-stepper {
-  flex-direction: row-reverse;
-}
-
-/* Gauge ring labels — center aligned in RTL too */
-[dir="rtl"] .module-card-head {
-  flex-direction: row-reverse;
-}
-
-/* Table header border radius follows direction */
-[dir="rtl"] thead th:first-child {
-  border-start-start-radius: var(--radius-md);
-}
-[dir="rtl"] thead th:last-child {
-  border-start-end-radius: var(--radius-md);
-}
-[dir="rtl"] tbody tr:last-child td:first-child {
-  border-end-start-radius: var(--radius-md);
-}
-[dir="rtl"] tbody tr:last-child td:last-child {
-  border-end-end-radius: var(--radius-md);
-}
-
-/* Modal close button alignment */
-[dir="rtl"] .modal-head > div:last-child {
-  direction: ltr;
-}
-
-/* Form labels right-aligned in RTL */
-[dir="rtl"] .field label {
-  text-align: right;
-}
-
-/* KPI value centering */
-[dir="rtl"] .kpi-card {
-  text-align: center;
-}
-[dir="rtl"] .kpi-label {
-  text-align: center;
-}
-
-/* Toast stack position flips */
-[dir="rtl"] .toast-stack {
-  left: 20px;
-  right: auto;
-}
-
-/* Module card stats */
-[dir="rtl"] .module-stats {
-  justify-content: flex-start;
-}
-
-/* Toolbar filter selects */
-[dir="rtl"] .toolbar .field {
-  margin-inline-end: 0;
-  margin-inline-start: 10px;
-}
-
-/* Status stepper buttons */
-[dir="rtl"] .status-step {
-  direction: rtl;
-}
-
-/* Button icon positioning in RTL modals */
-[dir="rtl"] .modal-head button[data-close] {
-  margin-inline-start: 0;
-  margin-inline-end: 8px;
-}
+.auth-card{ width:100%; max-width:400px; }
+.auth-brand{ display:flex; align-items:center; gap:10px; margin-bottom:22px; }
+.auth-brand-text{ font-family:var(--font-display); font-size:17px; }
+.auth-tabs{ display:flex; gap:4px; margin-bottom:18px; background:var(--line-soft); padding:4px; border-radius:var(--radius-sm); }
+.auth-tab{ flex:1; text-align:center; padding:8px; border-radius:6px; font-size:13px; font-weight:600; border:none; background:none; color:var(--ink-soft); }
+.auth-tab.active{ background:var(--paper-raised); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.08); }
 
 /* ---------------------------------------------------------------------- */
-/* Responsive                                                             */
+/* Detail sections                                                        */
 /* ---------------------------------------------------------------------- */
-@media (max-width: 900px) {
-  /* On mobile, hide sidebar by default */
-  .sidebar {
-    transform: translateX(-100%);
-  }
-  [dir="rtl"] .sidebar {
-    transform: translateX(100%);
-  }
-  .sidebar.open {
-    transform: translateX(0);
-  }
-  .main {
-    margin-inline-start: 0;
-  }
-  .menu-toggle {
-    display: inline-flex;
-  }
-}
-
+.section-title{ font-size:14px; margin:22px 0 10px; display:flex; align-items:center; gap:8px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.06em; }
+.detail-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 @media (max-width:720px){ .detail-grid{ grid-template-columns:1fr; } }
 
 .tabs{ display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:16px; }
@@ -428,5 +315,9 @@ tbody tr:hover{ background:var(--line-soft); }
 /* Responsive                                                             */
 /* ---------------------------------------------------------------------- */
 @media (max-width:900px){
+  .sidebar{ transform:translateX(-104%); }
+  [dir="rtl"] .sidebar{ transform:translateX(104%); }
+  .sidebar.open{ transform:translateX(0); }
+  .main{ margin-inline-start:0; }
   .menu-toggle{ display:inline-flex; }
 }
