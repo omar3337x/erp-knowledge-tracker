@@ -119,33 +119,61 @@ const State = {
 const REF_CACHE_KEY = 'erp_tracker_ref_cache_v1';
 const REF_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 h — reference data changes rarely
 
+const DEFAULT_MODULES = [
+  { id: 'MOD-1', name_en: 'Inventory', name_ar: 'المخزون' },
+  { id: 'MOD-2', name_en: 'Accounting', name_ar: 'الحسابات' },
+  { id: 'MOD-3', name_en: 'Maintenance', name_ar: 'الصيانة' },
+  { id: 'MOD-4', name_en: 'Assets', name_ar: 'الأصول' },
+  { id: 'MOD-5', name_en: 'Transportation', name_ar: 'النقليات' },
+  { id: 'MOD-6', name_en: 'HR', name_ar: 'الموارد البشرية' },
+  { id: 'MOD-7', name_en: 'Real Estate', name_ar: 'العقارات' },
+  { id: 'MOD-8', name_en: 'Contracting', name_ar: 'المقاولات' },
+  { id: 'MOD-9', name_en: 'Fuel Stations', name_ar: 'الوقود' },
+  { id: 'MOD-10', name_en: 'Law Firm', name_ar: 'المحاماة' }
+];
+
 /**
  * Loads Modules + ALL Categories in parallel.
  * Uses a localStorage layer (12 h TTL) as the outermost cache so a hard
  * refresh or new tab still feels instant. The in-memory API cache handles
- * all navigations within the same tab.
+ * all navigations within the same tab. Guaranteed fallback if offline/empty.
  */
 async function loadReferenceData() {
-  // Fast path: localStorage cache still fresh
   try {
     const raw = localStorage.getItem(REF_CACHE_KEY);
     if (raw) {
       const cached = JSON.parse(raw);
-      if (Date.now() - cached.savedAt < REF_CACHE_TTL_MS) {
+      if (Date.now() - cached.savedAt < REF_CACHE_TTL_MS && Array.isArray(cached.modules) && cached.modules.length > 0) {
         State.modulesCache  = cached.modules;
-        State.allCategories = cached.categories;
+        State.allCategories = cached.categories || [];
         return;
       }
     }
   } catch (e) { /* corrupt cache — fall through to network */ }
 
-  // Slow path: fetch both in parallel
-  const [modules, categories] = await Promise.all([API.modules(), API.categories()]);
-  State.modulesCache  = modules;
-  State.allCategories = categories;
   try {
-    localStorage.setItem(REF_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), modules, categories }));
-  } catch (e) { /* storage full/unavailable — non-fatal */ }
+    const [modules, categories] = await Promise.all([
+      API.modules().catch(() => null),
+      API.categories().catch(() => null)
+    ]);
+    if (Array.isArray(modules) && modules.length > 0) {
+      State.modulesCache = modules;
+    } else if (!Array.isArray(State.modulesCache) || !State.modulesCache.length) {
+      State.modulesCache = DEFAULT_MODULES;
+    }
+    if (Array.isArray(categories)) {
+      State.allCategories = categories;
+    }
+    localStorage.setItem(REF_CACHE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      modules: State.modulesCache,
+      categories: State.allCategories || []
+    }));
+  } catch (e) {
+    if (!Array.isArray(State.modulesCache) || !State.modulesCache.length) {
+      State.modulesCache = DEFAULT_MODULES;
+    }
+  }
 }
 
 function invalidateReferenceCache() {
@@ -245,7 +273,13 @@ const App = (function () {
 
   function buildSidebarModules() {
     const nav = document.getElementById('nav-modules');
-    nav.innerHTML = State.modulesCache.map(m => `
+    if (!nav) return;
+
+    const modules = (Array.isArray(State.modulesCache) && State.modulesCache.length > 0)
+      ? State.modulesCache
+      : DEFAULT_MODULES;
+
+    nav.innerHTML = modules.map(m => `
       <button class="nav-item nav-module-sub" data-route="module" data-module-id="${m.id}">
         <span class="dot"></span>${I18n.localizedName(m)}
       </button>
