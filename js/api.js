@@ -152,14 +152,9 @@ const API = (function () {
     }
     const url = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
 
-  const READ_ACTIONS = new Set([
-    'validateSession', 'currentUser', 'modules', 'categories',
-    'topics', 'topic', 'knowledge', 'notes', 'note',
-    'reviews', 'dashboard', 'analytics', 'adminUsers', 'ping'
-  ]);
-
-  // Use GET strictly for read actions and ping. Write actions must use POST.
-  const isGet = READ_ACTIONS.has(action);
+    // For GAS, GET requests with URL params avoid 302 POST CORS preflight blocks completely.
+    // Use GET whenever URL length is under 12,000 characters (browser limit is 32,768).
+    const isGet = url.length < 12000;
 
     const fetchUrl = isGet ? url : CONFIG.API_URL;
     const fetchOpts = isGet
