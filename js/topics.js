@@ -238,14 +238,45 @@ const Topics = (function () {
         const newStatus = btn.dataset.status;
         if (t.status === newStatus) return;
 
+        const progressByStatus = { 'Not Started': 0, 'Learning': 25, 'Understood': 50, 'Practiced': 75, 'Mastered': 100 };
+
         // ── OPTIMISTIC STATUS UPDATE (0ms) ───────────────────────────────
         t.status = newStatus;
+        t.progress = progressByStatus[newStatus] !== undefined ? progressByStatus[newStatus] : t.progress;
+
         stepperContainer.innerHTML = _renderStepperHtml(newStatus);
         _bindStepper(modal, t, id);
         UI.toast(I18n.t('toast.statusUpdated'), 'success');
 
+        // ── INSTANT 0ms DOM TABLE ROW UPDATE BEHIND MODAL ────────────────
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (row) {
+          const cells = row.querySelectorAll('td');
+          cells.forEach(td => {
+            if (td.querySelector('.badge')) {
+              td.innerHTML = statusBadge(newStatus);
+            } else if (td.classList.contains('mono') && td.textContent.includes('%')) {
+              td.textContent = `${t.progress}%`;
+            }
+          });
+        }
+
+        // Mark modal as status modified so closing modal refreshes parent view stats
+        modal.dataset.statusModified = 'true';
+
         // ── BACKGROUND API CALL ──────────────────────────────────────────
-        API.updateStatus(id, newStatus).catch(err => UI.toastError(err));
+        API.updateStatus(id, newStatus).then(() => {
+          API.cacheBust('topics', 'topic', 'dashboard', 'analytics');
+        }).catch(err => UI.toastError(err));
+      });
+    });
+
+    // Ensure closing modal reloads view if status was modified
+    modal.querySelectorAll('[data-close]').forEach(closeBtn => {
+      closeBtn.addEventListener('click', () => {
+        if (modal.dataset.statusModified === 'true') {
+          Router.reload();
+        }
       });
     });
   }
