@@ -65,6 +65,7 @@ const Notes = (function () {
   async function reloadNotes(listWrap, badgeEl, searchQuery) {
     try {
       _currentNotes = await API.notes(_currentModuleId);
+      if (!Array.isArray(_currentNotes)) _currentNotes = [];
       if (badgeEl) badgeEl.textContent = _currentNotes.length;
       renderNotesList(listWrap, searchQuery);
     } catch (err) {
@@ -83,9 +84,9 @@ const Notes = (function () {
 
     if (query) {
       filtered = _currentNotes.filter(n =>
-        (n.title || '').toLowerCase().includes(query) ||
-        (n.section_name || '').toLowerCase().includes(query) ||
-        (n.content || '').toLowerCase().includes(query)
+        String(n.title || '').toLowerCase().includes(query) ||
+        String(n.section_name || '').toLowerCase().includes(query) ||
+        String(n.content || '').toLowerCase().includes(query)
       );
     }
 
@@ -108,7 +109,7 @@ const Notes = (function () {
     // Group notes by section_name
     const groups = {};
     filtered.forEach(note => {
-      const section = (note.section_name || '').trim() || I18n.t('notes.uncategorized');
+      const section = String(note.section_name || '').trim() || I18n.t('notes.uncategorized');
       if (!groups[section]) groups[section] = [];
       groups[section].push(note);
     });
@@ -135,7 +136,7 @@ const Notes = (function () {
         e.stopPropagation();
         const action = btn.dataset.action;
         const noteId = btn.dataset.id;
-        const note = _currentNotes.find(n => n.id === noteId);
+        const note = _currentNotes.find(n => String(n.id) === String(noteId));
         if (!note) return;
 
         const badgeEl = document.querySelector('#notes-count-badge');
@@ -152,14 +153,15 @@ const Notes = (function () {
       card.addEventListener('click', (e) => {
         if (e.target.closest('.note-action-btn')) return;
         const noteId = card.dataset.id;
-        const note = _currentNotes.find(n => n.id === noteId);
+        const note = _currentNotes.find(n => String(n.id) === String(noteId));
         if (note) openViewModal(note);
       });
     });
   }
 
   function noteCardHtml(n) {
-    const sectionBadge = (n.section_name || '').trim() ? escapeHtml(n.section_name) : I18n.t('notes.uncategorized');
+    const sName = String(n.section_name || '').trim();
+    const sectionBadge = sName ? escapeHtml(sName) : I18n.t('notes.uncategorized');
     return `
       <div class="note-card" data-id="${n.id}">
         <div class="note-card-header">
@@ -254,14 +256,14 @@ const Notes = (function () {
         content: content
       }).then(realNote => {
         // Swap temp note with real server note
-        const idx = _currentNotes.findIndex(n => n.id === tempId);
+        const idx = _currentNotes.findIndex(n => String(n.id) === String(tempId));
         if (idx !== -1 && realNote && realNote.id) {
           _currentNotes[idx] = realNote;
           renderNotesList(listWrap, searchInput ? searchInput.value : '');
         }
       }).catch(err => {
         // Revert local optimistic addition on error
-        _currentNotes = _currentNotes.filter(n => n.id !== tempId);
+        _currentNotes = _currentNotes.filter(n => String(n.id) !== String(tempId));
         if (badgeEl) badgeEl.textContent = _currentNotes.length;
         renderNotesList(listWrap, searchInput ? searchInput.value : '');
         UI.toast(I18n.errorMessage(err), 'error');
@@ -278,15 +280,15 @@ const Notes = (function () {
       <form id="edit-note-form">
         <div class="field">
           <label class="required">${I18n.t('notes.noteTitle')}</label>
-          <input type="text" name="title" required value="${escapeHtml(note.title || '')}" placeholder="${I18n.t('notes.noteTitlePlaceholder')}">
+          <input type="text" name="title" required value="${escapeHtml(note.title)}" placeholder="${I18n.t('notes.noteTitlePlaceholder')}">
         </div>
         <div class="field">
           <label>${I18n.t('notes.sectionName')}</label>
-          <input type="text" name="section_name" value="${escapeHtml(note.section_name || '')}" placeholder="${I18n.t('notes.sectionNamePlaceholder')}">
+          <input type="text" name="section_name" value="${escapeHtml(note.section_name)}" placeholder="${I18n.t('notes.sectionNamePlaceholder')}">
         </div>
         <div class="field">
           <label class="required">${I18n.t('notes.content')}</label>
-          <textarea name="content" rows="6" required placeholder="${I18n.t('notes.contentPlaceholder')}">${escapeHtml(note.content || '')}</textarea>
+          <textarea name="content" rows="6" required placeholder="${I18n.t('notes.contentPlaceholder')}">${escapeHtml(note.content)}</textarea>
         </div>
         <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
           <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.cancel')}</button>
@@ -345,7 +347,8 @@ const Notes = (function () {
   }
 
   function openViewModal(note) {
-    const sectionBadge = (note.section_name || '').trim() ? escapeHtml(note.section_name) : I18n.t('notes.uncategorized');
+    const sName = String(note.section_name || '').trim();
+    const sectionBadge = sName ? escapeHtml(sName) : I18n.t('notes.uncategorized');
     const html = `
       <div class="modal-head">
         <h3>${I18n.t('notes.viewNote')}</h3>
@@ -368,6 +371,7 @@ const Notes = (function () {
   }
 
   function openDeleteConfirmModal(note, listWrap, badgeEl, searchInput) {
+    const sName = String(note.section_name || '').trim();
     const html = `
       <div class="modal-head">
         <h3>${I18n.t('notes.deleteNote')}</h3>
@@ -376,7 +380,7 @@ const Notes = (function () {
       <p style="margin-bottom:20px; font-size:14px; color:var(--ink);">${I18n.t('notes.confirmDelete')}</p>
       <div style="padding:10px 14px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); margin-bottom:20px;">
         <strong>${escapeHtml(note.title)}</strong>
-        ${(note.section_name || '').trim() ? `<small style="display:block; color:var(--ink-soft);">[ ${escapeHtml(note.section_name)} ]</small>` : ''}
+        ${sName ? `<small style="display:block; color:var(--ink-soft);">[ ${escapeHtml(sName)} ]</small>` : ''}
       </div>
       <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
         <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.cancel')}</button>
@@ -389,7 +393,7 @@ const Notes = (function () {
     const deleteBtn = document.getElementById('confirm-delete-note-btn');
     deleteBtn.addEventListener('click', () => {
       // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
-      const deletedIdx = _currentNotes.findIndex(n => n.id === note.id);
+      const deletedIdx = _currentNotes.findIndex(n => String(n.id) === String(note.id));
       if (deletedIdx !== -1) {
         _currentNotes.splice(deletedIdx, 1);
       }
@@ -413,7 +417,7 @@ const Notes = (function () {
   }
 
   function escapeHtml(str) {
-    if (!str) return '';
+    if (str == null) return '';
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
