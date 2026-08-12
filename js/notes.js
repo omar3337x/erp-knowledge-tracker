@@ -193,7 +193,11 @@ const Notes = (function () {
   // --------------------------------------------------------------------
 
   function openAddModal(moduleId, onSaved) {
-    const body = `
+    const html = `
+      <div class="modal-head">
+        <h3>${I18n.t('notes.addNote')}</h3>
+        <button class="btn btn-icon btn-ghost" data-close>&times;</button>
+      </div>
       <form id="add-note-form">
         <div class="field">
           <label class="required">${I18n.t('notes.noteTitle')}</label>
@@ -208,13 +212,13 @@ const Notes = (function () {
           <textarea name="content" rows="6" required placeholder="${I18n.t('notes.contentPlaceholder')}"></textarea>
         </div>
         <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-          <button type="button" class="btn btn-secondary" data-modal-close>${I18n.t('common.cancel')}</button>
+          <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.cancel')}</button>
           <button type="submit" class="btn btn-primary">${I18n.t('common.save')}</button>
         </div>
       </form>
     `;
 
-    UI.openModal(I18n.t('notes.addNote'), body);
+    UI.openModal(html);
 
     const form = document.getElementById('add-note-form');
     form.addEventListener('submit', async (e) => {
@@ -252,7 +256,11 @@ const Notes = (function () {
   }
 
   function openEditModal(note, onSaved) {
-    const body = `
+    const html = `
+      <div class="modal-head">
+        <h3>${I18n.t('notes.editNote')}</h3>
+        <button class="btn btn-icon btn-ghost" data-close>&times;</button>
+      </div>
       <form id="edit-note-form">
         <div class="field">
           <label class="required">${I18n.t('notes.noteTitle')}</label>
@@ -267,13 +275,13 @@ const Notes = (function () {
           <textarea name="content" rows="6" required placeholder="${I18n.t('notes.contentPlaceholder')}">${escapeHtml(note.content || '')}</textarea>
         </div>
         <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-          <button type="button" class="btn btn-secondary" data-modal-close>${I18n.t('common.cancel')}</button>
+          <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.cancel')}</button>
           <button type="submit" class="btn btn-primary">${I18n.t('common.save')}</button>
         </div>
       </form>
     `;
 
-    UI.openModal(I18n.t('notes.editNote'), body);
+    UI.openModal(html);
 
     const form = document.getElementById('edit-note-form');
     form.addEventListener('submit', async (e) => {
@@ -312,7 +320,11 @@ const Notes = (function () {
 
   function openViewModal(note) {
     const sectionBadge = (note.section_name || '').trim() ? escapeHtml(note.section_name) : I18n.t('notes.uncategorized');
-    const body = `
+    const html = `
+      <div class="modal-head">
+        <h3>${I18n.t('notes.viewNote')}</h3>
+        <button class="btn btn-icon btn-ghost" data-close>&times;</button>
+      </div>
       <div class="note-detail-wrap">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
           <span class="note-section-badge">${sectionBadge}</span>
@@ -321,28 +333,32 @@ const Notes = (function () {
         <h3 style="font-size:18px; font-weight:700; margin:0 0 12px; color:var(--ink);">${escapeHtml(note.title)}</h3>
         <div class="note-detail-content">${escapeHtml(note.content)}</div>
         <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-          <button type="button" class="btn btn-secondary" data-modal-close>${I18n.t('common.close')}</button>
+          <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.close')}</button>
         </div>
       </div>
     `;
 
-    UI.openModal(I18n.t('notes.viewNote'), body);
+    UI.openModal(html);
   }
 
   function openDeleteConfirmModal(note, onDeleted) {
-    const body = `
+    const html = `
+      <div class="modal-head">
+        <h3>${I18n.t('notes.deleteNote')}</h3>
+        <button class="btn btn-icon btn-ghost" data-close>&times;</button>
+      </div>
       <p style="margin-bottom:20px; font-size:14px; color:var(--ink);">${I18n.t('notes.confirmDelete')}</p>
       <div style="padding:10px 14px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); margin-bottom:20px;">
         <strong>${escapeHtml(note.title)}</strong>
         ${(note.section_name || '').trim() ? `<small style="display:block; color:var(--ink-soft);">[ ${escapeHtml(note.section_name)} ]</small>` : ''}
       </div>
       <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
-        <button type="button" class="btn btn-secondary" data-modal-close>${I18n.t('common.cancel')}</button>
+        <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.cancel')}</button>
         <button type="button" id="confirm-delete-note-btn" class="btn btn-danger">${I18n.t('common.delete')}</button>
       </div>
     `;
 
-    UI.openModal(I18n.t('notes.deleteNote'), body);
+    UI.openModal(html);
 
     const deleteBtn = document.getElementById('confirm-delete-note-btn');
     deleteBtn.addEventListener('click', async () => {
