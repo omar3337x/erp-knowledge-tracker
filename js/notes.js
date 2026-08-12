@@ -11,8 +11,8 @@ const Notes = (function () {
   let _activeTagFilter = '';
 
   function compressImage(dataUrl, maxWidth, quality, callback) {
-    maxWidth = maxWidth || 600;
-    quality = quality || 0.6;
+    maxWidth = maxWidth || 500;
+    quality = quality || 0.5;
     if (!dataUrl || !dataUrl.startsWith('data:image')) {
       callback(dataUrl || '');
       return;
