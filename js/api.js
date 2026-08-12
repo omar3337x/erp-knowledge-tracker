@@ -152,10 +152,10 @@ const API = (function () {
     }
     const url = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
 
-    // Use GET for all actions where payload fits in URL query string (< 3500 chars).
-    // Native GET->GET redirects in GAS are fast (1-1.5s) and never drop payload.
-    const isGet = READ_ACTIONS.has(action) || action === 'ping' || url.length < 3800;
+    // Use GET strictly for read actions and ping. Write actions must use POST.
+    const isGet = READ_ACTIONS.has(action) || action === 'ping';
 
+    const fetchUrl = isGet ? url : CONFIG.API_URL;
     const fetchOpts = isGet
       ? { method: 'GET' }
       : {
@@ -166,7 +166,7 @@ const API = (function () {
 
     let res;
     try {
-      res = await fetch(url, fetchOpts);
+      res = await fetch(fetchUrl, fetchOpts);
     } catch (networkErr) {
       if (attempt < MAX_ATTEMPTS) {
         await _sleep(_retryDelay(attempt));
