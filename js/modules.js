@@ -3,12 +3,15 @@
  * Renders a single Module's dashboard: stats + filterable Topics table +
  * the Categories management section for that module.
  *
- * Only ONE network call happens here (API.topics({module_id})) — Modules
- * and Categories are already sitting in State from the one-time reference
- * data load at boot, so opening a module never re-fetches them.
+ * PERFORMANCE STRATEGY:
+ *   We always call API.topics({}) — which fetches ALL topics for the user
+ *   in one round-trip — then filter to the current module in memory.
+ *   The dashboard pre-warms this cache key in the background right after
+ *   boot, so by the time the user clicks any module the data is already
+ *   ready and this function returns in < 1ms.
  *
- * After a category change, only the categories section + filter dropdown
- * are refreshed in-place. The topics table is NOT reloaded unless needed.
+ *   Modules and Categories are already in State from the one-time reference
+ *   data load at boot, so no extra calls for those.
  */
 
 const Modules = (function () {
@@ -19,15 +22,18 @@ const Modules = (function () {
     const mod = State.modulesCache.find(m => m.id === moduleId);
     if (!mod) { container.innerHTML = UI.errorState({ code: 'MODULE_NOT_FOUND' }); return; }
 
-    let topics;
+    let allTopics;
     try {
-      topics = await API.topics({ module_id: moduleId });
+      // ONE cached call — gets all user topics. Filter to this module below.
+      allTopics = await API.topics({});
     } catch (err) {
       container.innerHTML = UI.errorState(err);
       return;
     }
 
-    const stats = computeStats(topics);
+    // Filter to just this module's topics (instant, in memory)
+    const topics = allTopics.filter(t => t.module_id === moduleId);
+    const stats   = computeStats(topics);
 
     container.innerHTML = `
       <div class="grid grid-kpi" style="margin-bottom:20px;">
@@ -67,7 +73,7 @@ const Modules = (function () {
       <div id="categories-section-wrap" style="margin-top:32px;"></div>
     `;
 
-    // ---- topics table logic ----
+    // ---- topics table ----
     const tableWrap = container.querySelector('#topics-table-wrap');
     const draw = () => {
       const catF  = container.querySelector('#filter-category').value;
@@ -84,19 +90,20 @@ const Modules = (function () {
       .forEach(el => el.addEventListener('change', draw));
 
     container.querySelector('#add-gap-btn').addEventListener('click', () => {
-      Topics.openAddModal(moduleId, () => Router.go('module', { id: moduleId }));
+      Topics.openAddModal(moduleId, () => {
+        // Bust topics cache so new topic appears, then re-render
+        API.cacheBust('topics');
+        Router.go('module', { id: moduleId });
+      });
     });
 
     // ---- categories section ----
-    // When a category changes, just refresh the filter-dropdown options in place
     const catWrap = container.querySelector('#categories-section-wrap');
     const onCategoryChange = () => {
-      // Rebuild only the dropdown
       const sel = container.querySelector('#filter-category');
       if (!sel) return;
       const prev = sel.value;
       sel.innerHTML = `<option value="">${I18n.t('module.allCategories')}</option>${_buildCatOptions(moduleId)}`;
-      // Restore previously selected value if it still exists
       if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
       draw();
     };
@@ -112,9 +119,9 @@ const Modules = (function () {
 
   function computeStats(topics) {
     const total = topics.length;
-    const sum = topics.reduce((a, t) => a + Number(t.progress || 0), 0);
+    const sum   = topics.reduce((a, t) => a + Number(t.progress || 0), 0);
     return {
-      progress: total ? Math.round(sum / total) : 0,
+      progress:  total ? Math.round(sum / total) : 0,
       mastered:  topics.filter(t => t.status === 'Mastered').length,
       practiced: topics.filter(t => t.status === 'Practiced').length,
       learning:  topics.filter(t => t.status === 'Learning').length,

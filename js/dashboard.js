@@ -3,14 +3,14 @@
  * Renders the main Dashboard: KPI row, module gauge cards, review summary.
  * ONE API call (API.dashboard()) provides everything on this page.
  *
- * Background prefetch: after rendering, silently kicks off topics fetch for
- * every module so that navigating to any module is instant (cache hit).
- * Uses staggered batches to avoid hammering the GAS endpoint.
+ * Background prefetch: after rendering, fires ONE single API.topics({}) call
+ * that loads ALL topics for all modules in one round-trip. modules.js then
+ * reads from this shared cache — so every module page opens instantly.
  */
 
 const Dashboard = (function () {
 
-  // Track whether we've already prefetched in this session
+  // Prevent re-firing the prefetch if the user navigates back to the dashboard
   let _prefetchDone = false;
 
   async function render(container) {
@@ -56,35 +56,20 @@ const Dashboard = (function () {
     if (reviewBtn) reviewBtn.addEventListener('click', () => Router.go('review'));
 
     // ----------------------------------------------------------------
-    // Background prefetch — fire after a short idle delay so we don't
-    // compete with any pending renders. Stagger one module per request
-    // so we don't queue up 10 simultaneous GAS calls.
+    // Background prefetch — ONE single request fetches ALL topics for
+    // ALL modules at once. modules.js will filter from the same cache.
+    // This fires after a 200ms idle so it doesn't race the initial render.
     // ----------------------------------------------------------------
-    if (!_prefetchDone && State.modulesCache.length) {
+    if (!_prefetchDone) {
       _prefetchDone = true;
-      _prefetchAllModuleTopics(State.modulesCache.map(m => m.id));
+      setTimeout(() => {
+        // Single call — populates cache key 'topics:{}'
+        // modules.js reads from this same key when it calls API.topics({})
+        API.topics({}).catch(() => {});
+        // Also warm up reviews for the Review Center page
+        setTimeout(() => { API.reviews().catch(() => {}); }, 1000);
+      }, 200);
     }
-  }
-
-  /**
-   * Sequentially (staggered) prefetch topics for each module.
-   * Each call goes through API.topics() which populates the in-memory cache,
-   * so when the user navigates to a module the data is already there.
-   *
-   * We use a 700ms gap between requests to be gentle on GAS concurrency.
-   */
-  async function _prefetchAllModuleTopics(moduleIds) {
-    for (const moduleId of moduleIds) {
-      // Small delay before each prefetch to avoid hammering the API
-      await new Promise(r => setTimeout(r, 700));
-      // Only prefetch if we don't already have it cached
-      API.topics({ module_id: moduleId }).catch(() => {}); // silent failure
-    }
-    // Also prefetch all topics (for gaps/search pages) and reviews
-    await new Promise(r => setTimeout(r, 700));
-    API.topics({}).catch(() => {});
-    await new Promise(r => setTimeout(r, 700));
-    API.reviews().catch(() => {});
   }
 
   function kpiCard(label, value, tone) {
