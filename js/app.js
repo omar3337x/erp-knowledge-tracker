@@ -100,6 +100,31 @@ const UI = (function () {
   return { toast, toastError, openModal, closeModal, emptyState, errorState, fmtDate, gaugeRing, applyTheme, applyStaticTranslations };
 })();
 
+const ExportUtil = {
+  downloadCsv(filename, headers, rows) {
+    const processRow = row => row.map(val => {
+      let v = val === null || val === undefined ? '' : String(val);
+      v = v.replace(/"/g, '""');
+      if (v.search(/("|,|\n)/) >= 0) v = `"${v}"`;
+      return v;
+    }).join(',');
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(processRow)].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  },
+
+  exportPdf() {
+    window.print();
+  }
+};
+
 // ---------------------------------------------------------------------------
 // Global state
 // ---------------------------------------------------------------------------

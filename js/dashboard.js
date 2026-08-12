@@ -1,16 +1,10 @@
 /**
  * js/dashboard.js
- * Renders the main Dashboard: KPI row, module gauge cards, review summary.
- * ONE API call (API.dashboard()) provides everything on this page.
- *
- * Background prefetch: after rendering, fires ONE single API.topics({}) call
- * that loads ALL topics for all modules in one round-trip. modules.js then
- * reads from this shared cache — so every module page opens instantly.
+ * Renders the main Dashboard: KPI row, Pinned Items Widget (📌), Learning Goals (🎯), Module Cards, Review Summary.
  */
 
 const Dashboard = (function () {
 
-  // Prevent re-firing the prefetch if the user navigates back to the dashboard
   let _prefetchDone = false;
 
   async function render(container) {
@@ -24,6 +18,14 @@ const Dashboard = (function () {
     }
 
     const k = data.kpis;
+    const isAr = I18n.getLang() === 'ar';
+
+    // Fetch pre-cached topics for Pinned & Goals widgets
+    const allTopics = await API.topics({}).catch(() => []);
+
+    const pinnedTopics = (allTopics || []).filter(t => t.pinned === true || t.pinned === 'TRUE' || t.pinned === 'true' || t.pinned === 1);
+    const goalsTopics = (allTopics || []).filter(t => t.target_date && t.status !== 'Mastered');
+
     container.innerHTML = `
       <div class="grid grid-kpi" style="margin-bottom:24px;">
         ${kpiCard(I18n.t('dashboard.overallProgress'), k.overall_progress + '%', 'brass')}
@@ -43,6 +45,63 @@ const Dashboard = (function () {
         <button class="btn btn-sm btn-primary" data-route="review">${I18n.t('dashboard.goToReview')}</button>
       </div>` : ''}
 
+      <!-- 📌 PINNED & 🎯 GOALS WIDGETS ROW -->
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-bottom:28px;">
+
+        <!-- 📌 Pinned Items Widget -->
+        <div class="card" style="padding:18px;">
+          <h3 style="font-size:16px; font-weight:700; margin:0 0 14px; display:flex; align-items:center; gap:6px;">
+            📌 ${isAr ? 'العناصر المثبتة (Pinned)' : 'Pinned Items'}
+            <span class="badge" style="background:var(--gold-soft);">${pinnedTopics.length}</span>
+          </h3>
+          ${!pinnedTopics.length ? `
+            <p style="font-size:13px; color:var(--ink-soft); margin:0;">${isAr ? 'لا توجد مواضيع مثبتة بعد. انقر 📌 على أي موضوع لتثبيته هنا.' : 'No pinned topics yet. Click 📌 on any topic to pin it here.'}</p>
+          ` : `
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              ${pinnedTopics.slice(0, 5).map(t => `
+                <div class="dash-pinned-item" data-id="${t.id}" style="padding:8px 12px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                  <strong>${Topics.escapeHtml(t.topic)}</strong>
+                  ${Topics.statusBadge(t.status)}
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+
+        <!-- 🎯 Learning Goals & Milestones Widget -->
+        <div class="card" style="padding:18px;">
+          <h3 style="font-size:16px; font-weight:700; margin:0 0 14px; display:flex; align-items:center; gap:6px;">
+            🎯 ${isAr ? 'أهداف التعلم والجدول الزمني' : 'Learning Goals & Targets'}
+            <span class="badge" style="background:var(--brass-soft);">${goalsTopics.length}</span>
+          </h3>
+          ${!goalsTopics.length ? `
+            <p style="font-size:13px; color:var(--ink-soft); margin:0;">${isAr ? 'لا توجد أهداف نشطة حالياً. يمكنك تحديد تاريخ هدف عند إضافة أو تعديل أي موضوع.' : 'No active learning goals right now. Set a target date when adding topics.'}</p>
+          ` : `
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              ${goalsTopics.slice(0, 5).map(t => {
+                const now = new Date();
+                const target = new Date(t.target_date);
+                const diffDays = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+                const isOverdue = diffDays < 0;
+
+                return `
+                  <div class="dash-goal-item" data-id="${t.id}" style="padding:8px 12px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                    <div>
+                      <strong>${Topics.escapeHtml(t.topic)}</strong>
+                      <small style="display:block; color:var(--ink-soft);">${UI.fmtDate(t.target_date)}</small>
+                    </div>
+                    <span class="badge ${isOverdue ? 'badge-status-not-started' : 'badge-status-learning'}">
+                      ${isOverdue ? `⚠️ ${isAr ? 'متأخر' : 'Overdue'} (${Math.abs(diffDays)}d)` : `🎯 ${diffDays}d ${isAr ? 'متبقي' : 'left'}`}
+                    </span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+
+      </div>
+
       <h2 style="margin-bottom:14px;">${I18n.t('dashboard.modulesHeading')}</h2>
       <div class="grid grid-modules">
         ${data.modules.map(moduleCard).join('')}
@@ -52,21 +111,17 @@ const Dashboard = (function () {
     container.querySelectorAll('.module-card').forEach(card => {
       card.addEventListener('click', () => Router.go('module', { id: card.dataset.moduleId }));
     });
+    container.querySelectorAll('.dash-pinned-item, .dash-goal-item').forEach(el => {
+      el.addEventListener('click', () => Topics.openDetail(el.dataset.id));
+    });
+
     const reviewBtn = container.querySelector('[data-route="review"]');
     if (reviewBtn) reviewBtn.addEventListener('click', () => Router.go('review'));
 
-    // ----------------------------------------------------------------
-    // Background prefetch — ONE single request fetches ALL topics for
-    // ALL modules at once. modules.js will filter from the same cache.
-    // This fires after a 200ms idle so it doesn't race the initial render.
-    // ----------------------------------------------------------------
     if (!_prefetchDone) {
       _prefetchDone = true;
       setTimeout(() => {
-        // Single call — populates cache key 'topics:{}'
-        // modules.js reads from this same key when it calls API.topics({})
         API.topics({}).catch(() => {});
-        // Also warm up reviews for the Review Center page
         setTimeout(() => { API.reviews().catch(() => {}); }, 1000);
       }, 200);
     }
@@ -80,18 +135,17 @@ const Dashboard = (function () {
   }
 
   function moduleCard(m) {
-    return `<div class="card module-card" data-module-id="${m.id}">
-      <div class="module-card-head">
-        <div class="module-card-title">${I18n.localizedName(m)}<small>${I18n.getLang() === 'ar' ? m.name_en : m.name_ar}</small></div>
-        ${UI.gaugeRing(m.progress, 48)}
+    return `<div class="card module-card" data-module-id="${m.id}" style="cursor:pointer; padding:18px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+        <h3 style="font-size:16px; font-weight:700; margin:0;">${I18n.localizedName(m)}</h3>
+        <span class="mono" style="font-size:13px; font-weight:600; color:var(--brass);">${m.progress}%</span>
       </div>
-      <div class="gauge-bar"><div class="gauge-bar-fill" style="width:${m.progress}%"></div></div>
-      <div class="module-stats">
-        <span>${I18n.t('common.total')}: <b>${m.total}</b></span>
-        <span>${I18n.t('dashboard.mastered')}: <b>${m.mastered}</b></span>
-        <span>${I18n.t('dashboard.practiced')}: <b>${m.practiced}</b></span>
-        <span>${I18n.t('dashboard.learning')}: <b>${m.learning}</b></span>
-        <span>${I18n.t('dashboard.knowledgeGaps')}: <b>${m.not_started}</b></span>
+      <div class="progress-bar-wrap" style="margin-bottom:12px;">
+        <div class="progress-bar-fill" style="width:${m.progress}%;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--ink-soft);">
+        <span>${I18n.t('module.totalTopics')}: ${m.total}</span>
+        <span>${I18n.t('module.knowledgeGaps')}: ${m.not_started + m.learning}</span>
       </div>
     </div>`;
   }

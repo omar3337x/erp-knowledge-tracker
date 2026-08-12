@@ -17,7 +17,12 @@ const I18N_DICT = {
       activate: 'Activate', deactivate: 'Deactivate', search: 'Search', actions: 'Actions',
       yes: 'Yes', no: 'No', confirm: 'Confirm', loading: 'Loading...', saving: 'Saving...',
       all: 'All', description: 'Description', status: 'Status', active: 'Active', inactive: 'Inactive',
-      name: 'Name', total: 'Total', notFound: 'Not found', notFoundHint: 'Use the sidebar to navigate.'
+      name: 'Name', total: 'Total', notFound: 'Not found', notFoundHint: 'Use the sidebar to navigate.',
+      exportPdf: 'Export PDF', exportCsv: 'Export CSV', tags: 'Tags', addTags: 'Add Tags (comma separated)',
+      pin: 'Pin', unpin: 'Unpin', pinned: 'Pinned', targetDate: 'Target Date', learningGoals: 'Learning Goals',
+      daysLeft: 'days left', overdue: 'Overdue', attachImage: 'Attach Image / Screenshot',
+      pasteImage: 'Click or Paste Image (Ctrl+V)', removeImage: 'Remove Image',
+      filterByTag: 'Filter by Tag', filterByPriority: 'Filter by Priority', filterByStatus: 'Filter by Status'
     },
 
     nav: {
@@ -178,7 +183,12 @@ const I18N_DICT = {
       activate: 'تفعيل', deactivate: 'إلغاء التفعيل', search: 'بحث', actions: 'إجراءات',
       yes: 'نعم', no: 'لا', confirm: 'تأكيد', loading: 'جاري التحميل...', saving: 'جاري الحفظ...',
       all: 'الكل', description: 'الوصف', status: 'الحالة', active: 'مفعّل', inactive: 'غير مفعّل',
-      name: 'الاسم', total: 'الإجمالي', notFound: 'غير موجود', notFoundHint: 'استخدم القائمة الجانبية للتنقل.'
+      name: 'الاسم', total: 'الإجمالي', notFound: 'غير موجود', notFoundHint: 'استخدم القائمة الجانبية للتنقل.',
+      exportPdf: 'تصدير PDF', exportCsv: 'تصدير CSV / اكسل', tags: 'الوسوم (التاجات)', addTags: 'إضافة تاجات (مفصولة بفواصل)',
+      pin: 'تثبيت', unpin: 'إلغاء التثبيت', pinned: 'مثبت', targetDate: 'تاريخ المستهدف', learningGoals: 'أهداف التعلم',
+      daysLeft: 'أيام متبقية', overdue: 'متأخر', attachImage: 'إرفاق صورة / سكرين شوت',
+      pasteImage: 'انقر أو الصق صورة (Ctrl+V)', removeImage: 'إزالة الصورة',
+      filterByTag: 'تصفية بحسب التاج', filterByPriority: 'تصفية بحسب الأولوية', filterByStatus: 'تصفية بحسب الحالة'
     },
 
     nav: {

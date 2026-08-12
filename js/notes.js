@@ -1,19 +1,20 @@
 /**
  * js/notes.js
  * Module Notes section renderer + Dedicated "All Notes" page + Add/Edit/View/Delete modals.
- *
- * OPTIMISTIC UI & 0ms SPEED:
- *   All user actions update the local UI and in-memory cache INSTANTLY (0ms),
- *   then sync with Google Apps Script API asynchronously in the background.
+ * Features: Tags, Pinning (📌), Image Attachments (Ctrl+V Paste / Upload), PDF & CSV Export, Live Search & Multi-Filters.
  */
 
 const Notes = (function () {
 
   let _allNotesCache = [];
   let _currentModuleId = '';
+  let _activeTagFilter = '';
 
   function normalizeNote(n) {
     if (!n || typeof n !== 'object') return null;
+    const rawTags = n.tags || '';
+    const tagsArr = Array.isArray(rawTags) ? rawTags : String(rawTags).split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean);
+
     return {
       id: String(n.id || ''),
       user_id: String(n.user_id || ''),
@@ -21,6 +22,9 @@ const Notes = (function () {
       title: String(n.title || '').trim(),
       section_name: String(n.section_name || '').trim(),
       content: String(n.content || ''),
+      tags: tagsArr,
+      pinned: n.pinned === true || n.pinned === 'TRUE' || n.pinned === 'true' || n.pinned === 1,
+      image_url: String(n.image_url || n.image_data || ''),
       created_at: n.created_at || new Date().toISOString(),
       updated_at: n.updated_at || n.created_at || new Date().toISOString()
     };
@@ -31,6 +35,7 @@ const Notes = (function () {
    */
   async function renderSection(container, moduleId) {
     _currentModuleId = moduleId;
+    const isAr = I18n.getLang() === 'ar';
 
     container.innerHTML = `
       <div class="notes-section-wrap">
@@ -43,9 +48,15 @@ const Notes = (function () {
             <input type="text" id="notes-search-input" class="notes-search-input"
                    placeholder="${I18n.t('notes.searchPlaceholder')}" autocomplete="off">
           </div>
-          <div style="display:flex; gap:8px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" id="export-notes-csv-btn" title="Export CSV">
+              📥 ${I18n.t('common.exportCsv')}
+            </button>
+            <button class="btn btn-secondary btn-sm" id="export-notes-pdf-btn" title="Export PDF">
+              📄 ${I18n.t('common.exportPdf')}
+            </button>
             <button class="btn btn-secondary btn-sm" id="sync-notes-btn" title="Sync from Sheets">
-              🔄 ${I18n.getLang() === 'ar' ? 'مزامنة' : 'Sync'}
+              🔄 ${isAr ? 'مزامنة' : 'Sync'}
             </button>
             <button class="btn btn-primary btn-sm" id="add-note-btn">
               ${I18n.t('notes.addNote')}
@@ -62,6 +73,8 @@ const Notes = (function () {
     const searchInput = container.querySelector('#notes-search-input');
     const addBtn = container.querySelector('#add-note-btn');
     const syncBtn = container.querySelector('#sync-notes-btn');
+    const csvBtn = container.querySelector('#export-notes-csv-btn');
+    const pdfBtn = container.querySelector('#export-notes-pdf-btn');
     const badgeEl = container.querySelector('#notes-count-badge');
 
     addBtn.addEventListener('click', () => {
@@ -71,11 +84,14 @@ const Notes = (function () {
     syncBtn.addEventListener('click', async () => {
       syncBtn.disabled = true;
       API.cacheBust('notes');
-      UI.toast(I18n.getLang() === 'ar' ? 'جاري المزامنة مع الجدول...' : 'Syncing from Sheets...', 'info');
+      UI.toast(isAr ? 'جاري المزامنة مع الجدول...' : 'Syncing from Sheets...', 'info');
       await reloadNotes(listWrap, badgeEl, searchInput.value);
       syncBtn.disabled = false;
-      UI.toast(I18n.getLang() === 'ar' ? 'تمت المزامنة بنجاح' : 'Synced successfully', 'success');
+      UI.toast(isAr ? 'تمت المزامنة بنجاح' : 'Synced successfully', 'success');
     });
+
+    csvBtn.addEventListener('click', () => exportNotesCsv(_currentModuleId));
+    pdfBtn.addEventListener('click', () => ExportUtil.exportPdf());
 
     searchInput.addEventListener('input', () => {
       renderModuleNotesList(listWrap, searchInput.value, badgeEl);
@@ -89,6 +105,7 @@ const Notes = (function () {
    */
   async function renderAllNotesPage(container) {
     _currentModuleId = '';
+    _activeTagFilter = '';
     const isAr = I18n.getLang() === 'ar';
 
     container.innerHTML = `
@@ -98,15 +115,21 @@ const Notes = (function () {
             <h2 style="font-size:20px; margin:0;">${isAr ? 'جميع ملاحظات الموديولات' : 'All Module Notes'}</h2>
             <span class="notes-count-badge" id="all-notes-count-badge">0</span>
           </div>
-          <div style="display:flex; gap:12px; flex-wrap:wrap; flex:1; justify-content:flex-end; align-items:center;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; flex:1; justify-content:flex-end; align-items:center;">
             <select id="all-notes-module-filter" style="padding:8px 14px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--paper); color:var(--ink); font-size:13px; outline:none; height:38px;">
               <option value="">${isAr ? 'كل الموديولات' : 'All Modules'}</option>
               ${(State.modulesCache || []).map(m => `<option value="${m.id}">${I18n.localizedName(m)}</option>`).join('')}
             </select>
-            <div class="notes-search-wrap" style="max-width:280px;">
+            <div class="notes-search-wrap" style="max-width:260px;">
               <input type="text" id="all-notes-search-input" class="notes-search-input"
                      placeholder="${I18n.t('notes.searchPlaceholder')}" autocomplete="off" style="height:38px;">
             </div>
+            <button class="btn btn-secondary btn-sm" id="all-notes-csv-btn" title="Export CSV" style="height:38px;">
+              📥 CSV
+            </button>
+            <button class="btn btn-secondary btn-sm" id="all-notes-pdf-btn" title="Export PDF" style="height:38px;">
+              📄 PDF
+            </button>
             <button class="btn btn-secondary btn-sm" id="all-notes-sync-btn" title="Sync from Sheets" style="height:38px; padding:0 14px;">
               🔄 ${isAr ? 'مزامنة' : 'Sync'}
             </button>
@@ -115,6 +138,7 @@ const Notes = (function () {
             </button>
           </div>
         </div>
+        <div id="all-notes-tags-bar" style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;"></div>
       </div>
       <div id="all-notes-list-wrap">
         <div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>
@@ -126,6 +150,8 @@ const Notes = (function () {
     const moduleFilter = container.querySelector('#all-notes-module-filter');
     const addBtn = container.querySelector('#all-notes-add-btn');
     const syncBtn = container.querySelector('#all-notes-sync-btn');
+    const csvBtn = container.querySelector('#all-notes-csv-btn');
+    const pdfBtn = container.querySelector('#all-notes-pdf-btn');
     const badgeEl = container.querySelector('#all-notes-count-badge');
 
     addBtn.addEventListener('click', () => {
@@ -141,6 +167,9 @@ const Notes = (function () {
       syncBtn.disabled = false;
       UI.toast(isAr ? 'تمت المزامنة بنجاح' : 'Synced successfully', 'success');
     });
+
+    csvBtn.addEventListener('click', () => exportNotesCsv(moduleFilter.value));
+    pdfBtn.addEventListener('click', () => ExportUtil.exportPdf());
 
     const triggerRender = () => renderAllNotesGrouped(listWrap, searchInput.value, moduleFilter.value, badgeEl);
 
@@ -170,6 +199,33 @@ const Notes = (function () {
     }
   }
 
+  function renderTagsBar(tagsBarEl, listWrap, searchInput, moduleFilter, badgeEl) {
+    if (!tagsBarEl) return;
+    const allTags = new Set();
+    _allNotesCache.forEach(n => (n.tags || []).forEach(t => allTags.add(t)));
+
+    if (!allTags.size) {
+      tagsBarEl.innerHTML = '';
+      return;
+    }
+
+    const isAr = I18n.getLang() === 'ar';
+    let html = `<span style="font-size:12px; font-weight:600; color:var(--ink-soft); margin-right:4px;">🏷️ ${I18n.t('common.tags')}:</span>`;
+    html += `<span class="tag-badge ${_activeTagFilter === '' ? 'active' : ''}" data-tag="">${isAr ? 'الكل' : 'All'}</span>`;
+    Array.from(allTags).forEach(tag => {
+      html += `<span class="tag-badge ${_activeTagFilter === tag ? 'active' : ''}" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</span>`;
+    });
+
+    tagsBarEl.innerHTML = html;
+    tagsBarEl.querySelectorAll('.tag-badge').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _activeTagFilter = btn.dataset.tag;
+        renderTagsBar(tagsBarEl, listWrap, searchInput, moduleFilter, badgeEl);
+        renderAllNotesGrouped(listWrap, searchInput ? searchInput.value : '', moduleFilter ? moduleFilter.value : '', badgeEl);
+      });
+    });
+  }
+
   /**
    * Render notes inside a specific module view.
    */
@@ -186,9 +242,13 @@ const Notes = (function () {
       filtered = moduleNotes.filter(n =>
         String(n.title || '').toLowerCase().includes(query) ||
         String(n.section_name || '').toLowerCase().includes(query) ||
-        String(n.content || '').toLowerCase().includes(query)
+        String(n.content || '').toLowerCase().includes(query) ||
+        n.tags.some(t => t.toLowerCase().includes(query))
       );
     }
+
+    // Sort pinned notes to top
+    filtered.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
     if (!moduleNotes.length) {
       listWrap.innerHTML = UI.emptyState(
@@ -238,11 +298,20 @@ const Notes = (function () {
   function renderAllNotesGrouped(listWrap, query, selectedModuleId, badgeEl) {
     if (!listWrap) return;
 
+    const tagsBarEl = document.querySelector('#all-notes-tags-bar');
+    if (tagsBarEl && !tagsBarEl.innerHTML) {
+      renderTagsBar(tagsBarEl, listWrap, document.querySelector('#all-notes-search-input'), document.querySelector('#all-notes-module-filter'), badgeEl);
+    }
+
     query = (query || '').trim().toLowerCase();
     let filtered = _allNotesCache;
 
     if (selectedModuleId) {
       filtered = filtered.filter(n => String(n.module_id) === String(selectedModuleId));
+    }
+
+    if (_activeTagFilter) {
+      filtered = filtered.filter(n => n.tags.includes(_activeTagFilter));
     }
 
     if (query) {
@@ -254,11 +323,15 @@ const Notes = (function () {
           String(n.title || '').toLowerCase().includes(query) ||
           String(n.section_name || '').toLowerCase().includes(query) ||
           String(n.content || '').toLowerCase().includes(query) ||
+          n.tags.some(t => t.toLowerCase().includes(query)) ||
           modNameAr.includes(query) ||
           modNameEn.includes(query)
         );
       });
     }
+
+    // Sort pinned notes to top
+    filtered.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
     if (badgeEl) badgeEl.textContent = filtered.length;
 
@@ -333,20 +406,29 @@ const Notes = (function () {
       modBadgeHtml = `<span class="badge" style="background:var(--gold-soft); color:var(--ink); font-size:11px; font-weight:600;">📦 ${escapeHtml(modName)}</span>`;
     }
 
+    const tagsHtml = (n.tags || []).map(t => `<span class="tag-badge">#${escapeHtml(t)}</span>`).join(' ');
+    const pinBadge = n.pinned ? `<span class="pinned-badge">📌 ${I18n.t('common.pinned')}</span>` : '';
+    const imgThumb = n.image_url ? `<div style="margin-top:10px; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--line);"><img src="${n.image_url}" style="width:100%; max-height:140px; object-fit:cover; display:block;"></div>` : '';
+
     return `
-      <div class="note-card" data-id="${n.id}">
+      <div class="note-card ${n.pinned ? 'is-pinned' : ''}" data-id="${n.id}" style="${n.pinned ? 'border-color:var(--gold); background:rgba(212,175,55,0.03);' : ''}">
         <div class="note-card-header" style="flex-wrap:wrap; gap:6px;">
-          <h3 class="note-card-title">${escapeHtml(n.title)}</h3>
-          <div style="display:flex; gap:6px; align-items:center;">
+          <div style="display:flex; align-items:center; gap:8px; flex:1;">
+            <button class="pin-toggle-btn ${n.pinned ? 'pinned' : ''}" data-action="toggle-pin" data-id="${n.id}" title="${n.pinned ? I18n.t('common.unpin') : I18n.t('common.pin')}">📌</button>
+            <h3 class="note-card-title">${escapeHtml(n.title)}</h3>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            ${pinBadge}
             ${modBadgeHtml}
             <span class="note-section-badge">${sectionBadge}</span>
           </div>
         </div>
         <div class="note-card-content">${escapeHtml(n.content)}</div>
+        ${imgThumb}
+        ${tagsHtml ? `<div style="margin-top:10px; display:flex; gap:4px; flex-wrap:wrap;">${tagsHtml}</div>` : ''}
         <div class="note-card-footer">
           <div class="note-card-dates">
             <span>${I18n.t('notes.createdAt')}: ${UI.fmtDate(n.created_at)}</span>
-            ${n.updated_at && n.updated_at !== n.created_at ? `<span>${I18n.t('notes.updatedAt')}: ${UI.fmtDate(n.updated_at)}</span>` : ''}
           </div>
           <div class="note-card-actions">
             <button class="note-action-btn" data-action="view" data-id="${n.id}">${I18n.t('notes.view')}</button>
@@ -360,7 +442,27 @@ const Notes = (function () {
 
   function bindCardActions(listWrap, badgeEl, query, isAllNotesPage) {
     const searchInput = document.querySelector(isAllNotesPage ? '#all-notes-search-input' : '#notes-search-input');
-    const moduleFilter = isAllNotesPage ? document.querySelector('#all-notes-module-filter') : null;
+
+    listWrap.querySelectorAll('.pin-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const noteId = btn.dataset.id;
+        const note = _allNotesCache.find(n => String(n.id) === String(noteId));
+        if (!note) return;
+
+        note.pinned = !note.pinned;
+        UI.toast(note.pinned ? I18n.t('common.pinned') : I18n.t('common.unpin'), 'success');
+
+        if (isAllNotesPage) {
+          const modFilter = document.querySelector('#all-notes-module-filter');
+          renderAllNotesGrouped(listWrap, searchInput ? searchInput.value : '', modFilter ? modFilter.value : '', badgeEl);
+        } else {
+          renderModuleNotesList(listWrap, searchInput ? searchInput.value : '', badgeEl);
+        }
+
+        API.updateNote({ id: note.id, pinned: note.pinned }).catch(() => {});
+      });
+    });
 
     listWrap.querySelectorAll('.note-action-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -378,7 +480,7 @@ const Notes = (function () {
 
     listWrap.querySelectorAll('.note-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.note-action-btn')) return;
+        if (e.target.closest('.note-action-btn') || e.target.closest('.pin-toggle-btn')) return;
         const noteId = card.dataset.id;
         const note = _allNotesCache.find(n => String(n.id) === String(noteId));
         if (note) openViewModal(note);
@@ -387,14 +489,15 @@ const Notes = (function () {
   }
 
   // --------------------------------------------------------------------
-  // MODALS WITH OPTIMISTIC (0ms) UI UPDATES
+  // MODALS WITH OPTIMISTIC (0ms) UI UPDATES & IMAGE / TAG ATTACHMENTS
   // --------------------------------------------------------------------
 
   function openAddModal(defaultModuleId, listWrap, badgeEl, searchInput, isAllNotesPage) {
-    const isAr = I18n.getLang() === 'ar';
     const modulesOptions = (State.modulesCache || []).map(m => `
       <option value="${m.id}" ${String(m.id) === String(defaultModuleId) ? 'selected' : ''}>${I18n.localizedName(m)}</option>
     `).join('');
+
+    let currentImageData = '';
 
     const html = `
       <div class="modal-head">
@@ -412,13 +515,34 @@ const Notes = (function () {
           <label class="required">${I18n.t('notes.noteTitle')}</label>
           <input type="text" name="title" required placeholder="${I18n.t('notes.noteTitlePlaceholder')}">
         </div>
-        <div class="field">
-          <label>${I18n.t('notes.sectionName')}</label>
-          <input type="text" name="section_name" placeholder="${I18n.t('notes.sectionNamePlaceholder')}">
+        <div class="field-row">
+          <div class="field">
+            <label>${I18n.t('notes.sectionName')}</label>
+            <input type="text" name="section_name" placeholder="${I18n.t('notes.sectionNamePlaceholder')}">
+          </div>
+          <div class="field">
+            <label>${I18n.t('common.tags')}</label>
+            <input type="text" name="tags" placeholder="${I18n.t('common.addTags')}">
+          </div>
         </div>
         <div class="field">
           <label class="required">${I18n.t('notes.content')}</label>
-          <textarea name="content" rows="6" required placeholder="${I18n.t('notes.contentPlaceholder')}"></textarea>
+          <textarea name="content" rows="5" required placeholder="${I18n.t('notes.contentPlaceholder')}"></textarea>
+        </div>
+        <div class="field">
+          <label>${I18n.t('common.attachImage')}</label>
+          <div class="image-dropzone" id="img-dropzone">
+            <span>📷 ${I18n.t('common.pasteImage')}</span>
+            <input type="file" id="img-file-input" accept="image/*" style="display:none;">
+          </div>
+          <div class="image-preview-wrap hidden" id="img-preview-wrap">
+            <img id="img-preview-src" src="" alt="Screenshot">
+            <button type="button" class="btn-remove-img" id="btn-remove-img" title="${I18n.t('common.removeImage')}">&times;</button>
+          </div>
+        </div>
+        <div class="field checkbox-row" style="margin-top:10px;">
+          <input type="checkbox" id="add-note-pinned">
+          <label for="add-note-pinned" style="margin:0;">📌 ${I18n.t('common.pin')}</label>
         </div>
         <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
           <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.cancel')}</button>
@@ -427,15 +551,68 @@ const Notes = (function () {
       </form>
     `;
 
-    UI.openModal(html);
+    const modalEl = UI.openModal(html);
 
-    const form = document.getElementById('add-note-form');
+    // Setup image paste & upload
+    const dropzone = modalEl.querySelector('#img-dropzone');
+    const fileInput = modalEl.querySelector('#img-file-input');
+    const previewWrap = modalEl.querySelector('#img-preview-wrap');
+    const previewSrc = modalEl.querySelector('#img-preview-src');
+    const removeBtn = modalEl.querySelector('#btn-remove-img');
+
+    const updateImage = (url) => {
+      currentImageData = url || '';
+      if (currentImageData) {
+        previewSrc.src = currentImageData;
+        previewWrap.classList.remove('hidden');
+      } else {
+        previewSrc.src = '';
+        previewWrap.classList.add('hidden');
+      }
+    };
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => updateImage(ev.target.result);
+        reader.readAsDataURL(file);
+      }
+    });
+
+    const pasteHandler = (e) => {
+      const items = (e.clipboardData || e.originalEvent.clipboardData)?.items || [];
+      for (let item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = (ev) => updateImage(ev.target.result);
+          reader.readAsDataURL(blob);
+          UI.toast(I18n.t('common.attachImage'), 'info');
+          break;
+        }
+      }
+    };
+    window.addEventListener('paste', pasteHandler);
+
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      updateImage('');
+    });
+
+    const form = modalEl.querySelector('#add-note-form');
     form.addEventListener('submit', (e) => {
       e.preventDefault();
+      window.removeEventListener('paste', pasteHandler);
+
       const targetModuleId = form.elements['module_id'].value;
       const title = form.elements['title'].value.trim();
       const sectionName = form.elements['section_name'].value.trim();
       const content = form.elements['content'].value.trim();
+      const tagsRaw = form.elements['tags'].value.trim();
+      const isPinned = modalEl.querySelector('#add-note-pinned').checked;
+      const parsedTags = tagsRaw ? tagsRaw.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean) : [];
 
       if (!title || !content || !targetModuleId) {
         UI.toast(I18n.t('errors.NOTE_FIELDS_REQUIRED'), 'error');
@@ -445,15 +622,18 @@ const Notes = (function () {
       // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
       const tempId = 'NOTE-temp-' + Date.now();
       const now = new Date().toISOString();
-      const tempNote = {
+      const tempNote = normalizeNote({
         id: tempId,
         module_id: targetModuleId,
         title: title,
         section_name: sectionName,
         content: content,
+        tags: parsedTags,
+        pinned: isPinned,
+        image_url: currentImageData,
         created_at: now,
         updated_at: now
-      };
+      });
 
       _allNotesCache.unshift(tempNote);
 
@@ -472,7 +652,10 @@ const Notes = (function () {
         module_id: targetModuleId,
         title: title,
         section_name: sectionName,
-        content: content
+        content: content,
+        tags: parsedTags.join(','),
+        pinned: isPinned,
+        image_url: currentImageData
       }).then(realNote => {
         const idx = _allNotesCache.findIndex(n => String(n.id) === String(tempId));
         if (idx !== -1 && realNote && realNote.id) {
@@ -502,6 +685,8 @@ const Notes = (function () {
       <option value="${m.id}" ${String(m.id) === String(note.module_id) ? 'selected' : ''}>${I18n.localizedName(m)}</option>
     `).join('');
 
+    let currentImageData = note.image_url || '';
+
     const html = `
       <div class="modal-head">
         <h3>${I18n.t('notes.editNote')}</h3>
@@ -518,13 +703,34 @@ const Notes = (function () {
           <label class="required">${I18n.t('notes.noteTitle')}</label>
           <input type="text" name="title" required value="${escapeHtml(note.title)}" placeholder="${I18n.t('notes.noteTitlePlaceholder')}">
         </div>
-        <div class="field">
-          <label>${I18n.t('notes.sectionName')}</label>
-          <input type="text" name="section_name" value="${escapeHtml(note.section_name)}" placeholder="${I18n.t('notes.sectionNamePlaceholder')}">
+        <div class="field-row">
+          <div class="field">
+            <label>${I18n.t('notes.sectionName')}</label>
+            <input type="text" name="section_name" value="${escapeHtml(note.section_name)}" placeholder="${I18n.t('notes.sectionNamePlaceholder')}">
+          </div>
+          <div class="field">
+            <label>${I18n.t('common.tags')}</label>
+            <input type="text" name="tags" value="${escapeHtml((note.tags || []).join(', '))}" placeholder="${I18n.t('common.addTags')}">
+          </div>
         </div>
         <div class="field">
           <label class="required">${I18n.t('notes.content')}</label>
-          <textarea name="content" rows="6" required placeholder="${I18n.t('notes.contentPlaceholder')}">${escapeHtml(note.content)}</textarea>
+          <textarea name="content" rows="5" required placeholder="${I18n.t('notes.contentPlaceholder')}">${escapeHtml(note.content)}</textarea>
+        </div>
+        <div class="field">
+          <label>${I18n.t('common.attachImage')}</label>
+          <div class="image-dropzone" id="img-dropzone">
+            <span>📷 ${I18n.t('common.pasteImage')}</span>
+            <input type="file" id="img-file-input" accept="image/*" style="display:none;">
+          </div>
+          <div class="image-preview-wrap ${currentImageData ? '' : 'hidden'}" id="img-preview-wrap">
+            <img id="img-preview-src" src="${currentImageData}" alt="Screenshot">
+            <button type="button" class="btn-remove-img" id="btn-remove-img" title="${I18n.t('common.removeImage')}">&times;</button>
+          </div>
+        </div>
+        <div class="field checkbox-row" style="margin-top:10px;">
+          <input type="checkbox" id="edit-note-pinned" ${note.pinned ? 'checked' : ''}>
+          <label for="edit-note-pinned" style="margin:0;">📌 ${I18n.t('common.pin')}</label>
         </div>
         <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
           <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.cancel')}</button>
@@ -533,15 +739,67 @@ const Notes = (function () {
       </form>
     `;
 
-    UI.openModal(html);
+    const modalEl = UI.openModal(html);
 
-    const form = document.getElementById('edit-note-form');
+    const dropzone = modalEl.querySelector('#img-dropzone');
+    const fileInput = modalEl.querySelector('#img-file-input');
+    const previewWrap = modalEl.querySelector('#img-preview-wrap');
+    const previewSrc = modalEl.querySelector('#img-preview-src');
+    const removeBtn = modalEl.querySelector('#btn-remove-img');
+
+    const updateImage = (url) => {
+      currentImageData = url || '';
+      if (currentImageData) {
+        previewSrc.src = currentImageData;
+        previewWrap.classList.remove('hidden');
+      } else {
+        previewSrc.src = '';
+        previewWrap.classList.add('hidden');
+      }
+    };
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => updateImage(ev.target.result);
+        reader.readAsDataURL(file);
+      }
+    });
+
+    const pasteHandler = (e) => {
+      const items = (e.clipboardData || e.originalEvent.clipboardData)?.items || [];
+      for (let item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = (ev) => updateImage(ev.target.result);
+          reader.readAsDataURL(blob);
+          UI.toast(I18n.t('common.attachImage'), 'info');
+          break;
+        }
+      }
+    };
+    window.addEventListener('paste', pasteHandler);
+
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      updateImage('');
+    });
+
+    const form = modalEl.querySelector('#edit-note-form');
     form.addEventListener('submit', (e) => {
       e.preventDefault();
+      window.removeEventListener('paste', pasteHandler);
+
       const targetModuleId = form.elements['module_id'].value;
       const title = form.elements['title'].value.trim();
       const sectionName = form.elements['section_name'].value.trim();
       const content = form.elements['content'].value.trim();
+      const tagsRaw = form.elements['tags'].value.trim();
+      const isPinned = modalEl.querySelector('#edit-note-pinned').checked;
+      const parsedTags = tagsRaw ? tagsRaw.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean) : [];
 
       if (!title || !content || !targetModuleId) {
         UI.toast(I18n.t('errors.NOTE_FIELDS_REQUIRED'), 'error');
@@ -552,6 +810,9 @@ const Notes = (function () {
       const prevTitle = note.title;
       const prevSection = note.section_name;
       const prevContent = note.content;
+      const prevTags = note.tags;
+      const prevPinned = note.pinned;
+      const prevImage = note.image_url;
       const prevUpdated = note.updated_at;
 
       // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
@@ -559,6 +820,9 @@ const Notes = (function () {
       note.title = title;
       note.section_name = sectionName;
       note.content = content;
+      note.tags = parsedTags;
+      note.pinned = isPinned;
+      note.image_url = currentImageData;
       note.updated_at = new Date().toISOString();
 
       if (isAllNotesPage) {
@@ -577,13 +841,20 @@ const Notes = (function () {
         module_id: targetModuleId,
         title: title,
         section_name: sectionName,
-        content: content
+        content: content,
+        tags: parsedTags.join(','),
+        pinned: isPinned,
+        image_url: currentImageData
       }).catch(err => {
         note.module_id = prevModule;
         note.title = prevTitle;
         note.section_name = prevSection;
         note.content = prevContent;
+        note.tags = prevTags;
+        note.pinned = prevPinned;
+        note.image_url = prevImage;
         note.updated_at = prevUpdated;
+
         if (isAllNotesPage) {
           const modFilter = document.querySelector('#all-notes-module-filter');
           renderAllNotesGrouped(listWrap, searchInput ? searchInput.value : '', modFilter ? modFilter.value : '', badgeEl);
@@ -600,6 +871,9 @@ const Notes = (function () {
     const sectionBadge = sName ? escapeHtml(sName) : I18n.t('notes.uncategorized');
     const modObj = (State.modulesCache || []).find(m => String(m.id) === String(note.module_id));
     const modName = modObj ? I18n.localizedName(modObj) : note.module_id;
+    const tagsHtml = (note.tags || []).map(t => `<span class="tag-badge">#${escapeHtml(t)}</span>`).join(' ');
+    const pinBadge = note.pinned ? `<span class="pinned-badge">📌 ${I18n.t('common.pinned')}</span>` : '';
+    const imgHtml = note.image_url ? `<div style="margin-top:16px; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--line);"><img src="${note.image_url}" style="width:100%; max-height:400px; object-fit:contain; background:var(--paper); display:block;"></div>` : '';
 
     const html = `
       <div class="modal-head">
@@ -607,15 +881,18 @@ const Notes = (function () {
         <button class="btn btn-icon btn-ghost" data-close>&times;</button>
       </div>
       <div class="note-detail-wrap">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <div style="display:flex; gap:8px; align-items:center;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            ${pinBadge}
             <span class="badge" style="background:var(--gold-soft); color:var(--ink); font-size:12px; font-weight:600;">📦 ${escapeHtml(modName)}</span>
             <span class="note-section-badge">${sectionBadge}</span>
           </div>
           <span class="mono" style="font-size:12px; color:var(--ink-soft);">${UI.fmtDate(note.created_at)}</span>
         </div>
         <h3 style="font-size:18px; font-weight:700; margin:0 0 12px; color:var(--ink);">${escapeHtml(note.title)}</h3>
-        <div class="note-detail-content">${escapeHtml(note.content)}</div>
+        <div class="note-detail-content" style="white-space:pre-wrap;">${escapeHtml(note.content)}</div>
+        ${imgHtml}
+        ${tagsHtml ? `<div style="margin-top:16px; display:flex; gap:6px; flex-wrap:wrap;">${tagsHtml}</div>` : ''}
         <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
           <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.close')}</button>
         </div>
@@ -677,6 +954,26 @@ const Notes = (function () {
         UI.toast(I18n.errorMessage(err), 'error');
       });
     });
+  }
+
+  function exportNotesCsv(filterModuleId) {
+    let list = _allNotesCache;
+    if (filterModuleId) list = list.filter(n => String(n.module_id) === String(filterModuleId));
+
+    const headers = ['Module', 'Section', 'Title', 'Content', 'Tags', 'Pinned', 'Created Date'];
+    const rows = list.map(n => {
+      const mod = (State.modulesCache || []).find(m => String(m.id) === String(n.module_id));
+      return [
+        mod ? I18n.localizedName(mod) : n.module_id,
+        n.section_name,
+        n.title,
+        n.content,
+        (n.tags || []).join(', '),
+        n.pinned ? 'Yes' : 'No',
+        UI.fmtDate(n.created_at)
+      ];
+    });
+    ExportUtil.downloadCsv('erp-module-notes.csv', headers, rows);
   }
 
   function escapeHtml(str) {

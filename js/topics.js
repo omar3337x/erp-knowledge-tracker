@@ -3,6 +3,7 @@
  * Shared topic table renderer + Add Knowledge Gap modal + Topic Detail modal
  * (basic info, What I Know/Don't Know/Need to Learn, Business & ERP
  * understanding, Practical Experience, Notes, status lifecycle, reviews).
+ * Features: Tags, Pinning (📌), Target Completion Dates (🎯 Goals), Multi-Filter Bar, PDF/CSV Export.
  */
 
 const Topics = (function () {
@@ -19,15 +20,35 @@ const Topics = (function () {
     return `<span class="badge badge-priority-${slug}">${I18n.priorityLabel(priority)}</span>`;
   }
 
+  function targetDateBadge(targetDateStr) {
+    if (!targetDateStr) return '';
+    const now = new Date();
+    const target = new Date(targetDateStr);
+    const diffDays = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      return `<span class="target-date-badge urgent">⚠️ ${I18n.t('common.overdue')} (${Math.abs(diffDays)}d)</span>`;
+    } else if (diffDays <= 3) {
+      return `<span class="target-date-badge urgent">🎯 ${diffDays} ${I18n.t('common.daysLeft')}</span>`;
+    } else {
+      return `<span class="target-date-badge">🎯 ${diffDays} ${I18n.t('common.daysLeft')}</span>`;
+    }
+  }
+
   // --------------------------------------------------------------------
-  // TABLE
+  // TABLE WITH MULTI-FILTER BAR & EXPORT
   // --------------------------------------------------------------------
   function renderTable(container, topics, opts) {
     opts = opts || {};
-    if (!topics.length) {
+
+    if (!topics || !topics.length) {
       container.innerHTML = UI.emptyState(I18n.t('empty.noKnowledgeGaps'), opts.emptyHint || I18n.t('empty.startAdding'));
       return;
     }
+
+    const isAr = I18n.getLang() === 'ar';
+    const showModuleCol = !!opts.showModule;
+
     const catName = (id) => {
       const c = State.allCategories.find(c => c.id === id);
       return c ? I18n.localizedName(c) : '—';
@@ -36,9 +57,73 @@ const Topics = (function () {
       const m = State.modulesCache.find(m => m.id === id);
       return m ? I18n.localizedName(m) : '—';
     };
-    const showModuleCol = !!opts.showModule;
+
+    let filterPriority = '';
+    let filterStatus = '';
+
+    function filterAndRender() {
+      let list = topics;
+      if (filterPriority) list = list.filter(t => t.priority === filterPriority);
+      if (filterStatus) list = list.filter(t => t.status === filterStatus);
+
+      // Sort pinned topics to top
+      list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+      const tableBodyHtml = list.map(t => {
+        const rawTags = t.tags || '';
+        const tagsArr = Array.isArray(rawTags) ? rawTags : String(rawTags).split(',').map(x => x.trim().replace(/^#/, '')).filter(Boolean);
+        const tagsHtml = tagsArr.map(tag => `<span class="tag-badge">#${escapeHtml(tag)}</span>`).join(' ');
+        const pinBadge = t.pinned ? `<span class="pinned-badge">📌</span>` : '';
+        const goalBadge = targetDateBadge(t.target_date);
+
+        return `
+          <tr data-id="${t.id}" class="${t.pinned ? 'is-pinned' : ''}">
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                ${pinBadge}
+                <strong>${escapeHtml(t.topic)}</strong>
+                ${goalBadge}
+              </div>
+              ${tagsHtml ? `<div style="margin-top:4px;">${tagsHtml}</div>` : ''}
+            </td>
+            ${showModuleCol ? `<td>${modName(t.module_id)}</td>` : ''}
+            <td>${catName(t.category_id)}</td>
+            <td>${statusBadge(t.status)}</td>
+            <td>${priorityBadge(t.priority)}</td>
+            <td class="mono">${t.progress}%</td>
+            <td class="mono">${UI.fmtDate(t.last_review)}</td>
+            <td class="mono">${UI.fmtDate(t.next_review)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const tableWrap = container.querySelector('#topics-tbody-wrap');
+      if (tableWrap) {
+        tableWrap.innerHTML = tableBodyHtml;
+        container.querySelectorAll('tbody tr').forEach(row => {
+          row.addEventListener('click', () => openDetail(row.dataset.id));
+        });
+      }
+    }
 
     container.innerHTML = `
+      <div class="card" style="margin-bottom:16px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-radius:var(--radius-md);">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <span style="font-size:12px; font-weight:600; color:var(--ink-soft);">🔍 ${isAr ? 'تصفية' : 'Filters'}:</span>
+          <select id="filter-priority-sel" style="padding:6px 10px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper); color:var(--ink); font-size:12px;">
+            <option value="">${I18n.t('module.allPriorities')}</option>
+            ${PRIORITY_VALUES.map(p => `<option value="${p}">${I18n.priorityLabel(p)}</option>`).join('')}
+          </select>
+          <select id="filter-status-sel" style="padding:6px 10px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper); color:var(--ink); font-size:12px;">
+            <option value="">${I18n.t('module.allStatuses')}</option>
+            ${STATUS_VALUES.map(s => `<option value="${s}">${I18n.statusLabel(s)}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary btn-sm" id="export-gaps-csv-btn">📥 CSV</button>
+          <button class="btn btn-secondary btn-sm" id="export-gaps-pdf-btn">📄 PDF</button>
+        </div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr>
@@ -51,26 +136,38 @@ const Topics = (function () {
             <th>${I18n.t('table.lastReview')}</th>
             <th>${I18n.t('table.nextReview')}</th>
           </tr></thead>
-          <tbody>
-            ${topics.map(t => `
-              <tr data-id="${t.id}">
-                <td><strong>${escapeHtml(t.topic)}</strong></td>
-                ${showModuleCol ? `<td>${modName(t.module_id)}</td>` : ''}
-                <td>${catName(t.category_id)}</td>
-                <td>${statusBadge(t.status)}</td>
-                <td>${priorityBadge(t.priority)}</td>
-                <td class="mono">${t.progress}%</td>
-                <td class="mono">${UI.fmtDate(t.last_review)}</td>
-                <td class="mono">${UI.fmtDate(t.next_review)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
+          <tbody id="topics-tbody-wrap"></tbody>
         </table>
       </div>
     `;
-    container.querySelectorAll('tbody tr').forEach(row => {
-      row.addEventListener('click', () => openDetail(row.dataset.id));
+
+    const priSel = container.querySelector('#filter-priority-sel');
+    const statSel = container.querySelector('#filter-status-sel');
+    const csvBtn = container.querySelector('#export-gaps-csv-btn');
+    const pdfBtn = container.querySelector('#export-gaps-pdf-btn');
+
+    priSel.addEventListener('change', (e) => { filterPriority = e.target.value; filterAndRender(); });
+    statSel.addEventListener('change', (e) => { filterStatus = e.target.value; filterAndRender(); });
+
+    csvBtn.addEventListener('click', () => {
+      const headers = ['Topic', 'Module', 'Category', 'Status', 'Priority', 'Progress', 'Target Date', 'Last Review', 'Next Review'];
+      const rows = topics.map(t => [
+        t.topic,
+        modName(t.module_id),
+        catName(t.category_id),
+        t.status,
+        t.priority,
+        `${t.progress}%`,
+        t.target_date || '',
+        UI.fmtDate(t.last_review),
+        UI.fmtDate(t.next_review)
+      ]);
+      ExportUtil.downloadCsv('knowledge-gaps.csv', headers, rows);
     });
+
+    pdfBtn.addEventListener('click', () => ExportUtil.exportPdf());
+
+    filterAndRender();
   }
 
   // --------------------------------------------------------------------
@@ -102,15 +199,25 @@ const Topics = (function () {
             <select name="category_id" id="at-category"></select>
           </div>
         </div>
+        <div class="field-row">
+          <div class="field">
+            <label>${I18n.t('addTopic.priority')}</label>
+            <select name="priority">
+              ${PRIORITY_VALUES.map(p => `<option value="${p}" ${p==='Medium'?'selected':''}>${I18n.priorityLabel(p)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>🎯 ${I18n.t('common.targetDate')}</label>
+            <input type="date" name="target_date">
+          </div>
+        </div>
+        <div class="field">
+          <label>🏷️ ${I18n.t('common.tags')}</label>
+          <input type="text" name="tags" placeholder="${I18n.t('common.addTags')}">
+        </div>
         <div class="field">
           <label>${I18n.t('addTopic.description')}</label>
           <textarea name="description" placeholder="${I18n.t('addTopic.descriptionPlaceholder')}"></textarea>
-        </div>
-        <div class="field">
-          <label>${I18n.t('addTopic.priority')}</label>
-          <select name="priority">
-            ${PRIORITY_VALUES.map(p => `<option value="${p}" ${p==='Medium'?'selected':''}>${I18n.priorityLabel(p)}</option>`).join('')}
-          </select>
         </div>
         <div class="field">
           <label>${I18n.t('addTopic.currentUnderstanding')}</label>
@@ -124,7 +231,11 @@ const Topics = (function () {
           <label>${I18n.t('addTopic.whatINeedToLearn')}</label>
           <textarea name="what_i_need_to_learn" placeholder="${I18n.t('addTopic.whatINeedToLearnPlaceholder')}"></textarea>
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;">${I18n.t('addTopic.save')}</button>
+        <div class="field checkbox-row">
+          <input type="checkbox" id="add-topic-pinned" name="pinned">
+          <label for="add-topic-pinned" style="margin:0;">📌 ${I18n.t('common.pin')}</label>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:16px;">${I18n.t('addTopic.save')}</button>
       </form>
     `;
     const modal = UI.openModal(body);
@@ -141,6 +252,7 @@ const Topics = (function () {
       e.preventDefault();
       const fd = new FormData(e.target);
       const payload = Object.fromEntries(fd.entries());
+      payload.pinned = modal.querySelector('#add-topic-pinned').checked;
 
       // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
       UI.closeModal();
@@ -170,11 +282,15 @@ const Topics = (function () {
     const knowledge = data.knowledge || {};
     const mod = State.modulesCache.find(m => m.id === t.module_id);
     const cat = State.allCategories.find(c => c.id === t.category_id);
+    const goalBadge = targetDateBadge(t.target_date);
 
     modal.innerHTML = `
       <div class="modal-head">
         <div>
-          <h3>${escapeHtml(t.topic)}</h3>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <h3>${escapeHtml(t.topic)}</h3>
+            ${goalBadge}
+          </div>
           <div class="field-hint">${mod ? I18n.localizedName(mod) : ''} ${cat ? '· ' + I18n.localizedName(cat) : ''}</div>
         </div>
         <div style="display:flex; gap:8px;">
@@ -199,7 +315,6 @@ const Topics = (function () {
 
     modal.querySelector('#delete-topic-btn').addEventListener('click', () => {
       if (!confirm(I18n.t('topicDetail.confirmDeleteTopic'))) return;
-      // ── OPTIMISTIC DELETE (0ms) ────────────────────────────────────────
       UI.closeModal();
       UI.toast(I18n.t('toast.topicDeleted'), 'success');
       Router.reload();
@@ -261,7 +376,6 @@ const Topics = (function () {
           });
         }
 
-        // Mark modal as status modified so closing modal refreshes parent view stats
         modal.dataset.statusModified = 'true';
 
         // ── BACKGROUND API CALL ──────────────────────────────────────────
@@ -271,7 +385,6 @@ const Topics = (function () {
       });
     });
 
-    // Ensure closing modal reloads view if status was modified
     modal.querySelectorAll('[data-close]').forEach(closeBtn => {
       closeBtn.addEventListener('click', () => {
         if (modal.dataset.statusModified === 'true') {
