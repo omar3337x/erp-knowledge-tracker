@@ -39,10 +39,10 @@ const Auth = (function () {
       });
       API.setToken(data.token);
       State.currentUser = data.user;
-      UI.toast('Login successful', 'success');
+      UI.toast(I18n.t('toast.loginSuccessful'), 'success');
       await App.boot();
     } catch (err) {
-      errEl.textContent = err.message;
+      errEl.textContent = I18n.errorMessage(err);
     } finally {
       btn.disabled = false;
     }
@@ -62,13 +62,13 @@ const Auth = (function () {
         password: document.getElementById('signup-password').value,
         confirm_password: document.getElementById('signup-confirm').value
       });
-      UI.toast('Account created. Logging you in...', 'success');
+      UI.toast(I18n.t('toast.accountCreated'), 'success');
       document.getElementById('login-identifier').value = document.getElementById('signup-username').value.trim();
       document.getElementById('login-password').value = document.getElementById('signup-password').value;
       switchTab('login');
       document.getElementById('login-form').dispatchEvent(new Event('submit', { cancelable: true }));
     } catch (err) {
-      errEl.textContent = err.message;
+      errEl.textContent = I18n.errorMessage(err);
     } finally {
       btn.disabled = false;
     }
@@ -82,7 +82,7 @@ const Auth = (function () {
   }
 
   function onSessionExpired() {
-    UI.toast('Session expired. Please log in again.', 'error');
+    UI.toast(I18n.t('errors.SESSION_EXPIRED'), 'error');
     showAuthScreen();
   }
 
@@ -93,11 +93,6 @@ const Auth = (function () {
     try {
       const data = await API.validateSession();
       State.currentUser = data.user;
-      // Restore user's language preference
-      if (data.user && data.user.language) {
-        I18N.setLocale(data.user.language);
-        if (window.__updateUIStrings) window.__updateUIStrings();
-      }
       return true;
     } catch (err) {
       API.clearToken();

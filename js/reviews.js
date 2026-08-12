@@ -1,6 +1,8 @@
 /**
- * js/reviews.js — Review Center (Due Today / Overdue / Due This Week / Recently Learned)
+ * js/reviews.js
+ * Review Center (Due Today / Overdue / Due This Week / Recently Learned)
  * and the per-topic Reviews tab with "Mark as Reviewed".
+ * ONE API call (API.topics({})) drives the whole Review Center page.
  */
 
 const Reviews = (function () {
@@ -9,39 +11,46 @@ const Reviews = (function () {
   function renderTopicReviewsTab(topic, reviews) {
     return `
       <form id="review-form" style="margin-bottom:18px;">
-        <div class="section-title">${I18N.t('reviews.mark_as_reviewed')}</div>
+        <div class="section-title">${I18n.t('reviews.markAsReviewed')}</div>
         <div class="field">
-          <label>${I18N.t('reviews.understanding')}</label>
+          <label>${I18n.t('reviews.understandingLevel')}</label>
           <select name="understanding">
-            <option value="Weak">${I18N.t('reviews.weak')}</option>
-            <option value="Good" selected>${I18N.t('reviews.good')}</option>
-            <option value="Strong">${I18N.t('reviews.strong')}</option>
+            <option value="Weak">${I18n.t('reviews.weak')}</option>
+            <option value="Good" selected>${I18n.t('reviews.good')}</option>
+            <option value="Strong">${I18n.t('reviews.strong')}</option>
           </select>
         </div>
         <div class="field">
-          <label>${I18N.t('reviews.notes_label')}</label>
-          <textarea name="notes" placeholder="${I18N.t('reviews.notes_ph')}"></textarea>
+          <label>${I18n.t('reviews.notes')}</label>
+          <textarea name="notes" placeholder="${I18n.t('reviews.notesPlaceholder')}"></textarea>
         </div>
         <div class="field">
-          <label>${I18N.t('reviews.next_review_days')}</label>
+          <label>${I18n.t('reviews.nextReviewDays')}</label>
           <input type="number" name="next_review_days" value="14" min="1" max="180">
         </div>
-        <button type="submit" class="btn btn-primary">${I18N.t('reviews.mark_btn')}</button>
+        <button type="submit" class="btn btn-primary">${I18n.t('reviews.submit')}</button>
       </form>
 
-      <div class="section-title">${I18N.t('reviews.history_title')}</div>
+      <div class="section-title">${I18n.t('reviews.reviewHistory')}</div>
       ${reviews.length ? `
         <div class="table-wrap">
           <table>
-            <thead><tr><th>${I18N.t('reviews.date')}</th><th>${I18N.t('reviews.understanding')}</th><th>${I18N.t('reviews.notes_label')}</th></tr></thead>
+            <thead><tr><th>${I18n.t('reviews.date')}</th><th>${I18n.t('reviews.understanding')}</th><th>${I18n.t('reviews.notesCol')}</th></tr></thead>
             <tbody>
               ${reviews.slice().reverse().map(r => `
-                <tr><td class="mono">${UI.fmtDate(r.review_date)}</td><td>${r.understanding}</td><td>${Topics.escapeHtml(r.notes)}</td></tr>
+                <tr><td class="mono">${UI.fmtDate(r.review_date)}</td><td>${understandingLabel(r.understanding)}</td><td>${Topics.escapeHtml(r.notes)}</td></tr>
               `).join('')}
             </tbody>
           </table>
-        </div>` : `<p class="field-hint">${I18N.t('reviews.no_reviews')}</p>`}
+        </div>` : `<p class="field-hint">${I18n.t('reviews.noReviewsYet')}</p>`}
     `;
+  }
+
+  function understandingLabel(v) {
+    if (v === 'Weak') return I18n.t('reviews.weak');
+    if (v === 'Strong') return I18n.t('reviews.strong');
+    if (v === 'Good') return I18n.t('reviews.good');
+    return v || '—';
   }
 
   function bindTab(panelEl, topicId, onDone) {
@@ -55,10 +64,10 @@ const Reviews = (function () {
       btn.disabled = true;
       try {
         await API.markReviewed(topicId, payload);
-        UI.toast(I18N.t('toast.review_completed'), 'success');
+        UI.toast(I18n.t('toast.reviewCompleted'), 'success');
         if (onDone) onDone();
       } catch (err) {
-        UI.toast(err.message, 'error');
+        UI.toastError(err);
       } finally {
         btn.disabled = false;
       }
@@ -67,12 +76,12 @@ const Reviews = (function () {
 
   // ---------------------------------------------------------------- Review Center page
   async function renderCenter(container) {
-    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_review')}</div>`;
+    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
     let topics;
     try {
       topics = await API.topics({});
     } catch (err) {
-      container.innerHTML = UI.errorState(err.message);
+      container.innerHTML = UI.errorState(err);
       return;
     }
 
@@ -90,10 +99,10 @@ const Reviews = (function () {
       .slice(0, 8);
 
     container.innerHTML = `
-      ${section(I18N.t('reviews.overdue'), overdue, 'rust')}
-      ${section(I18N.t('reviews.due_today'), dueToday, 'brass')}
-      ${section(I18N.t('reviews.due_this_week'), dueThisWeek, '')}
-      ${section(I18N.t('reviews.recently_learned'), recentlyLearned, 'teal', true)}
+      ${section(I18n.t('reviews.overdue'), overdue, false)}
+      ${section(I18n.t('reviews.dueToday'), dueToday, false)}
+      ${section(I18n.t('reviews.dueThisWeek'), dueThisWeek, false)}
+      ${section(I18n.t('reviews.recentlyLearned'), recentlyLearned, true)}
     `;
 
     container.querySelectorAll('[data-topic-id]').forEach(row => {
@@ -107,21 +116,21 @@ const Reviews = (function () {
         e.stopPropagation();
         try {
           await API.markReviewed(btn.dataset.topicId, { understanding: 'Good', next_review_days: 14 });
-          UI.toast(I18N.t('toast.review_completed'), 'success');
+          UI.toast(I18n.t('toast.reviewCompleted'), 'success');
           renderCenter(container);
-        } catch (err) { UI.toast(err.message, 'error'); }
+        } catch (err) { UI.toastError(err); }
       });
     });
   }
 
-  function section(title, topics, tone, hideMarkBtn) {
+  function section(title, topics, hideMarkBtn) {
     return `
       <div style="margin-bottom:26px;">
         <h2 style="margin-bottom:10px;">${title} <span class="badge" style="background:var(--line-soft); color:var(--ink-soft);">${topics.length}</span></h2>
         ${topics.length ? `
           <div class="table-wrap">
             <table>
-              <thead><tr><th>${I18N.t('topics.table.topic')}</th><th>${I18N.t('topics.table.status')}</th><th>${I18N.t('topics.table.next_review')}</th>${hideMarkBtn ? `<th>${I18N.t('analytics.mastered_on')}</th>` : `<th></th>`}</tr></thead>
+              <thead><tr><th>${I18n.t('table.topic')}</th><th>${I18n.t('table.status')}</th><th>${I18n.t('table.nextReview')}</th>${hideMarkBtn ? `<th>${I18n.t('reviews.completed')}</th>` : '<th></th>'}</tr></thead>
               <tbody>
                 ${topics.map(t => `
                   <tr data-topic-id="${t.id}">
@@ -130,13 +139,13 @@ const Reviews = (function () {
                     <td class="mono">${UI.fmtDate(t.next_review)}</td>
                     ${hideMarkBtn
                       ? `<td class="mono">${UI.fmtDate(t.completed_at)}</td>`
-                      : `<td><button class="btn btn-sm mark-reviewed-btn" data-topic-id="${t.id}">${I18N.t('reviews.mark_btn')}</button></td>`}
+                      : `<td><button class="btn btn-sm mark-reviewed-btn" data-topic-id="${t.id}">${I18n.t('reviews.markAsReviewed')}</button></td>`}
                   </tr>
                 `).join('')}
               </tbody>
             </table>
           </div>
-        ` : `<p class="field-hint">${title === I18N.t('reviews.recently_learned') ? I18N.t('reviews.no_mastered') : I18N.t('reviews.no_due')}</p>`}
+        ` : `<p class="field-hint">${title === I18n.t('reviews.recentlyLearned') ? I18n.t('reviews.nothingMastered') : I18n.t('reviews.noTopicsDue')}</p>`}
       </div>
     `;
   }

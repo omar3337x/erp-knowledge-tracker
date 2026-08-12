@@ -1,5 +1,8 @@
 /**
- * js/knowledge.js — Renders and saves the "Knowledge" record attached to a Topic.
+ * js/knowledge.js
+ * Renders and saves the "Knowledge" record attached to a Topic:
+ * what_i_know / what_i_dont_know / what_i_need_to_learn,
+ * business_understanding / erp_understanding, practical_experience, notes.
  */
 
 const Knowledge = (function () {
@@ -7,18 +10,18 @@ const Knowledge = (function () {
   function ta(name, label, value, placeholder) {
     return `<div class="field">
       <label>${label}</label>
-      <textarea name="${name}" placeholder="${placeholder || ''}">${Topics.escapeHtml(value || '')}</textarea>
+      <textarea name="${name}" placeholder="${placeholder || ''}">${escapeHtml(value || '')}</textarea>
     </div>`;
   }
 
   function renderKnowledgeTab(topic, k) {
     return `
       <form id="knowledge-form">
-        ${ta('what_i_know', I18N.t('knowledge.what_i_know'), k.what_i_know, I18N.t('knowledge.what_i_know_ph'))}
-        ${ta('what_i_dont_know', I18N.t('knowledge.what_i_dont_know'), k.what_i_dont_know, I18N.t('knowledge.what_i_dont_know_ph'))}
-        ${ta('what_i_need_to_learn', I18N.t('knowledge.what_i_need_to_learn'), k.what_i_need_to_learn, I18N.t('knowledge.what_i_need_to_learn_ph'))}
-        ${ta('notes', I18N.t('knowledge.notes'), k.notes, I18N.t('knowledge.notes_ph'))}
-        <button type="submit" class="btn btn-primary">${I18N.t('knowledge.save')}</button>
+        ${ta('what_i_know', I18n.t('topicDetail.whatIKnow'), k.what_i_know, I18n.t('topicDetail.whatIKnowPlaceholder'))}
+        ${ta('what_i_dont_know', I18n.t('topicDetail.whatIDontKnow'), k.what_i_dont_know, I18n.t('topicDetail.whatIDontKnowPlaceholder'))}
+        ${ta('what_i_need_to_learn', I18n.t('topicDetail.whatINeedToLearn'), k.what_i_need_to_learn, I18n.t('topicDetail.whatINeedToLearnPlaceholder'))}
+        ${ta('notes', I18n.t('topicDetail.notes'), k.notes, I18n.t('topicDetail.notesPlaceholder'))}
+        <button type="submit" class="btn btn-primary">${I18n.t('topicDetail.saveKnowledge')}</button>
       </form>
     `;
   }
@@ -26,11 +29,11 @@ const Knowledge = (function () {
   function renderBusinessErpTab(k) {
     return `
       <form id="business-form">
-        <div class="section-title">${I18N.t('knowledge.business_section')}</div>
-        ${ta('business_understanding', I18N.t('knowledge.business_label'), k.business_understanding, I18N.t('knowledge.business_ph'))}
-        <div class="section-title">${I18N.t('knowledge.erp_section')}</div>
-        ${ta('erp_understanding', I18N.t('knowledge.erp_label'), k.erp_understanding, I18N.t('knowledge.erp_ph'))}
-        <button type="submit" class="btn btn-primary">${I18N.t('general.save')}</button>
+        <div class="section-title">${I18n.t('topicDetail.businessUnderstanding')}</div>
+        ${ta('business_understanding', I18n.t('topicDetail.businessUnderstanding'), k.business_understanding, I18n.t('topicDetail.businessPlaceholder'))}
+        <div class="section-title">${I18n.t('topicDetail.erpUnderstanding')}</div>
+        ${ta('erp_understanding', I18n.t('topicDetail.erpUnderstanding'), k.erp_understanding, I18n.t('topicDetail.erpPlaceholder'))}
+        <button type="submit" class="btn btn-primary">${I18n.t('topicDetail.save')}</button>
       </form>
     `;
   }
@@ -38,9 +41,9 @@ const Knowledge = (function () {
   function renderPracticalTab(topic, k) {
     return `
       <form id="practical-form">
-        <div class="section-title">${I18N.t('knowledge.practical_section')}</div>
-        ${ta('practical_experience', I18N.t('knowledge.practical_label'), k.practical_experience, I18N.t('knowledge.practical_ph'))}
-        <button type="submit" class="btn btn-primary">${I18N.t('general.save')}</button>
+        <div class="section-title">${I18n.t('topicDetail.practicalExperience')}</div>
+        ${ta('practical_experience', I18n.t('topicDetail.practicalExperience'), k.practical_experience, I18n.t('topicDetail.practicalPlaceholder'))}
+        <button type="submit" class="btn btn-primary">${I18n.t('topicDetail.save')}</button>
       </form>
     `;
   }
@@ -62,14 +65,18 @@ const Knowledge = (function () {
         btn.disabled = true;
         try {
           await API.saveKnowledge(payload);
-          UI.toast(I18N.t('toast.knowledge_updated'), 'success');
+          UI.toast(I18n.t('toast.knowledgeUpdated'), 'success');
         } catch (err) {
-          UI.toast(err.message, 'error');
+          UI.toastError(err);
         } finally {
           btn.disabled = false;
         }
       });
     });
+  }
+
+  function escapeHtml(str) {
+    return String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
   }
 
   return { renderKnowledgeTab, renderBusinessErpTab, renderPracticalTab, bindTab };

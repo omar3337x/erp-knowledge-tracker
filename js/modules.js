@@ -1,65 +1,68 @@
 /**
- * js/modules.js — Renders a single Module's dashboard with stats, filterable Topics, and Category Management.
+ * js/modules.js
+ * Renders a single Module's dashboard: stats + filterable Topics table +
+ * the Categories management section for that module.
+ *
+ * Only ONE network call happens here (API.topics({module_id})) — Modules
+ * and Categories are already sitting in State from the one-time reference
+ * data load at boot, so opening a module never re-fetches them.
  */
 
 const Modules = (function () {
 
   async function render(container, moduleId) {
-    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_module')}</div>`;
+    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
 
-    let mod = State.modulesCache.find(m => m.id === moduleId);
-    let topics, categories;
+    const mod = State.modulesCache.find(m => m.id === moduleId);
+    if (!mod) { container.innerHTML = UI.errorState({ code: 'MODULE_NOT_FOUND' }); return; }
+
+    let topics;
     try {
-      [topics, categories] = await Promise.all([
-        API.topics({ module_id: moduleId }),
-        API.categories(moduleId)
-      ]);
+      topics = await API.topics({ module_id: moduleId });
     } catch (err) {
-      container.innerHTML = UI.errorState(err.message);
+      container.innerHTML = UI.errorState(err);
       return;
     }
-    if (!mod) { container.innerHTML = UI.errorState(I18N.t('general.page_not_found')); return; }
 
-    State.categoriesCache[moduleId] = categories;
+    const categories = State.categoriesForModule(moduleId, { includeInactive: true });
     const stats = computeStats(topics);
 
     container.innerHTML = `
       <div class="grid grid-kpi" style="margin-bottom:20px;">
-        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.progress')}</div><div class="kpi-value brass">${stats.progress}%</div></div>
-        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.total_topics')}</div><div class="kpi-value">${topics.length}</div></div>
-        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.completed')}</div><div class="kpi-value teal">${stats.mastered}</div></div>
-        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.learning')}</div><div class="kpi-value">${stats.learning}</div></div>
-        <div class="card kpi-card"><div class="kpi-label">${I18N.t('module.gaps')}</div><div class="kpi-value rust">${stats.gaps}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18n.t('module.moduleProgress')}</div><div class="kpi-value brass">${stats.progress}%</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18n.t('module.totalTopics')}</div><div class="kpi-value">${topics.length}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18n.t('module.completed')}</div><div class="kpi-value teal">${stats.mastered}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18n.t('module.learning')}</div><div class="kpi-value">${stats.learning}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18n.t('module.knowledgeGaps')}</div><div class="kpi-value rust">${stats.gaps}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">${I18n.t('module.mastered')}</div><div class="kpi-value teal">${stats.mastered}</div></div>
       </div>
 
       <div class="toolbar">
         <div class="field">
           <select id="filter-category">
-            <option value="">${I18N.t('module.all_categories')}</option>
-            ${categories.map(c => `<option value="${c.id}">${I18N.getCategoryName(c)}</option>`).join('')}
+            <option value="">${I18n.t('module.allCategories')}</option>
+            ${categories.filter(c => c.active === true || c.active === 'TRUE').map(c => `<option value="${c.id}">${I18n.localizedName(c)}</option>`).join('')}
           </select>
         </div>
         <div class="field">
           <select id="filter-status">
-            <option value="">${I18N.t('module.all_statuses')}</option>
-            ${Topics.STATUS_VALUES.map(s => `<option value="${s}">${I18N.statusLabel(s)}</option>`).join('')}
+            <option value="">${I18n.t('module.allStatuses')}</option>
+            ${Topics.STATUS_VALUES.map(s => `<option value="${s}">${I18n.statusLabel(s)}</option>`).join('')}
           </select>
         </div>
         <div class="field">
           <select id="filter-priority">
-            <option value="">${I18N.t('module.all_priorities')}</option>
-            ${Topics.PRIORITY_VALUES.map(p => `<option value="${p}">${I18N.priorityLabel(p)}</option>`).join('')}
+            <option value="">${I18n.t('module.allPriorities')}</option>
+            ${Topics.PRIORITY_VALUES.map(p => `<option value="${p}">${I18n.priorityLabel(p)}</option>`).join('')}
           </select>
         </div>
         <div style="flex:1;"></div>
-        <button class="btn btn-primary" id="add-gap-btn">${I18N.t('module.add_gap')}</button>
+        <button class="btn btn-primary" id="add-gap-btn">${I18n.t('module.addKnowledgeGap')}</button>
       </div>
 
       <div id="topics-table-wrap"></div>
 
-      <!-- Category Management Section -->
-      <div id="categories-section" style="margin-top:40px; padding-top:24px; border-top:1px solid var(--line);">
-      </div>
+      <div id="categories-section-wrap" style="margin-top:32px;"></div>
     `;
 
     const tableWrap = container.querySelector('#topics-table-wrap');
@@ -71,25 +74,16 @@ const Modules = (function () {
       if (catF) filtered = filtered.filter(t => t.category_id === catF);
       if (statF) filtered = filtered.filter(t => t.status === statF);
       if (prioF) filtered = filtered.filter(t => t.priority === prioF);
-      Topics.renderTable(tableWrap, filtered, { categories, emptyHint: I18N.t('module.no_data') });
+      Topics.renderTable(tableWrap, filtered, { emptyHint: I18n.t('empty.startAdding') });
     };
     draw();
     container.querySelectorAll('#filter-category,#filter-status,#filter-priority').forEach(el => el.addEventListener('change', draw));
 
     container.querySelector('#add-gap-btn').addEventListener('click', () => {
-      Topics.openAddModal(moduleId, categories, async () => {
-        Router.go('module', { id: moduleId });
-      });
+      Topics.openAddModal(moduleId, () => Router.go('module', { id: moduleId }));
     });
 
-    // Render Category Management
-    Categories.renderTable(
-      container.querySelector('#categories-section'),
-      moduleId,
-      State.modulesCache,
-      categories,
-      topics
-    );
+    Categories.renderSection(container.querySelector('#categories-section-wrap'), moduleId, topics);
   }
 
   function computeStats(topics) {

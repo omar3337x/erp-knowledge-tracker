@@ -1,5 +1,8 @@
 /**
- * js/app.js — Optimized bootstrap with smart initial load, i18n, and improved loading UX.
+ * js/app.js
+ * UI helpers (toast/modal/gauge/states), global State, hash-based Router,
+ * i18n bootstrap + language switcher, and the App bootstrap that ties
+ * every module together.
  */
 
 // ---------------------------------------------------------------------------
@@ -14,6 +17,11 @@ const UI = (function () {
     el.textContent = message;
     stack.appendChild(el);
     setTimeout(() => el.remove(), 3800);
+  }
+
+  // Accepts either a plain string or a thrown API error ({message, code}).
+  function toastError(err) {
+    toast(I18n.errorMessage(err), 'error');
   }
 
   function openModal(innerHtml, extraClass) {
@@ -42,8 +50,8 @@ const UI = (function () {
     return `<div class="empty-state"><h3>${title}</h3><p>${hint}</p></div>`;
   }
 
-  function errorState(message) {
-    return `<div class="empty-state"><h3>${message}</h3></div>`;
+  function errorState(err) {
+    return `<div class="empty-state"><h3>${I18n.t('common.notFound')}</h3><p>${I18n.errorMessage(err)}</p></div>`;
   }
 
   function fmtDate(iso) {
@@ -53,6 +61,7 @@ const UI = (function () {
     return d.toISOString().slice(0, 10);
   }
 
+  // Signature "instrument gauge" ring, built with a conic-gradient dial.
   function gaugeRing(percent, size) {
     size = size || 48;
     const pct = Math.max(0, Math.min(100, percent));
@@ -73,25 +82,22 @@ const UI = (function () {
     localStorage.setItem('erp_tracker_theme', theme);
   }
 
-  function skeletonCards(count) {
-    let html = '<div class="grid grid-kpi">';
-    for (let i = 0; i < count; i++) {
-      html += `<div class="card kpi-card"><div class="skeleton" style="height:20px;width:60%;margin-bottom:8px;"></div><div class="skeleton" style="height:32px;width:40%;"></div></div>`;
-    }
-    html += '</div>';
-    return html;
+  // Applies every [data-i18n] / [data-i18n-placeholder] node in the static
+  // shell (sidebar, topbar, auth screen). Dynamic view content is
+  // translated inline via I18n.t() in each view's render function.
+  function applyStaticTranslations() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = I18n.t(el.getAttribute('data-i18n'));
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      el.setAttribute('placeholder', I18n.t(el.getAttribute('data-i18n-placeholder')));
+    });
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.lang === I18n.getLang());
+    });
   }
 
-  function skeletonModuleCards(count) {
-    let html = '<div class="grid grid-modules">';
-    for (let i = 0; i < count; i++) {
-      html += `<div class="card module-card"><div class="skeleton" style="height:18px;width:70%;margin-bottom:12px;"></div><div class="skeleton" style="height:8px;width:100%;margin-bottom:8px;"></div><div class="skeleton" style="height:14px;width:50%;"></div></div>`;
-    }
-    html += '</div>';
-    return html;
-  }
-
-  return { toast, openModal, closeModal, emptyState, errorState, fmtDate, gaugeRing, applyTheme, skeletonCards, skeletonModuleCards };
+  return { toast, toastError, openModal, closeModal, emptyState, errorState, fmtDate, gaugeRing, applyTheme, applyStaticTranslations };
 })();
 
 // ---------------------------------------------------------------------------
@@ -100,27 +106,65 @@ const UI = (function () {
 const State = {
   currentUser: null,
   modulesCache: [],
-  categoriesCache: {},
-  initialized: false
+  allCategories: [],
+
+  categoriesForModule(moduleId, opts) {
+    opts = opts || {};
+    let list = State.allCategories.filter(c => c.module_id === moduleId);
+    if (!opts.includeInactive) list = list.filter(c => c.active === true || c.active === 'TRUE');
+    return list;
+  }
 };
 
+const REF_CACHE_KEY = 'erp_tracker_ref_cache_v1';
+const REF_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12h — reference data changes rarely
+
+// Loads Modules + ALL Categories in parallel, ONCE per browser session,
+// with a localStorage cache so a page refresh doesn't even hit the backend
+// for this near-static reference data until the cache goes stale.
+async function loadReferenceData() {
+  try {
+    const raw = localStorage.getItem(REF_CACHE_KEY);
+    if (raw) {
+      const cached = JSON.parse(raw);
+      if (Date.now() - cached.savedAt < REF_CACHE_TTL_MS) {
+        State.modulesCache = cached.modules;
+        State.allCategories = cached.categories;
+        return;
+      }
+    }
+  } catch (e) { /* corrupt cache, ignore */ }
+
+  const [modules, categories] = await Promise.all([API.modules(), API.categories()]);
+  State.modulesCache = modules;
+  State.allCategories = categories;
+  try {
+    localStorage.setItem(REF_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), modules, categories }));
+  } catch (e) { /* storage full/unavailable, non-fatal */ }
+}
+
+function invalidateReferenceCache() {
+  localStorage.removeItem(REF_CACHE_KEY);
+}
+
 // ---------------------------------------------------------------------------
-// ROUTER
+// Router (hash based — works natively on GitHub Pages, no server config)
 // ---------------------------------------------------------------------------
 const Router = (function () {
 
   let current = { route: 'dashboard', params: {} };
 
-  const titles = {
-    dashboard: 'dashboard.title',
-    module: 'module.progress',
-    gaps: 'nav.gaps',
-    review: 'nav.review',
-    analytics: 'nav.analytics',
-    profile: 'nav.profile',
-    admin: 'nav.admin',
-    search: 'search.results_for'
-  };
+  function titleFor(route, params) {
+    if (route === 'module') {
+      const mod = State.modulesCache.find(m => m.id === params.id);
+      return mod ? I18n.localizedName(mod) : I18n.t('nav.modules');
+    }
+    const map = {
+      dashboard: 'dashboard.title', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
+      analytics: 'analytics.title', profile: 'nav.myProfile', admin: 'admin.title'
+    };
+    return map[route] ? I18n.t(map[route]) : I18n.t('common.notFound');
+  }
 
   function encodeHash(route, params) {
     const q = new URLSearchParams(params || {}).toString();
@@ -152,68 +196,33 @@ const Router = (function () {
 
     const content = document.getElementById('content');
     const titleEl = document.getElementById('page-title');
+    titleEl.textContent = titleFor(route, params);
 
-    // Update page title
-    const titleKey = titles[route] || route;
-    titleEl.textContent = I18N.t(titleKey);
-
-    if (route === 'dashboard') {
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_dashboard')}</div>`;
-      try { await Dashboard.render(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
-      return;
-    }
-
-    if (route === 'module') {
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_module')}</div>`;
-      try { await Modules.render(content, params.id); } catch (err) { content.innerHTML = UI.errorState(err.message); }
-      return;
-    }
-
+    if (route === 'dashboard') return Dashboard.render(content);
+    if (route === 'module') return Modules.render(content, params.id);
     if (route === 'gaps') {
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_gaps')}</div>`;
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
       try {
         const topics = await API.topics({});
         const gaps = topics.filter(t => t.status !== 'Mastered' && t.status !== 'Practiced');
-        Topics.renderTable(content, gaps, { showModule: true, emptyHint: I18N.t('topics.empty_hint') });
-      } catch (err) { content.innerHTML = UI.errorState(err.message); }
+        Topics.renderTable(content, gaps, { showModule: true, emptyHint: I18n.t('empty.noOpenGaps') });
+      } catch (err) { content.innerHTML = UI.errorState(err); }
       return;
     }
-
-    if (route === 'review') {
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_review')}</div>`;
-      try { await Reviews.renderCenter(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
-      return;
-    }
-
-    if (route === 'analytics') {
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('analytics.loading')}</div>`;
-      try { await Analytics.render(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
-      return;
-    }
-
-    if (route === 'profile') {
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.loading_profile')}</div>`;
-      try { await Profile.render(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
-      return;
-    }
-
-    if (route === 'admin') {
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('admin.loading')}</div>`;
-      try { await Profile.renderAdmin(content); } catch (err) { content.innerHTML = UI.errorState(err.message); }
-      return;
-    }
-
+    if (route === 'review') return Reviews.renderCenter(content);
+    if (route === 'analytics') return Analytics.render(content);
+    if (route === 'profile') return Profile.render(content);
+    if (route === 'admin') return Profile.renderAdmin(content);
     if (route === 'search') {
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18N.t('general.searching')}</div>`;
+      titleEl.textContent = `${I18n.t('common.search')}: "${params.q}"`;
+      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
       try {
         const topics = await API.topics({ search: params.q });
-        Topics.renderTable(content, topics, { showModule: true, emptyHint: I18N.t('search.empty_hint') });
-      } catch (err) { content.innerHTML = UI.errorState(err.message); }
+        Topics.renderTable(content, topics, { showModule: true, emptyHint: I18n.t('empty.tryDifferentSearch') });
+      } catch (err) { content.innerHTML = UI.errorState(err); }
       return;
     }
-
-    titleEl.textContent = I18N.t('general.page_not_found');
-    content.innerHTML = UI.emptyState(I18N.t('general.page_not_found'), I18N.t('general.use_sidebar'));
+    content.innerHTML = UI.emptyState(I18n.t('common.notFound'), I18n.t('common.notFoundHint'));
   }
 
   function init() {
@@ -224,7 +233,7 @@ const Router = (function () {
 })();
 
 // ---------------------------------------------------------------------------
-// APP BOOTSTRAP
+// App bootstrap
 // ---------------------------------------------------------------------------
 const App = (function () {
 
@@ -232,7 +241,7 @@ const App = (function () {
     const nav = document.getElementById('nav-modules');
     nav.innerHTML = State.modulesCache.map(m => `
       <button class="nav-item nav-module-sub" data-route="module" data-module-id="${m.id}">
-        <span class="dot"></span>${I18N.getModuleName(m)}
+        <span class="dot"></span>${I18n.localizedName(m)}
       </button>
     `).join('');
     nav.querySelectorAll('.nav-item').forEach(btn => {
@@ -240,50 +249,18 @@ const App = (function () {
     });
   }
 
-  function updateUIStrings() {
-    // Update static UI elements
-    document.getElementById('tab-login').textContent = I18N.t('auth.login');
-    document.getElementById('tab-signup').textContent = I18N.t('auth.signup');
-    document.querySelector('#login-form label[for="login-identifier"]').textContent = I18N.t('auth.username_or_email');
-    document.querySelector('#login-form label[for="login-password"]').textContent = I18N.t('auth.password');
-    document.querySelector('#login-form button[type="submit"]').textContent = I18N.t('auth.login');
-    document.querySelector('#login-form .checkbox-row label').textContent = I18N.t('auth.remember_me');
-
-    document.querySelector('#signup-form label[for="signup-fullname"]').textContent = I18N.t('auth.full_name');
-    document.querySelector('#signup-form label[for="signup-username"]').textContent = I18N.t('auth.username');
-    document.querySelector('#signup-form label[for="signup-email"]').textContent = I18N.t('auth.email');
-    document.querySelector('#signup-form label[for="signup-password"]').textContent = I18N.t('auth.password');
-    document.querySelector('#signup-form label[for="signup-confirm"]').textContent = I18N.t('auth.confirm_password');
-    document.querySelector('#signup-form button[type="submit"]').textContent = I18N.t('auth.create_account');
-
-    // Nav items
-    document.querySelector('[data-route="dashboard"]').textContent = I18N.t('nav.dashboard');
-    document.querySelector('[data-route="gaps"]').textContent = I18N.t('nav.gaps');
-    document.querySelector('[data-route="review"]').textContent = I18N.t('nav.review');
-    document.querySelector('[data-route="analytics"]').textContent = I18N.t('nav.analytics');
-    document.querySelector('[data-route="profile"]').textContent = I18N.t('nav.profile');
-    const adminNav = document.getElementById('nav-admin');
-    if (adminNav) adminNav.textContent = I18N.t('nav.admin');
-
-    // Search placeholder
-    const searchInput = document.getElementById('global-search');
-    if (searchInput) searchInput.placeholder = I18N.t('search.placeholder');
-
-    // Quick add button
-    const quickAddBtn = document.getElementById('quick-add-btn');
-    if (quickAddBtn) quickAddBtn.textContent = I18N.t('module.add_gap');
-
-    // Logout button
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) logoutBtn.textContent = I18N.t('auth.logout') || 'Logout';
-
-    // Page title
-    const titleEl = document.getElementById('page-title');
-    if (titleEl) titleEl.textContent = I18N.t('nav.dashboard');
-
-    // Language switcher
-    const langSwitcher = document.getElementById('lang-switcher');
-    if (langSwitcher) langSwitcher.value = I18N.getLocale();
+  function bindLanguageSwitch() {
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const lang = btn.dataset.lang;
+        if (lang === I18n.getLang()) return;
+        I18n.setLang(lang);
+        // Best-effort sync to the user's profile; never blocks the UI.
+        if (State.currentUser) {
+          API.updateProfile({ language: lang }).then(u => { State.currentUser = u; }).catch(() => {});
+        }
+      });
+    });
   }
 
   function bindStaticNav() {
@@ -302,78 +279,53 @@ const App = (function () {
 
     document.getElementById('quick-add-btn').addEventListener('click', () => {
       const defaultModuleId = State.modulesCache.length ? State.modulesCache[0].id : null;
-      Topics.openAddModal(defaultModuleId, State.categoriesCache[defaultModuleId] || [], () => Router.reload());
+      Topics.openAddModal(defaultModuleId, () => Router.reload());
     });
 
     const search = document.getElementById('global-search');
     search.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && search.value.trim()) Router.go('search', { q: search.value.trim() });
     });
-
-    // Language switcher
-    const langSwitcher = document.getElementById('lang-switcher');
-    if (langSwitcher) {
-      langSwitcher.addEventListener('change', async (e) => {
-        const locale = e.target.value;
-        I18N.setLocale(locale);
-        updateUIStrings();
-        // Save language preference to user profile if logged in
-        if (State.currentUser && API.getToken()) {
-          try { await API.updateProfile({ language: locale }); } catch (err) { /* ignore */ }
-        }
-        // Re-render current route
-        Router.reload();
-      });
-    }
   }
 
+  // Loads everything needed after a successful login/session restore, then
+  // shows the app shell and renders the current route.
   async function boot() {
     Auth.showApp();
-
-    if (!State.modulesCache.length) {
-      try {
-        State.modulesCache = await API.modules();
-      } catch (err) {
-        UI.toast(err.message, 'error');
-      }
+    if (State.currentUser && State.currentUser.language && State.currentUser.language !== I18n.getLang()) {
+      I18n.setLang(State.currentUser.language);
     }
-
+    if (!State.modulesCache.length) {
+      try { await loadReferenceData(); } catch (err) { UI.toastError(err); }
+    }
     buildSidebarModules();
-
     if (State.currentUser && State.currentUser.role === 'Admin') {
       document.getElementById('nav-admin').classList.remove('hidden');
     }
-
-    State.initialized = true;
     const h = Router.decodeHash();
     Router.render(h.route, h.params);
   }
 
   async function init() {
+    I18n.init();
+    UI.applyStaticTranslations();
+    I18n.onChange(() => {
+      UI.applyStaticTranslations();
+      buildSidebarModules();
+      if (!document.getElementById('app').classList.contains('hidden')) Router.reload();
+    });
+
     const savedTheme = localStorage.getItem('erp_tracker_theme') || 'light';
     UI.applyTheme(savedTheme);
 
-    // Initialize i18n
-    I18N.init();
-    updateUIStrings();
-
     Auth.init();
     bindStaticNav();
+    bindLanguageSwitch();
     Router.init();
 
     const restored = await Auth.tryRestoreSession();
-    if (restored) {
-      // Load user's language preference from profile
-      if (State.currentUser && State.currentUser.language) {
-        I18N.setLocale(State.currentUser.language);
-        updateUIStrings();
-      }
-      await boot();
-    }
+    if (restored) await boot();
   }
-
-  // Expose for external access (e.g., from auth.js on session restore)
-  window.__updateUIStrings = updateUIStrings;
 
   return { init, boot };
 })();
