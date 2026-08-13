@@ -205,7 +205,8 @@ const Topics = (function () {
         container.querySelectorAll('tbody tr').forEach(row => {
           row.addEventListener('click', (e) => {
             if (e.target.type === 'checkbox') return;
-            openDetail(row.dataset.id);
+            const item = list.find(x => String(x.id) === String(row.dataset.id));
+            openDetail(row.dataset.id, item);
           });
         });
         // Checkbox change → update bulk toolbar
@@ -377,57 +378,95 @@ const Topics = (function () {
   }
 
   // --------------------------------------------------------------------
-  // TOPIC DETAIL MODAL
+  // TOPIC DETAIL MODAL (0ms Instant Render)
   // --------------------------------------------------------------------
-  async function openDetail(id) {
-    const modal = UI.openModal(`<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`, 'modal-lg');
+  async function openDetail(id, initialTopicObj) {
+    let t = initialTopicObj;
+    if (!t) {
+      const cachedDashboard = API.cacheGet('dashboard:', 'dashboard');
+      if (cachedDashboard && Array.isArray(cachedDashboard.topics)) {
+        t = cachedDashboard.topics.find(x => String(x.id) === String(id));
+      }
+    }
+
+    const modalHtml = (topicObj) => {
+      const mod = State.modulesCache.find(m => m.id === topicObj.module_id);
+      const cat = State.allCategories.find(c => c.id === topicObj.category_id);
+      const goalBadge = targetDateBadge(topicObj.target_date);
+      return `
+        <div class="modal-head">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <h3>${escapeHtml(topicObj.topic)}</h3>
+              ${goalBadge}
+            </div>
+            <div class="field-hint">${mod ? I18n.localizedName(mod) : ''} ${cat ? '· ' + I18n.localizedName(cat) : ''}</div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-danger btn-sm" id="delete-topic-btn">${I18n.t('topicDetail.deleteTopic')}</button>
+            <button class="btn btn-icon btn-ghost" data-close>&times;</button>
+          </div>
+        </div>
+
+        <div class="status-stepper" id="topic-status-stepper" style="margin-bottom:18px;">
+          ${_renderStepperHtml(topicObj.status)}
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="knowledge">${I18n.t('topicDetail.tabKnowledge')}</button>
+          <button class="tab" data-tab="business">${I18n.t('topicDetail.tabBusiness')}</button>
+          <button class="tab" data-tab="practical">${I18n.t('topicDetail.tabPractical')}</button>
+          <button class="tab" data-tab="reviews">${I18n.t('topicDetail.tabReviews')}</button>
+        </div>
+
+        <div id="tab-panels">${UI.skeleton('card')}</div>
+      `;
+    };
+
+    let modal;
+    if (t) {
+      // PERF: Render modal shell instantly in 0ms using memory topic
+      modal = UI.openModal(modalHtml(t), 'modal-lg');
+      _bindStepper(modal, t, id);
+    } else {
+      modal = UI.openModal(UI.skeleton('card'), 'modal-lg');
+    }
+
     let data;
     try {
       data = await API.topic(id);
     } catch (err) {
-      modal.innerHTML = UI.errorState(err);
+      if (!t) modal.innerHTML = UI.errorState(err);
       return;
     }
-    const t = data.topic;
+
+    t = data.topic;
     const knowledge = data.knowledge || {};
-    const mod = State.modulesCache.find(m => m.id === t.module_id);
-    const cat = State.allCategories.find(c => c.id === t.category_id);
-    const goalBadge = targetDateBadge(t.target_date);
+    const reviews = data.reviews || [];
 
-    modal.innerHTML = `
-      <div class="modal-head">
-        <div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <h3>${escapeHtml(t.topic)}</h3>
-            ${goalBadge}
-          </div>
-          <div class="field-hint">${mod ? I18n.localizedName(mod) : ''} ${cat ? '· ' + I18n.localizedName(cat) : ''}</div>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn btn-danger btn-sm" id="delete-topic-btn">${I18n.t('topicDetail.deleteTopic')}</button>
-          <button class="btn btn-icon btn-ghost" data-close>&times;</button>
-        </div>
-      </div>
+    if (!modal.querySelector('#tab-panels')) {
+      modal.innerHTML = modalHtml(t);
+      _bindStepper(modal, t, id);
+    }
 
-      <div class="status-stepper" id="topic-status-stepper" style="margin-bottom:18px;">
-        ${_renderStepperHtml(t.status)}
-      </div>
+    const panels = modal.querySelector('#tab-panels');
+    function paintTab(tab) {
+      modal.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      if (tab === 'knowledge') panels.innerHTML = Knowledge.renderKnowledgeTab(t, knowledge);
+      if (tab === 'business') panels.innerHTML = Knowledge.renderBusinessErpTab(knowledge);
+      if (tab === 'practical') panels.innerHTML = Knowledge.renderPracticalTab(t, knowledge);
+      if (tab === 'reviews') panels.innerHTML = Reviews.renderTopicReviewsTab(t, reviews);
+      Knowledge.bindTab(panels, t.id);
+      Reviews.bindTab(panels, t.id, () => openDetail(id, t));
+    }
 
-      <div class="tabs">
-        <button class="tab active" data-tab="knowledge">${I18n.t('topicDetail.tabKnowledge')}</button>
-        <button class="tab" data-tab="business">${I18n.t('topicDetail.tabBusiness')}</button>
-        <button class="tab" data-tab="practical">${I18n.t('topicDetail.tabPractical')}</button>
-        <button class="tab" data-tab="reviews">${I18n.t('topicDetail.tabReviews')}</button>
-      </div>
-
-      <div id="tab-panels"></div>
-    `;
+    modal.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => paintTab(b.dataset.tab)));
+    paintTab('knowledge');
 
     modal.querySelector('#delete-topic-btn').addEventListener('click', () => {
       if (!confirm(I18n.t('topicDetail.confirmDeleteTopic'))) return;
       UI.closeModal();
 
-      // PERF: Optimistic DOM removal (0ms)
       const row = document.querySelector(`tr[data-id="${id}"]`);
       if (row) row.style.display = 'none';
 
