@@ -10,7 +10,9 @@
 const Modules = (function () {
 
   async function render(container, moduleId) {
-    const mod = State.modulesCache.find(m => m.id === moduleId);
+    const modulesList = (State.modulesCache && State.modulesCache.length) ? State.modulesCache : (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
+    const mod = modulesList.find(m => String(m.id).toLowerCase() === String(moduleId).toLowerCase())
+      || (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES.find(m => String(m.id).toLowerCase() === String(moduleId).toLowerCase()) : null);
     if (!mod) { container.innerHTML = UI.errorState({ code: 'MODULE_NOT_FOUND' }); return; }
 
     // PERF: Layout Shimmer UI instead of spinner
