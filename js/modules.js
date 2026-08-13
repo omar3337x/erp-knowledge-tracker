@@ -63,15 +63,11 @@ const Modules = (function () {
         <button class="btn btn-primary" id="add-gap-btn">${I18n.t('module.addKnowledgeGap')}</button>
       </div>
 
-      <div id="ai-insights-section-wrap" style="margin-top:24px; margin-bottom:28px;"></div>
       <div id="topics-table-wrap"></div>
       <div id="notes-section-wrap-module"></div>
+      <div id="ai-insights-section-wrap" style="margin-top:28px; margin-bottom:28px;"></div>
       <div id="categories-section-wrap" style="margin-top:32px;"></div>
     `;
-
-    // ---- AI Insights Section (Asynchronous 0ms load) ----
-    const aiWrap = container.querySelector('#ai-insights-section-wrap');
-    loadAIInsightsSection(aiWrap, moduleId);
 
     // ---- topics table ----
     const tableWrap = container.querySelector('#topics-table-wrap');
@@ -101,6 +97,10 @@ const Modules = (function () {
     // ---- notes section ----
     const notesWrap = container.querySelector('#notes-section-wrap-module');
     Notes.renderSection(notesWrap, moduleId);
+
+    // ---- AI Insights Section (Asynchronous 0ms load - Below Notes) ----
+    const aiWrap = container.querySelector('#ai-insights-section-wrap');
+    loadAIInsightsSection(aiWrap, moduleId);
 
     // ---- categories section ----
     const catWrap = container.querySelector('#categories-section-wrap');
@@ -134,7 +134,7 @@ const Modules = (function () {
     const cardsContainer = wrapEl.querySelector('#ai-insights-cards-container');
     const refreshBtn = wrapEl.querySelector('#btn-refresh-ai-insights');
 
-    let currentInsights = [];
+    let currentInsights = API.cacheGet('insights:' + moduleId) || getFallbackInsightsLocal(moduleId);
     let favoritesMap = {};
 
     const renderInsightsList = () => {
@@ -144,7 +144,7 @@ const Modules = (function () {
       }
 
       cardsContainer.innerHTML = currentInsights.map(insight => {
-        const isFav = !!favoritesMap[insight.id];
+        const isFav = State.isFavorite(insight.id);
         const badgeClass = getBadgeClass(insight.type);
 
         return `
@@ -178,10 +178,26 @@ const Modules = (function () {
           const targetInsight = currentInsights.find(i => String(i.id) === String(insightId));
           if (!targetInsight) return;
 
-          const wasFav = !!favoritesMap[insightId];
-          favoritesMap[insightId] = !wasFav;
+          const wasFav = State.isFavorite(insightId);
+
+          // 0ms Instant Real-time State Update
+          if (wasFav) {
+            State.removeFavorite(insightId, insightId);
+          } else {
+            State.addFavorite({
+              insight_id: insightId,
+              module_id: moduleId,
+              title: targetInsight.title,
+              type: targetInsight.type,
+              content: targetInsight.content,
+              example: targetInsight.example || '',
+              why_it_matters: targetInsight.why_it_matters || ''
+            });
+          }
+
           btn.classList.toggle('is-fav', !wasFav);
           btn.innerHTML = !wasFav ? '★ ' + I18n.t('ai.favoriteRemove') : '☆ ' + I18n.t('ai.favoriteAdd');
+          UI.toast(!wasFav ? (I18n.getLang() === 'ar' ? 'تمت الإضافة للمفضلة' : 'Saved to favorites') : I18n.t('favorites.removedToast'), 'info');
 
           try {
             if (wasFav) {
@@ -198,30 +214,29 @@ const Modules = (function () {
               });
             }
           } catch (err) {
-            favoritesMap[insightId] = wasFav;
-            btn.classList.toggle('is-fav', wasFav);
-            btn.innerHTML = wasFav ? '★ ' + I18n.t('ai.favoriteRemove') : '☆ ' + I18n.t('ai.favoriteAdd');
             UI.toastError(err);
           }
         });
       });
     };
 
-    try {
-      const [res, favs] = await Promise.all([
-        API.getModuleInsights(moduleId).catch(() => null),
-        API.getFavorites().catch(() => [])
-      ]);
+    // 0ms Instant First Paint!
+    renderInsightsList();
 
+    // Background Async Fetch & Sync
+    API.getFavorites().then(favs => {
       if (favs && Array.isArray(favs)) {
-        favs.forEach(f => { favoritesMap[f.insight_id] = true; });
+        State.setFavorites(favs);
+        renderInsightsList();
       }
+    }).catch(() => {});
 
-      currentInsights = (res && Array.isArray(res.insights)) ? res.insights : [];
-      renderInsightsList();
-    } catch (err) {
-      cardsContainer.innerHTML = `<p style="font-size:13px; color:var(--ink-soft); margin:0;">${I18n.t('ai.error')}</p>`;
-    }
+    API.getModuleInsights(moduleId).then(res => {
+      if (res && Array.isArray(res.insights) && res.insights.length > 0) {
+        currentInsights = res.insights;
+        renderInsightsList();
+      }
+    }).catch(() => {});
 
     if (refreshBtn) {
       refreshBtn.addEventListener('click', async () => {
@@ -253,6 +268,59 @@ const Modules = (function () {
     if (t.includes('practice') || t.includes('best')) return 'ai-type-practice';
     if (t.includes('account') || t.includes('tax')) return 'ai-type-accounting';
     return 'ai-type-default';
+  }
+
+  function getFallbackInsightsLocal(moduleId) {
+    const isAr = I18n.getLang() === 'ar';
+    const modLower = String(moduleId || '').toLowerCase();
+
+    if (modLower.includes('inventory') || modLower.includes('mod-1')) {
+      return [
+        {
+          id: 'AI-local-1',
+          title: isAr ? 'الربط التلقائي بين تقييم المخزون والقيود المحاسبية' : 'Automated Inventory Valuation & Journal Entries',
+          type: 'Accounting Impact',
+          content: isAr ? 'عند اختيار طريقة FIFO أو Average Cost، تأكد من ضبط إعدادات الفئات (Product Categories) على "Automated" لترحيل قيود كلفة البضاعة المباعة (COGS) وحساب الفروقات فورياً مع كل حركة مخزنية.' : 'When using FIFO or Average Cost, ensure Product Categories valuation is set to Automated to trigger real-time COGS and valuation ledger entries.',
+          example: isAr ? 'تسليم شحنة مبيعات يقود القيد: من ح/ كلفة البضاعة المباعة إلى ح/ المخزون.' : 'Sales delivery auto-posts: Dr COGS, Cr Inventory.',
+          why_it_matters: isAr ? 'يمنع تسوية التكاليف يدوياً بنهاية الشهر ويضمن دقة القوائم المالية.' : 'Prevents manual month-end cost reconciliations and guarantees real-time balance sheet accuracy.'
+        },
+        {
+          id: 'AI-local-2',
+          title: isAr ? 'فحص التسويات المخزنية (Stock Adjustments)' : 'Audit Trail on Stock Adjustments',
+          type: 'Common Mistake',
+          content: isAr ? 'عدم تحديد سبب التسوية المخزنية (تلف، سرقة، عينة تجارية) يجعل تتبع الخسائر صعباً على الإدارة المالية.' : 'Not recording adjustment reason codes (damage, sample, theft) obscures variance analysis in financial reporting.',
+          example: isAr ? 'إنشاء حسابات مستهدفة جداً لكل سبب تسوية بدل حساب واحد عام.' : 'Map Scrap/Damage to specific Expense Accounts instead of a generic Loss Account.',
+          why_it_matters: isAr ? 'يساعد في تقليل الهدر وزيادة رقابة المخازن.' : 'Improves internal control and inventory shrinkage visibility.'
+        },
+        {
+          id: 'AI-local-3',
+          title: isAr ? 'إعادة الطلب التلقائية (Reordering Rules)' : 'Automated Reordering Rules & Buffer Safety',
+          type: 'Tip',
+          content: isAr ? 'حدد الحد الأدنى والأقصى لكل منتج بناءً على زمن التوريد (Lead Time) لتجنب انقطاع المخزون دون تجميد السيولة.' : 'Set Minimum and Maximum safety stock levels based on Lead Time to prevent stockouts without overcapitalizing cash.',
+          example: isAr ? 'منتج بـ Lead Time 10 أيام واستهلاك يومي 5 قطع -> الحد الأدنى 50 قطعة.' : 'Lead time 10 days + 5 daily sales = Min safety stock 50 units.',
+          why_it_matters: isAr ? 'رفع الكفاءة التشغيلية وحماية المبيعات من التوقف.' : 'Optimizes working capital and avoids lost sales.'
+        }
+      ];
+    }
+
+    return [
+      {
+        id: 'AI-local-1',
+        title: isAr ? 'أفضل الممارسات لتنظيم وتوثيق موديول ' + moduleId : 'Best Practices for ' + moduleId + ' Module',
+        type: 'Best Practice',
+        content: isAr ? 'ربط العمليات الحقلية بموديول ' + moduleId + ' يسهم في بناء قاعدة بيانات دقيقة لاتخاذ القرارات الإدارية.' : 'Integrating field operations with the ' + moduleId + ' module establishes data consistency across all business units.',
+        example: isAr ? 'اعتماد نماذج موحدة لإدخال البيانات وتحديد الأذونات بناءً على الأدوار الوظيفية.' : 'Standardize data entry forms and enforce role-based permission controls.',
+        why_it_matters: isAr ? 'تسريع الدورة التشغيلية وتقليل الأخطاء البشرية.' : 'Accelerates workflow cycle times and eliminates manual entry errors.'
+      },
+      {
+        id: 'AI-local-2',
+        title: isAr ? 'الرقابة والتحليل الدوري للعمليات' : 'Periodic Process Review & KPI Tracking',
+        type: 'Process Insight',
+        content: isAr ? 'مراجعة التقارير الدورية وتحليل الانحرافات تضمن كفاءة استخدام الموارد في موديول ' + moduleId + '.' : 'Regularly reviewing operational KPIs and variances ensures optimal resource allocation.',
+        example: isAr ? 'مقارنة التكاليف الفعلية بالميزانية التقديرية بشكل شهري.' : 'Compare actual operational costs against budgeted targets monthly.',
+        why_it_matters: isAr ? 'تحسين الربحية وضمان الامتثال للسياسات الإدارية.' : 'Boosts profitability and maintains policy compliance.'
+      }
+    ];
   }
 
   function _buildCatOptions(moduleId) {

@@ -332,7 +332,17 @@ function publicUser(user) {
 
 function getSheetId() {
   var id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  if (!id) throw new Error('SHEET_ID script property is not set.');
+  if (!id && typeof SpreadsheetApp !== 'undefined') {
+    try {
+      var active = SpreadsheetApp.getActiveSpreadsheet();
+      if (active) {
+        id = active.getId();
+        PropertiesService.getScriptProperties().setProperty('SHEET_ID', id);
+        return id;
+      }
+    } catch (e) {}
+  }
+  if (!id) throw new Error('SHEET_ID script property is not set. Please set SHEET_ID in Project Settings (⚙️) -> Script Properties.');
   return id;
 }
 
@@ -1942,24 +1952,28 @@ function generateModuleInsights(user, moduleId, lang, dateKey) {
     { role: 'user', content: userPrompt }
   ];
 
-  var rawAiRes = callAI(messages);
-
-  var cleanJson = rawAiRes.replace(/```json/gi, '').replace(/```/g, '').trim();
   var parsedList = [];
   try {
-    parsedList = JSON.parse(cleanJson);
-  } catch (e) {
-    var match = cleanJson.match(/\[[\s\S]*\]/);
-    if (match) parsedList = JSON.parse(match[0]);
+    var rawAiRes = callAI(messages);
+    var cleanJson = rawAiRes.replace(/```json/gi, '').replace(/```/g, '').trim();
+    try {
+      parsedList = JSON.parse(cleanJson);
+    } catch (e) {
+      var match = cleanJson.match(/\[[\s\S]*\]/);
+      if (match) parsedList = JSON.parse(match[0]);
+    }
+  } catch (err) {
+    Logger.log('AI Service call failed, using curated fallback insights: ' + err.message);
+    parsedList = getFallbackInsights(moduleId, lang);
   }
 
   if (!Array.isArray(parsedList) || !parsedList.length) {
-    throw new Error('AI failed to output valid insights list.');
+    parsedList = getFallbackInsights(moduleId, lang);
   }
 
   var nowStr = nowIso();
   var newRows = parsedList.map(function(item) {
-    var id = 'AI-' + makeId(8);
+    var id = generateId('AI');
     var rowObj = {
       id: id,
       user_id: user.id,
@@ -1981,6 +1995,71 @@ function generateModuleInsights(user, moduleId, lang, dateKey) {
   return successResponse({ insights: newRows });
 }
 
+function getFallbackInsights(moduleId, lang) {
+  var isAr = lang === 'ar';
+  var modLower = String(moduleId || '').toLowerCase();
+
+  if (modLower.indexOf('inventory') !== -1 || modLower.indexOf('mod-1') !== -1) {
+    return [
+      {
+        title: isAr ? 'الربط التلقائي بين تقييم المخزون والقيود المحاسبية' : 'Automated Inventory Valuation & Journal Entries',
+        type: 'Accounting Impact',
+        content: isAr ? 'عند اختيار طريقة FIFO أو Average Cost، تأكد من ضبط إعدادات الفئات (Product Categories) على "Automated" لترحيل قيود كلفة البضاعة المباعة (COGS) وحساب الفروقات فورياً مع كل حركة مخزنية.' : 'When using FIFO or Average Cost, ensure Product Categories valuation is set to Automated to trigger real-time COGS and valuation ledger entries.',
+        example: isAr ? 'تسليم شحنة مبيعات يقود القيد: من ح/ كلفة البضاعة المباعة إلى ح/ المخزون.' : 'Sales delivery auto-posts: Dr COGS, Cr Inventory.',
+        why_it_matters: isAr ? 'يمنع تسوية التكاليف يدوياً بنهاية الشهر ويضمن دقة القوائم المالية.' : 'Prevents manual month-end cost reconciliations and guarantees real-time balance sheet accuracy.'
+      },
+      {
+        title: isAr ? 'فحص التسويات المخزنية (Stock Adjustments)' : 'Audit Trail on Stock Adjustments',
+        type: 'Common Mistake',
+        content: isAr ? 'عدم تحديد سبب التسوية المخزنية (تلف، سرقة، عينة تجارية) يجعل تتبع الخسائر صعباً على الإدارة المالية.' : 'Not recording adjustment reason codes (damage, sample, theft) obscures variance analysis in financial reporting.',
+        example: isAr ? 'إنشاء حسابات مستهدفة جداً لكل سبب تسوية بدل حساب واحد عام.' : 'Map Scrap/Damage to specific Expense Accounts instead of a generic Loss Account.',
+        why_it_matters: isAr ? 'يساعد في تقليل الهدر وزيادة رقابة المخازن.' : 'Improves internal control and inventory shrinkage visibility.'
+      },
+      {
+        title: isAr ? 'إعادة الطلب التلقائية (Reordering Rules)' : 'Automated Reordering Rules & Buffer Safety',
+        type: 'Tip',
+        content: isAr ? 'حدد الحد الأدنى والأقصى لكل منتج بناءً على زمن التوريد (Lead Time) لتجنب انقطاع المخزون دون تجميد السيولة.' : 'Set Minimum and Maximum safety stock levels based on Lead Time to prevent stockouts without overcapitalizing cash.',
+        example: isAr ? 'منتج بـ Lead Time 10 أيام واستهلاك يومي 5 قطع -> الحد الأدنى 50 قطعة.' : 'Lead time 10 days + 5 daily sales = Min safety stock 50 units.',
+        why_it_matters: isAr ? 'رفع الكفاءة التشغيلية وحماية المبيعات من التوقف.' : 'Optimizes working capital and avoids lost sales.'
+      }
+    ];
+  } else if (modLower.indexOf('accounting') !== -1 || modLower.indexOf('mod-2') !== -1) {
+    return [
+      {
+        title: isAr ? 'إقفال الفترات المالية وتثبيت القيود' : 'Period Lock & Journal Entry Controls',
+        type: 'Best Practice',
+        content: isAr ? 'قم بإغلاق الفترة المالية شهرياً لمنع تعديل القيود المحاسبية السابقة بعد اعتماد التقارير.' : 'Lock accounting periods monthly to prevent back-dated entries after financial statements approval.',
+        example: isAr ? 'تحديد تاريخ الإقفال (Lock Date) في نهاية كل شهر ميلادي.' : 'Set Lock Date on the last day of each calendar month.',
+        why_it_matters: isAr ? 'يحمي سلامة البيانات المالية المعتمدة أمام المراجعين والجهات الضريبية.' : 'Ensures financial integrity and compliance with external audit standards.'
+      },
+      {
+        title: isAr ? 'تسوية الحسابات البنكية اليومية (Bank Reconciliation)' : 'Daily Automated Bank Reconciliation',
+        type: 'Process Insight',
+        content: isAr ? 'مطابقة التدفقات النقدية والودائع البنكية يومياً تكتشف الأخطاء والشيكات المعلقة مبكراً.' : 'Reconciling bank feeds daily catches duplicate transactions and uncollected checks early.',
+        example: isAr ? 'استيراد ملفات MT940 / CAMT.053 للتسوية الآلية.' : 'Import MT940 statement files for auto-matching.',
+        why_it_matters: isAr ? 'ضمان دقة الرصيد النقدي وتفادي التحايل.' : 'Guarantees accurate liquidity management and fraud protection.'
+      }
+    ];
+  }
+
+  return [
+    {
+      title: isAr ? 'أفضل الممارسات لتنظيم وتوثيق موديول ' + moduleId : 'Best Practices for ' + moduleId + ' Module',
+      type: 'Best Practice',
+      content: isAr ? 'ربط العمليات الحقلية بموديول ' + moduleId + ' يسهم في بناء قاعدة بيانات دقيقة لاتخاذ القرارات الإدارية.' : 'Integrating field operations with the ' + moduleId + ' module establishes data consistency across all business units.',
+      example: isAr ? 'اعتماد نماذج موحدة لإدخال البيانات وتحديد الأذونات بناءً على الأدوار الوظيفية.' : 'Standardize data entry forms and enforce role-based permission controls.',
+      why_it_matters: isAr ? 'تسريع الدورة التشغيلية وتقليل الأخطاء البشرية.' : 'Accelerates workflow cycle times and eliminates manual entry errors.'
+    },
+    {
+      title: isAr ? 'الرقابة والتحليل الدوري للعمليات' : 'Periodic Process Review & KPI Tracking',
+      type: 'Process Insight',
+      content: isAr ? 'مراجعة التقارير الدورية وتحليل الانحرافات تضمن كفاءة استخدام الموارد في موديول ' + moduleId + '.' : 'Regularly reviewing operational KPIs and variances ensures optimal resource allocation.',
+      example: isAr ? 'مقارنة التكاليف الفعلية بالميزانية التقديرية بشكل شهري.' : 'Compare actual operational costs against budgeted targets monthly.',
+      why_it_matters: isAr ? 'تحسين الربحية وضمان الامتثال للسياسات الإدارية.' : 'Boosts profitability and maintains policy compliance.'
+    }
+  ];
+}
+
 function actionGetFavorites(user) {
   var rows = readAllRows(SHEET_NAMES.AI_FAVORITES).filter(function(r) { return String(r.user_id) === String(user.id); });
   return successResponse(rows.map(stripRow));
@@ -1999,7 +2078,7 @@ function actionAddFavorite(user, payload) {
   }
 
   var favObj = {
-    id: 'FAV-' + makeId(8),
+    id: generateId('FAV'),
     user_id: user.id,
     insight_id: insightId,
     module_id: payload.module_id || '',

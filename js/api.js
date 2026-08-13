@@ -41,18 +41,20 @@ const API = (function () {
 
   // PERF: L0 Memory TTLs per data classification
   const MEM_TTL = {
-    modules        : 24 * 60 * 60 * 1000, // 24h
-    categories     : 24 * 60 * 60 * 1000, // 24h
-    dashboard      : 30 * 60 * 1000,      // 30m
-    topics         : 15 * 60 * 1000,      // 15m
-    topic          : 15 * 60 * 1000,      // 15m
-    reviews        : 15 * 60 * 1000,      // 15m
-    analytics      : 15 * 60 * 1000,      // 15m
-    notes          : 10 * 60 * 1000,      // 10m
-    note           : 10 * 60 * 1000,      // 10m
-    knowledge      : 15 * 60 * 1000,      // 15m
-    validateSession: 10 * 60 * 1000,      // 10m
-    currentUser    : 10 * 60 * 1000,      // 10m
+    modules          : 24 * 60 * 60 * 1000, // 24h
+    categories       : 24 * 60 * 60 * 1000, // 24h
+    dashboard        : 30 * 60 * 1000,      // 30m
+    topics           : 15 * 60 * 1000,      // 15m
+    topic            : 15 * 60 * 1000,      // 15m
+    reviews          : 15 * 60 * 1000,      // 15m
+    analytics        : 15 * 60 * 1000,      // 15m
+    notes            : 10 * 60 * 1000,      // 10m
+    note             : 10 * 60 * 1000,      // 10m
+    knowledge        : 15 * 60 * 1000,      // 15m
+    validateSession  : 10 * 60 * 1000,      // 10m
+    currentUser      : 10 * 60 * 1000,      // 10m
+    getModuleInsights: 24 * 60 * 60 * 1000, // 24h
+    getFavorites     : 24 * 60 * 60 * 1000, // 24h
   };
 
   function memGet(key) {
@@ -66,7 +68,7 @@ const API = (function () {
   }
 
   // PERF: L1 localStorage Cache with Version Invalidation
-  const LS_ACTIONS = new Set(['modules', 'categories', 'topics', 'reviews', 'dashboard', 'analytics', 'notes']);
+  const LS_ACTIONS = new Set(['modules', 'categories', 'topics', 'reviews', 'dashboard', 'analytics', 'notes', 'getModuleInsights', 'getFavorites']);
   const LS_PREFIX = `erp_cache_${APP_VERSION}:`;
 
   function lsGet(key, action) {

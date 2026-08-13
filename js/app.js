@@ -181,12 +181,45 @@ const State = {
   currentUser: null,
   modulesCache: [],
   allCategories: [],
+  favoritesCache: [],
+  favoritesMap: {},
 
   categoriesForModule(moduleId, opts) {
     opts = opts || {};
     let list = State.allCategories.filter(c => c.module_id === moduleId);
     if (!opts.includeInactive) list = list.filter(c => c.active === true || c.active === 'TRUE');
     return list;
+  },
+
+  setFavorites(list) {
+    State.favoritesCache = Array.isArray(list) ? list : [];
+    State.favoritesMap = {};
+    State.favoritesCache.forEach(f => {
+      if (f.insight_id) State.favoritesMap[f.insight_id] = true;
+      if (f.id) State.favoritesMap[f.id] = true;
+    });
+  },
+
+  addFavorite(favObj) {
+    if (!favObj) return;
+    const exists = State.favoritesCache.some(f => String(f.insight_id) === String(favObj.insight_id) || String(f.id) === String(favObj.id));
+    if (!exists) {
+      State.favoritesCache.unshift(favObj);
+    }
+    if (favObj.insight_id) State.favoritesMap[favObj.insight_id] = true;
+    if (favObj.id) State.favoritesMap[favObj.id] = true;
+  },
+
+  removeFavorite(insightId, favId) {
+    State.favoritesCache = State.favoritesCache.filter(f =>
+      String(f.insight_id) !== String(insightId) && String(f.id) !== String(favId) && String(f.insight_id) !== String(favId)
+    );
+    if (insightId) delete State.favoritesMap[insightId];
+    if (favId) delete State.favoritesMap[favId];
+  },
+
+  isFavorite(insightId) {
+    return !!State.favoritesMap[insightId];
   }
 };
 
@@ -272,7 +305,7 @@ const Router = (function () {
       return mod ? I18n.localizedName(mod) : I18n.t('nav.modules');
     }
     const map = {
-      dashboard: 'dashboard.title', notes: 'nav.allNotes', favorites: 'nav.favorites', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
+      dashboard: 'dashboard.title', notes: 'nav.allNotes', favorites: 'nav.favorites', 'ai-insights': 'nav.aiInsights', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
       analytics: 'analytics.title', profile: 'nav.myProfile', admin: 'admin.title'
     };
     return map[route] ? I18n.t(map[route]) : I18n.t('common.notFound');
@@ -323,6 +356,7 @@ const Router = (function () {
     if (route === 'dashboard') return Dashboard.render(content);
     if (route === 'notes') return Notes.renderAllNotesPage(content);
     if (route === 'favorites') return Favorites.render(content);
+    if (route === 'ai-insights') return AIInsightsPage.render(content);
     if (route === 'module') return Modules.render(content, params.id);
     if (route === 'gaps') {
       content.innerHTML = UI.skeleton('table');
