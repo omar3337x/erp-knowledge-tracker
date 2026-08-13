@@ -10,6 +10,31 @@ const Notes = (function () {
   let _currentModuleId = '';
   let _activeTagFilter = '';
 
+  // localStorage cache for instant notes load (2-min TTL)
+  const NOTES_LS_KEY = 'erp_notes_cache_v2';
+  const NOTES_LS_TTL = 2 * 60 * 1000; // 2 minutes
+
+  function _loadNotesFromLS() {
+    try {
+      const raw = localStorage.getItem(NOTES_LS_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (Date.now() - parsed.savedAt < NOTES_LS_TTL && Array.isArray(parsed.notes)) {
+        return parsed.notes;
+      }
+    } catch (e) { /* corrupt — ignore */ }
+    return null;
+  }
+
+  function _saveNotesToLS(notes) {
+    try {
+      // Only cache up to 200 notes to avoid localStorage quota issues
+      // Strip image_url to save space (images are re-fetched from GAS anyway)
+      const slim = notes.slice(0, 200).map(n => Object.assign({}, n, { image_url: n.image_url && n.image_url.length > 200 ? '[image]' : n.image_url }));
+      localStorage.setItem(NOTES_LS_KEY, JSON.stringify({ savedAt: Date.now(), notes: slim }));
+    } catch (e) { /* quota exceeded — ignore */ }
+  }
+
   function compressImage(dataUrl, maxWidth, quality, callback) {
     maxWidth = maxWidth || 400;
     quality = quality || 0.4;
@@ -168,6 +193,11 @@ const Notes = (function () {
         <div id="all-notes-tags-bar" style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;"></div>
       </div>
       <div id="all-notes-list-wrap">
+        <!-- Subtle background refresh indicator — only shows when stale cache is displayed -->
+        <div id="notes-bg-sync" style="display:none; align-items:center; gap:8px; padding:6px 12px; margin-bottom:8px; background:var(--line-soft); border-radius:var(--radius-sm); font-size:12px; color:var(--ink-soft);">
+          <span class="spinner" style="width:12px; height:12px; border-width:1.5px;"></span>
+          ${isAr ? 'جاري التحديث من الداتا بيز...' : 'Refreshing from database...'}
+        </div>
         <div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>
       </div>
     `;
@@ -189,8 +219,10 @@ const Notes = (function () {
     syncBtn.addEventListener('click', async () => {
       syncBtn.disabled = true;
       API.cacheBust('notes');
+      _allNotesCache = [];
+      try { localStorage.removeItem(NOTES_LS_KEY); } catch(e) {}
       UI.toast(isAr ? 'جاري المزامنة...' : 'Syncing...', 'info');
-      await reloadAllNotesPage(listWrap, badgeEl, searchInput.value, moduleFilter.value);
+      await reloadAllNotesPage(listWrap, badgeEl, searchInput.value, moduleFilter.value, { forceNetwork: true });
       syncBtn.disabled = false;
       UI.toast(isAr ? 'تمت المزامنة بنجاح' : 'Synced successfully', 'success');
     });
@@ -201,28 +233,94 @@ const Notes = (function () {
     const triggerRender = () => renderAllNotesGrouped(listWrap, searchInput.value, moduleFilter.value, badgeEl);
 
     searchInput.addEventListener('input', triggerRender);
-    moduleFilter.addEventListener('change', triggerRender);
+    moduleFilter.addEventListener('change', () => {
+      // Bust notes API cache when module filter changes so fresh data is fetched
+      API.cacheBust('notes');
+      _allNotesCache = [];
+      triggerRender();
+      reloadAllNotesPage(listWrap, badgeEl, searchInput.value, moduleFilter.value);
+    });
 
-    await reloadAllNotesPage(listWrap, badgeEl, '', '');
+    // Initial load — uses stale-while-revalidate
+    await reloadAllNotesPage(listWrap, badgeEl, '', '', {});
   }
 
-  async function reloadNotes(listWrap, badgeEl, searchQuery) {
+  // Stale-While-Revalidate loader:
+  // 1. If we have in-memory cache → render instantly
+  // 2. If not, try localStorage cache → render instantly  
+  // 3. Always fetch fresh in background and re-render silently if changed
+  async function reloadAllNotesPage(listWrap, badgeEl, searchQuery, selectedModuleId, opts) {
+    opts = opts || {};
+    const forceNetwork = opts.forceNetwork || false;
+
+    // ── Step 1: Show stale data immediately ────────────────────────
+    const hasMemoryCache = _allNotesCache.length > 0;
+    if (!hasMemoryCache) {
+      const lsData = _loadNotesFromLS();
+      if (lsData && lsData.length > 0) {
+        _allNotesCache = lsData.map(normalizeNote).filter(Boolean);
+        renderAllNotesGrouped(listWrap, searchQuery, selectedModuleId, badgeEl);
+      }
+    } else if (!forceNetwork) {
+      // Already have memory cache — render instantly and refresh in background
+      renderAllNotesGrouped(listWrap, searchQuery, selectedModuleId, badgeEl);
+    }
+
+    // ── Step 2: Fetch fresh data in background ─────────────────────
+    const isStaleShown = _allNotesCache.length > 0;
+    if (isStaleShown && !forceNetwork) {
+      // Show loading indicator subtly (not full-screen spinner)
+      const indicator = listWrap ? listWrap.querySelector('#notes-bg-sync') : null;
+      if (indicator) indicator.style.display = 'flex';
+    }
+
     try {
-      const raw = await API.notes({ module_id: _currentModuleId, search: searchQuery || '' });
-      _allNotesCache = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
-      renderModuleNotesList(listWrap, searchQuery, badgeEl);
+      const raw = await API.notes({ module_id: selectedModuleId || '', search: searchQuery || '' });
+      const freshNotes = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
+
+      // Only re-render if data actually changed (avoid flicker)
+      const changed = freshNotes.length !== _allNotesCache.length ||
+        JSON.stringify(freshNotes.map(n => n.id + n.updated_at)) !==
+        JSON.stringify(_allNotesCache.map(n => n.id + n.updated_at));
+
+      _allNotesCache = freshNotes;
+      _saveNotesToLS(freshNotes);
+
+      if (changed || !isStaleShown) {
+        renderAllNotesGrouped(listWrap, searchQuery, selectedModuleId, badgeEl);
+      }
+      // Hide the background sync indicator
+      const indicator = listWrap ? listWrap.querySelector('#notes-bg-sync') : null;
+      if (indicator) indicator.style.display = 'none';
     } catch (err) {
-      if (listWrap) listWrap.innerHTML = UI.errorState(err);
+      // If we already showed stale data, don't replace it with an error screen
+      if (!isStaleShown && listWrap) {
+        listWrap.innerHTML = UI.errorState(err);
+      } else {
+        UI.toastError(err);
+      }
     }
   }
 
-  async function reloadAllNotesPage(listWrap, badgeEl, searchQuery, selectedModuleId) {
+  async function reloadNotes(listWrap, badgeEl, searchQuery) {
+    // Show stale data immediately if available
+    if (_allNotesCache.length > 0) {
+      renderModuleNotesList(listWrap, searchQuery, badgeEl);
+    }
     try {
-      const raw = await API.notes({ module_id: selectedModuleId || '', search: searchQuery || '' });
-      _allNotesCache = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
-      renderAllNotesGrouped(listWrap, searchQuery, selectedModuleId, badgeEl);
+      const raw = await API.notes({ module_id: _currentModuleId, search: searchQuery || '' });
+      const freshNotes = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
+      const changed = freshNotes.length !== _allNotesCache.length ||
+        JSON.stringify(freshNotes.map(n => n.id + n.updated_at)) !==
+        JSON.stringify(_allNotesCache.map(n => n.id + n.updated_at));
+      _allNotesCache = freshNotes;
+      _saveNotesToLS(freshNotes);
+      if (changed || _allNotesCache.length === 0) {
+        renderModuleNotesList(listWrap, searchQuery, badgeEl);
+      }
     } catch (err) {
-      if (listWrap) listWrap.innerHTML = UI.errorState(err);
+      if (_allNotesCache.length === 0 && listWrap) listWrap.innerHTML = UI.errorState(err);
+      else UI.toastError(err);
     }
   }
 

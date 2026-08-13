@@ -54,6 +54,12 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
+  // Only intercept http/https — never cache chrome-extension:// or other schemes
+  if (event.request.url.startsWith('chrome-extension://') ||
+      (!event.request.url.startsWith('http://') && !event.request.url.startsWith('https://'))) {
+    return;
+  }
+
   // Never intercept API / OAuth calls — always go to network
   if (
     url.hostname.includes('script.google.com') ||

@@ -123,8 +123,13 @@ const Dashboard = (function () {
     if (!_prefetchDone) {
       _prefetchDone = true;
       setTimeout(() => {
+        // Pre-warm topics cache
         API.topics({}).catch(() => {});
-        setTimeout(() => { API.reviews().catch(() => {}); }, 1000);
+        // Pre-warm notes cache (fetches all notes so All Notes page renders instantly)
+        setTimeout(() => {
+          API.notes({ module_id: '', search: '' }).catch(() => {});
+          API.reviews().catch(() => {});
+        }, 800);
       }, 200);
     }
   }
