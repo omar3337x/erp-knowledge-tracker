@@ -39,9 +39,12 @@ const Profile = (function () {
                 <option value="ar" ${user.language === 'ar' ? 'selected' : ''}>العربية</option>
               </select>
             </div>
-            <div class="field checkbox-row" style="margin-top:10px; margin-bottom:14px;">
+            <div class="field checkbox-row" style="margin-top:10px; margin-bottom:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
               <input type="checkbox" id="digest-enabled-cb" name="digest_enabled" ${user.digest_enabled !== false && user.digest_enabled !== 'FALSE' ? 'checked' : ''}>
               <label for="digest-enabled-cb" style="margin:0;">📧 ${I18n.t('digest.receiveWeeklyDigest')}</label>
+              <button type="button" class="btn btn-secondary btn-sm" id="send-test-digest-profile-btn" style="margin-inline-start:auto;">
+                📧 ${I18n.t('digest.sendTestDigest')}
+              </button>
             </div>
             <button type="submit" class="btn btn-primary">${I18n.t('profile.saveChanges')}</button>
           </form>
@@ -100,6 +103,19 @@ const Profile = (function () {
       } catch (err) { UI.toastError(err); }
       finally { btn.disabled = false; }
     });
+
+    const testDigestProfileBtn = container.querySelector('#send-test-digest-profile-btn');
+    if (testDigestProfileBtn) {
+      testDigestProfileBtn.addEventListener('click', async () => {
+        testDigestProfileBtn.disabled = true;
+        UI.toast(I18n.getLang() === 'ar' ? 'جاري إرسال البريد التجريبي...' : 'Sending test email...', 'info');
+        try {
+          await API.sendTestDigest();
+          UI.toast(I18n.t('digest.testDigestSent'), 'success');
+        } catch (err) { UI.toastError(err); }
+        finally { testDigestProfileBtn.disabled = false; }
+      });
+    }
 
     // Feature 5: Export & Import Handlers
     const exportBtn = container.querySelector('#export-backup-btn');

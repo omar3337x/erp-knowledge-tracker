@@ -1568,7 +1568,6 @@ function actionGetStreak(user) {
 // ---------------------------------------------------------------------------
 
 function actionSendTestDigest(user) {
-  if (user.role !== 'Admin') return errorResponse('Admin access required.', 'ADMIN_REQUIRED');
   sendWeeklyDigestForUser(user);
   return successResponse({ sent: true }, 'Test digest sent successfully.');
 }

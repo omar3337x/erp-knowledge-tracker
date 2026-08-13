@@ -137,6 +137,10 @@ const API = (function () {
   /* PERF: GAS Cold Start Mitigation & Exponential Backoff             */
   /* ------------------------------------------------------------------ */
   const MAX_ATTEMPTS = 5;
+  const READ_ACTIONS = new Set([
+    'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
+    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping', 'batch', 'getStreak'
+  ]);
 
   function _retryDelay(attempt, is429) {
     if (is429) return Math.min(2000 * Math.pow(2, attempt - 1), 10000); // Exponential backoff for 429
@@ -159,7 +163,6 @@ const API = (function () {
     }
 
     const token = getToken();
-    const payloadStr = JSON.stringify(payload || {});
 
     // PERF: AbortController for cancelable requests
     const controller = new AbortController();
@@ -170,17 +173,23 @@ const API = (function () {
       activeControllers.set(options.route, controller);
     }
 
-    // PERF: Include action and token in URL query string + POST body.
-    // Dual parameter passing guarantees compatibility with both new and old GAS deployments,
-    // eliminates 302 -> macros/echo 404 redirects, and prevents Missing action parameter errors.
-    const qs = new URLSearchParams({ action: action || '', token: token || '' }).toString();
+    const qsParams = { action: action || '', token: token || '' };
+    if (payload && typeof payload === 'object' && Object.keys(payload).length > 0) {
+      qsParams.payload = JSON.stringify(payload);
+    }
+    const qs = new URLSearchParams(qsParams).toString();
     const fetchUrl = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs;
+
+    const isReadAction = READ_ACTIONS.has(action);
     const fetchOpts = {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: action || '', payload: payload || {}, token: token || '' }),
+      method: isReadAction ? 'GET' : 'POST',
       signal: controller.signal
     };
+
+    if (!isReadAction) {
+      fetchOpts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+      fetchOpts.body = JSON.stringify({ action: action || '', payload: payload || {}, token: token || '' });
+    }
 
     let res;
     try {
@@ -245,10 +254,6 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   /* PERF: Cached Read Calls & Prioritization                           */
   /* ------------------------------------------------------------------ */
-  const READ_ACTIONS = new Set([
-    'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
-    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping', 'batch', 'getStreak'
-  ]);
 
   async function call(action, payload, options) {
     if (!READ_ACTIONS.has(action)) return rawCall(action, payload, 1, options);
