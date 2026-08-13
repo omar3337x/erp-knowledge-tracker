@@ -159,6 +159,10 @@ const API = (function () {
   let _requestQueue = Promise.resolve();
 
   function rawCall(action, payload, attempt, options) {
+    // PERF: High-priority user interactive auth actions execute IMMEDIATELY without waiting in queue
+    if (action === 'login' || action === 'signup' || action === 'logout') {
+      return _executeRawCall(action, payload, attempt, options);
+    }
     const run = () => _executeRawCall(action, payload, attempt, options);
     const p = _requestQueue.then(run, run);
     _requestQueue = p.catch(() => {});
@@ -337,6 +341,7 @@ const API = (function () {
   }
   function stopWarmupQueue() {
     if (_warmupTimer) { clearInterval(_warmupTimer); _warmupTimer = null; }
+    _requestQueue = Promise.resolve(); // Discard any pending background warmup pings instantly
   }
 
   // PERF: Predictive Prefetch — ONE batch call after login (dashboard + topics + notes + reviews + modules + categories + favorites)

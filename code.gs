@@ -544,6 +544,7 @@ function getUsersIndex() {
   rows.forEach(function(u) {
     index.byUsername[String(u.username).toLowerCase()] = u.id;
     index.byEmail[String(u.email).toLowerCase()] = u.id;
+    cachePut('user:' + u.id, u, CACHE_TTL_USER);
   });
   cachePut('users_index', index, CACHE_TTL_REFERENCE);
   return index;
