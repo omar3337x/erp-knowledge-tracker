@@ -499,21 +499,6 @@ const Topics = (function () {
         }
       }, 50);
     });
-
-    _bindStepper(modal, t, id);
-
-    const panels = modal.querySelector('#tab-panels');
-    function paintTab(tab) {
-      modal.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-      if (tab === 'knowledge') panels.innerHTML = Knowledge.renderKnowledgeTab(t, knowledge);
-      if (tab === 'business') panels.innerHTML = Knowledge.renderBusinessErpTab(knowledge);
-      if (tab === 'practical') panels.innerHTML = Knowledge.renderPracticalTab(t, knowledge);
-      if (tab === 'reviews') panels.innerHTML = Reviews.renderTopicReviewsTab(t, data.reviews);
-      Knowledge.bindTab(panels, t.id);
-      Reviews.bindTab(panels, t.id, () => openDetail(id));
-    }
-    modal.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => paintTab(b.dataset.tab)));
-    paintTab('knowledge');
   }
 
   function _renderStepperHtml(currentStatus) {
