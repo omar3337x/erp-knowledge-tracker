@@ -190,14 +190,11 @@ const API = (function () {
       activeControllers.set(options.route, controller);
     }
 
-    // PERF: Include action & token in query parameters (short URL, < 100 chars) AND in POST body.
-    // When GAS 302 redirects POST -> GET to macros/echo, query params ensure e.parameter.action is NEVER lost,
-    // while POST body delivers the heavy payload reliably without causing 404 URL overflow errors.
-    const qsParams = { action: action || '' };
-    if (token) qsParams.token = token;
-    const qs = new URLSearchParams(qsParams).toString();
-    const fetchUrl = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs;
-
+    // PERF: Always send clean POST request to CONFIG.API_URL with text/plain body.
+    // Query string parameters cause Google Apps Script edge CDN to issue 302 redirects to macros/echo
+    // with huge user_content_key parameters that fail with HTTP 404 (Not Found).
+    // Clean POST with text/plain body delivers action, payload, and token directly into doPost(e) with 0 errors.
+    const fetchUrl = CONFIG.API_URL;
     const fetchOpts = {
       method: 'POST',
       signal: controller.signal,
