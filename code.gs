@@ -1862,8 +1862,8 @@ function actionAskAI(user, payload) {
     var isAr = lang === 'ar';
 
     var systemMsg = isAr
-      ? 'أنت مستشار وحبير أنظمة ERP متخصص للغاية، دقيق، محترف وعملي. تجيب بتنسيق JSON نظيف ومنظم دون اختراع أرقام أو فوتشرات غير حقيقية.'
-      : 'You are an expert ERP Functional Consultant & Solution Architect. You provide concise, highly accurate, structured responses in JSON.';
+      ? 'أنت مستشار وخبير أنظمة ERP متخصص للغاية، دقيق، محترف وعملي. تقدم إجاباتك بتنسيق منظم احترافي بأقسام وعناوين واضحة وبطاقات مقارنة وأمثلة عملية وبنود محددة دون اختراع أرقام أو فوتشرات غير حقيقية.'
+      : 'You are an expert ERP Functional Consultant & Solution Architect. Provide concise, highly accurate, beautifully structured responses with section headers, bullet points, and practical business scenarios.';
 
     var contextStr = 'User Language: ' + lang + '\n' +
       'Module ID: ' + (context.module_id || 'N/A') + '\n' +

@@ -142,7 +142,7 @@ const API = (function () {
   const READ_ACTIONS = new Set([
     'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
     'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping', 'batch', 'getStreak',
-    'getModuleInsights', 'getAISettings', 'getFavorites'
+    'getModuleInsights', 'getAISettings', 'getFavorites', 'askAI'
   ]);
 
   function _retryDelay(attempt, is429) {
