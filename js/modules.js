@@ -113,7 +113,7 @@ const Modules = (function () {
       draw();
     };
 
-    Categories.renderSection(catWrap, moduleId, onCategoryChange);
+    Categories.renderSection(catWrap, moduleId, topics, onCategoryChange);
   }
 
   async function loadAIInsightsSection(wrapEl, moduleId) {

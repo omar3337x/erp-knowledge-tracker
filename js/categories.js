@@ -43,6 +43,11 @@ const Categories = (function () {
    *          doing a full Router.reload().
    */
   function renderSection(container, moduleId, topics, onCategoryChange) {
+    if (typeof topics === 'function') {
+      onCategoryChange = topics;
+      topics = null;
+    }
+    topics = Array.isArray(topics) ? topics : [];
     const categories = State.categoriesForModule(moduleId, { includeInactive: true });
     const countFor = (catId) => topics.filter(t => t.category_id === catId).length;
 

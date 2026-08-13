@@ -1776,6 +1776,10 @@ function deleteRowsByUser(sheetName, userId) {
   }
 }
 
+function todayIsoDate() {
+  return new Date().toISOString().substring(0, 10);
+}
+
 // ---------------------------------------------------------------------------
 // AI DAILY INSIGHTS & FAVORITES SERVICE
 // ---------------------------------------------------------------------------
