@@ -208,7 +208,7 @@ const Notes = (function () {
 
   async function reloadNotes(listWrap, badgeEl, searchQuery) {
     try {
-      const raw = await API.notes(_currentModuleId);
+      const raw = await API.notes({ module_id: _currentModuleId, search: searchQuery || '' });
       _allNotesCache = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
       renderModuleNotesList(listWrap, searchQuery, badgeEl);
     } catch (err) {
@@ -218,7 +218,7 @@ const Notes = (function () {
 
   async function reloadAllNotesPage(listWrap, badgeEl, searchQuery, selectedModuleId) {
     try {
-      const raw = await API.notes();
+      const raw = await API.notes({ module_id: selectedModuleId || '', search: searchQuery || '' });
       _allNotesCache = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
       renderAllNotesGrouped(listWrap, searchQuery, selectedModuleId, badgeEl);
     } catch (err) {

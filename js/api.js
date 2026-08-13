@@ -122,15 +122,22 @@ const API = (function () {
 
   /* ------------------------------------------------------------------ */
   /* Raw HTTP call with exponential-backoff retry loop                  */
-  /*                                                                    */
-  /* GAS cold start = ~14 seconds. During this time the POST→302→echo   */
-  /* redirect returns 404 because GAS hasn't stored the response yet.  */
-  /* We retry with doubling delays until we get a valid JSON response,  */
-  /* or until MAX_ATTEMPTS is exhausted (~30s total budget).            */
+  /* ------------------------------------------------------------------ */
+  /* rawCall — always GET (≤7500 chars) or fire-and-forget no-cors POST  */
+  /* for oversized payloads (base64 images). Avoids CORS 302/echo/404.  */
   /* ------------------------------------------------------------------ */
   const MAX_ATTEMPTS = 8;
   // Delay schedule (ms): 300, 600, 1200, 2400, 3000, 3000, 3000
   function _retryDelay(attempt) { return Math.min(300 * Math.pow(2, attempt - 1), 3000); }
+
+  const WRITE_ACTIONS = new Set([
+    'signup','login','logout','updateProfile','changePassword',
+    'createCategory','updateCategory','deleteCategory','toggleCategoryStatus',
+    'createTopic','updateTopic','deleteTopic','updateStatus','updateStatusBulk','updateProgress',
+    'saveKnowledge','updateKnowledge',
+    'createNote','updateNote','deleteNote',
+    'addReview','markReviewed','seed'
+  ]);
 
   async function rawCall(action, payload, attempt) {
     attempt = attempt || 1;
@@ -144,25 +151,34 @@ const API = (function () {
     const token = getToken();
     const payloadStr = JSON.stringify(payload || {});
 
-    // Embed action, token, and payload in query string parameters.
-    // For GAS, GET requests with URL params avoid 302 POST->GET body-loss entirely.
+    // Always encode as GET query params — GAS doGet handles all actions.
+    // This avoids 302→echo→404 and CORS preflight entirely.
     const qs = new URLSearchParams({ action, token });
     if (payload && Object.keys(payload).length) {
       qs.set('payload', payloadStr);
     }
     const url = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
 
-    // For GAS, GET requests with URL params avoid 302 POST CORS preflight blocks completely.
-    // Use GET whenever URL length is under 12,000 characters (browser limit is 32,768).
-    const isGet = url.length < 12000;
+    let fetchUrl, fetchOpts;
 
-    const fetchUrl = isGet ? url : CONFIG.API_URL;
-    const fetchOpts = isGet
-      ? { method: 'GET' }
-      : {
-          method : 'POST',
-          body   : JSON.stringify({ action, payload: payload || {}, token })
-        };
+    if (url.length <= 7500) {
+      // Normal GET — works for all reads and most writes
+      fetchUrl = url;
+      fetchOpts = { method: 'GET' };
+    } else {
+      // Payload too large for GET (e.g. base64 image) — send as no-cors POST.
+      // no-cors means we can't read the response, so the caller must rely on
+      // optimistic UI (which is already in place for all write operations).
+      fetchUrl = CONFIG.API_URL;
+      fetchOpts = {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify({ action, payload: payload || {}, token })
+      };
+      // Fire and forget — no response to parse
+      fetch(fetchUrl, fetchOpts).catch(() => {});
+      return {};  // Optimistic UI already applied; background sync will fix up on next fetch
+    }
 
     let res;
     try {
@@ -177,8 +193,7 @@ const API = (function () {
       throw err;
     }
 
-    // GAS 302→echo→404: GAS hasn't stored the response yet (cold start).
-    // Retry automatically — each retry adds to GAS's warmup time.
+    // GAS 302→echo→404: cold start. Retry automatically.
     if (res.status === 404) {
       if (attempt < MAX_ATTEMPTS) {
         await _sleep(_retryDelay(attempt));
@@ -192,7 +207,6 @@ const API = (function () {
     let json;
     try { json = await res.json(); }
     catch (parseErr) {
-      // GAS may return an HTML error page during cold start
       if (attempt < MAX_ATTEMPTS) {
         await _sleep(_retryDelay(attempt));
         return rawCall(action, payload, attempt + 1);
@@ -218,7 +232,7 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   const READ_ACTIONS = new Set([
     'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
-    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note'
+    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping'
   ]);
 
   async function call(action, payload) {
@@ -300,14 +314,21 @@ const API = (function () {
     updateTopic: async (p) => { const r = await rawCall('updateTopic', p); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
     deleteTopic: async (id) => { const r = await rawCall('deleteTopic', { id }); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
     updateStatus: async (id, status) => { const r = await rawCall('updateStatus', { id, status }); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
+    updateStatusBulk: async (ids, status) => { const r = await rawCall('updateStatusBulk', { ids, status }); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
     updateProgress: async (id, progress) => { const r = await rawCall('updateProgress', { id, progress }); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
 
     // Knowledge
     knowledge    : (topicId) => call('knowledge', { topic_id: topicId }),
     saveKnowledge: async (p) => { const r = await rawCall('saveKnowledge', p); cacheBust('knowledge', 'topic'); return r; },
 
-    // Notes
-    notes     : (moduleId, search) => call('notes', { module_id: moduleId || '', search: search || '' }),
+    // Notes — paginated server-side. Returns { notes, total, limit, offset }.
+    // notes(opts) accepts: { module_id, search, tag, pinned_only, limit, offset }
+    notes : (opts) => call('notes', opts || {}).then(r => {
+      // Server returns { notes: [...], total, limit, offset } — extract the array for callers
+      if (r && Array.isArray(r.notes)) { API._lastNotesMeta = { total: r.total, limit: r.limit, offset: r.offset }; return r.notes; }
+      // Legacy fallback (old server): r is already an array
+      return Array.isArray(r) ? r : [];
+    }),
     note      : (id) => call('note', { id }),
     createNote: async (p) => { const r = await rawCall('createNote', p); cacheBust('notes'); return r; },
     updateNote: async (p) => { const r = await rawCall('updateNote', p); cacheBust('notes', 'note'); return r; },

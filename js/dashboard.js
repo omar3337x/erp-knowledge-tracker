@@ -20,15 +20,13 @@ const Dashboard = (function () {
     const k = data.kpis;
     const isAr = I18n.getLang() === 'ar';
 
-    // Non-blocking cached topics for Pinned & Goals widgets
-    let allTopics = [];
-    try {
-      const cached = API.topics ? API.topics({}).catch(() => []) : [];
-      allTopics = Array.isArray(cached) ? cached : [];
-    } catch(e) {}
+    // Topics come embedded in the dashboard response — zero extra network calls
+    const allTopics = Array.isArray(data.topics) ? data.topics : [];
 
-    const pinnedTopics = (allTopics || []).filter(t => t.pinned === true || t.pinned === 'TRUE' || t.pinned === 'true' || t.pinned === 1);
-    const goalsTopics = (allTopics || []).filter(t => t.target_date && t.status !== 'Mastered');
+    const pinnedTopics = allTopics.filter(t => t.pinned === true || t.pinned === 'TRUE' || t.pinned === 'true' || t.pinned === 1);
+    const goalsTopics  = allTopics.filter(t => t.target_date && t.status !== 'Mastered');
+    // Seed the in-memory API cache so subsequent pages (module, gaps, review) get topics instantly
+    if (allTopics.length) API._dashboardTopics = allTopics;
 
     container.innerHTML = `
       <div class="grid grid-kpi" style="margin-bottom:24px;">

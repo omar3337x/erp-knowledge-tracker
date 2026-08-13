@@ -124,9 +124,22 @@ const Topics = (function () {
           <button class="btn btn-secondary btn-sm" id="export-gaps-pdf-btn">📄 PDF</button>
         </div>
       </div>
+
+      <!-- Bulk Action Toolbar (hidden until rows selected) -->
+      <div id="bulk-toolbar" style="display:none; margin-bottom:12px; padding:10px 16px; background:var(--brass-soft, #fef3c7); border:1px solid var(--brass); border-radius:var(--radius-md); display:none; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span id="bulk-count" style="font-weight:600; font-size:13px; color:var(--ink);">0 ${isAr ? 'محدد' : 'selected'}</span>
+        <span style="color:var(--ink-soft); font-size:12px;">${isAr ? 'تغيير الحالة إلى:' : 'Change status to:'}</span>
+        ${STATUS_VALUES.map(s => `
+          <button class="btn btn-sm btn-secondary bulk-status-btn" data-status="${s}"
+                  style="padding:4px 10px; font-size:12px;">${I18n.statusLabel(s)}</button>
+        `).join('')}
+        <button class="btn btn-sm btn-ghost" id="bulk-cancel-btn" style="margin-inline-start:auto; font-size:12px;">${isAr ? 'إلغاء التحديد' : 'Clear selection'}</button>
+      </div>
+
       <div class="table-wrap">
         <table>
           <thead><tr>
+            <th style="width:36px;"><input type="checkbox" id="select-all-topics" title="${isAr ? 'تحديد الكل' : 'Select all'}"></th>
             <th>${I18n.t('table.topic')}</th>
             ${showModuleCol ? `<th>${I18n.t('table.module')}</th>` : ''}
             <th>${I18n.t('table.category')}</th>
@@ -145,29 +158,126 @@ const Topics = (function () {
     const statSel = container.querySelector('#filter-status-sel');
     const csvBtn = container.querySelector('#export-gaps-csv-btn');
     const pdfBtn = container.querySelector('#export-gaps-pdf-btn');
+    const bulkToolbar = container.querySelector('#bulk-toolbar');
+    const bulkCountEl = container.querySelector('#bulk-count');
+    const selectAllCb = container.querySelector('#select-all-topics');
+    const bulkCancelBtn = container.querySelector('#bulk-cancel-btn');
 
-    priSel.addEventListener('change', (e) => { filterPriority = e.target.value; filterAndRender(); });
-    statSel.addEventListener('change', (e) => { filterStatus = e.target.value; filterAndRender(); });
+    // Redefine filterAndRender to include checkbox column
+    function filterAndRenderFull() {
+      let list = topics;
+      if (filterPriority) list = list.filter(t => t.priority === filterPriority);
+      if (filterStatus)   list = list.filter(t => t.status   === filterStatus);
+      list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+      const tableBodyHtml = list.map(t => {
+        const rawTags = t.tags || '';
+        const tagsArr = Array.isArray(rawTags) ? rawTags : String(rawTags).split(',').map(x => x.trim().replace(/^#/, '')).filter(Boolean);
+        const tagsHtml = tagsArr.map(tag => `<span class="tag-badge">#${escapeHtml(tag)}</span>`).join(' ');
+        const pinBadge = t.pinned ? `<span class="pinned-badge">📌</span>` : '';
+        const goalBadge = targetDateBadge(t.target_date);
+        return `
+          <tr data-id="${t.id}" class="${t.pinned ? 'is-pinned' : ''}">
+            <td onclick="event.stopPropagation();" style="text-align:center;">
+              <input type="checkbox" class="topic-select-cb" data-id="${t.id}">
+            </td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                ${pinBadge}<strong>${escapeHtml(t.topic)}</strong>${goalBadge}
+              </div>
+              ${tagsHtml ? `<div style="margin-top:4px;">${tagsHtml}</div>` : ''}
+            </td>
+            ${showModuleCol ? `<td>${modName(t.module_id)}</td>` : ''}
+            <td>${catName(t.category_id)}</td>
+            <td>${statusBadge(t.status)}</td>
+            <td>${priorityBadge(t.priority)}</td>
+            <td class="mono">${t.progress}%</td>
+            <td class="mono">${UI.fmtDate(t.last_review)}</td>
+            <td class="mono">${UI.fmtDate(t.next_review)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const tableWrap = container.querySelector('#topics-tbody-wrap');
+      if (tableWrap) {
+        tableWrap.innerHTML = tableBodyHtml;
+        // Row click → detail (skip checkbox cell)
+        container.querySelectorAll('tbody tr').forEach(row => {
+          row.addEventListener('click', (e) => {
+            if (e.target.type === 'checkbox') return;
+            openDetail(row.dataset.id);
+          });
+        });
+        // Checkbox change → update bulk toolbar
+        container.querySelectorAll('.topic-select-cb').forEach(cb => {
+          cb.addEventListener('change', updateBulkToolbar);
+        });
+      }
+      // Reset select-all state
+      if (selectAllCb) selectAllCb.checked = false;
+      bulkToolbar.style.display = 'none';
+    }
+
+    function updateBulkToolbar() {
+      const checked = [...container.querySelectorAll('.topic-select-cb:checked')];
+      const count = checked.length;
+      if (bulkCountEl) bulkCountEl.textContent = `${count} ${isAr ? 'محدد' : 'selected'}`;
+      bulkToolbar.style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    selectAllCb && selectAllCb.addEventListener('change', () => {
+      container.querySelectorAll('.topic-select-cb').forEach(cb => { cb.checked = selectAllCb.checked; });
+      updateBulkToolbar();
+    });
+
+    bulkCancelBtn && bulkCancelBtn.addEventListener('click', () => {
+      container.querySelectorAll('.topic-select-cb').forEach(cb => { cb.checked = false; });
+      if (selectAllCb) selectAllCb.checked = false;
+      bulkToolbar.style.display = 'none';
+    });
+
+    // Bulk status update buttons
+    container.querySelectorAll('.bulk-status-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const checked = [...container.querySelectorAll('.topic-select-cb:checked')];
+        const ids = checked.map(cb => cb.dataset.id);
+        const status = btn.dataset.status;
+        if (!ids.length) return;
+        btn.disabled = true;
+        try {
+          await API.updateStatusBulk(ids, status);
+          API.cacheBust('topics', 'topic', 'dashboard', 'analytics');
+          UI.toast(isAr ? `تم تحديث ${ids.length} مواضيع إلى "${I18n.statusLabel(status)}"` : `${ids.length} topics updated to "${I18n.statusLabel(status)}"`, 'success');
+          // Optimistically update local topics array
+          ids.forEach(id => {
+            const t = topics.find(x => x.id === id);
+            if (t) { t.status = status; t.progress = { 'Not Started': 0, 'Learning': 25, 'Understood': 50, 'Practiced': 75, 'Mastered': 100 }[status] || 0; }
+          });
+          filterAndRenderFull();
+        } catch (err) {
+          UI.toastError(err);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+
+    priSel.addEventListener('change', (e) => { filterPriority = e.target.value; filterAndRenderFull(); });
+    statSel.addEventListener('change', (e) => { filterStatus  = e.target.value; filterAndRenderFull(); });
 
     csvBtn.addEventListener('click', () => {
       const headers = ['Topic', 'Module', 'Category', 'Status', 'Priority', 'Progress', 'Target Date', 'Last Review', 'Next Review'];
       const rows = topics.map(t => [
-        t.topic,
-        modName(t.module_id),
-        catName(t.category_id),
-        t.status,
-        t.priority,
-        `${t.progress}%`,
-        t.target_date || '',
-        UI.fmtDate(t.last_review),
-        UI.fmtDate(t.next_review)
+        t.topic, modName(t.module_id), catName(t.category_id),
+        t.status, t.priority, `${t.progress}%`,
+        t.target_date || '', UI.fmtDate(t.last_review), UI.fmtDate(t.next_review)
       ]);
       ExportUtil.downloadCsv('knowledge-gaps.csv', headers, rows);
     });
 
     pdfBtn.addEventListener('click', () => ExportUtil.exportPdf());
 
-    filterAndRender();
+    filterAndRenderFull();
   }
 
   // --------------------------------------------------------------------

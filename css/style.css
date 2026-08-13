@@ -642,3 +642,67 @@ tbody tr:hover{ background:var(--line-soft); }
   .main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
   .card, .note-card { break-inside: avoid; border: 1px solid #ccc !important; box-shadow: none !important; }
 }
+
+/* --------------------------------------------------------------------------- */
+/* BULK SELECTION TOOLBAR                                                       */
+/* --------------------------------------------------------------------------- */
+
+#bulk-toolbar {
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.topic-select-cb {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brass);
+  cursor: pointer;
+}
+
+tbody tr:has(.topic-select-cb:checked) {
+  background: var(--brass-soft, #fef3c7) !important;
+  outline: 2px solid var(--brass);
+  outline-offset: -2px;
+}
+
+/* --------------------------------------------------------------------------- */
+/* ANALYTICS HEATMAP                                                            */
+/* --------------------------------------------------------------------------- */
+
+.heatmap-cell {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  cursor: default;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.heatmap-cell:hover {
+  transform: scale(1.4);
+}
+
+/* --------------------------------------------------------------------------- */
+/* OFFLINE BADGE                                                                */
+/* --------------------------------------------------------------------------- */
+
+#offline-badge {
+  animation: pulseBadge 2s ease-in-out infinite;
+}
+
+@keyframes pulseBadge {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
+}
+
+/* --------------------------------------------------------------------------- */
+/* ANIMATED GAUGE BARS                                                          */
+/* --------------------------------------------------------------------------- */
+
+.gauge-bar-fill {
+  transition: width 0.7s cubic-bezier(.4,0,.2,1);
+}

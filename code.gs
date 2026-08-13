@@ -217,6 +217,7 @@ function handleRequest(action, payload, token) {
       case 'updateTopic':        return jsonResponse(withAuth(token, function(user){ return actionUpdateTopic(user, payload); }));
       case 'deleteTopic':        return jsonResponse(withAuth(token, function(user){ return actionDeleteTopic(user, payload); }));
       case 'updateStatus':       return jsonResponse(withAuth(token, function(user){ return actionUpdateStatus(user, payload); }));
+      case 'updateStatusBulk':   return jsonResponse(withAuth(token, function(user){ return actionUpdateStatusBulk(user, payload); }));
       case 'updateProgress':     return jsonResponse(withAuth(token, function(user){ return actionUpdateProgress(user, payload); }));
 
       // Knowledge
@@ -229,7 +230,7 @@ function handleRequest(action, payload, token) {
       case 'addReview':           return jsonResponse(withAuth(token, function(user){ return actionAddReview(user, payload); }));
       case 'markReviewed':        return jsonResponse(withAuth(token, function(user){ return actionMarkReviewed(user, payload); }));
 
-      // Notes
+      // Notes — paginated
       case 'notes':               return jsonResponse(withAuth(token, function(user){ return actionGetNotes(user, payload); }));
       case 'note':                return jsonResponse(withAuth(token, function(user){ return actionGetNote(user, payload); }));
       case 'createNote':          return jsonResponse(withAuth(token, function(user){ return actionCreateNote(user, payload); }));
@@ -869,6 +870,26 @@ function actionUpdateStatus(user, payload) {
   return successResponse(stripRow(updated), 'Status updated.');
 }
 
+function actionUpdateStatusBulk(user, payload) {
+  // payload.ids = ['TOP-xxx', 'TOP-yyy', ...], payload.status = 'Learning'
+  var ids = payload.ids;
+  if (!Array.isArray(ids) || ids.length === 0) return errorResponse('No topic IDs provided.', 'NO_IDS');
+  if (ids.length > 50) return errorResponse('Bulk limit is 50 topics.', 'BULK_LIMIT');
+  if (STATUS_VALUES.indexOf(payload.status) === -1) return errorResponse('Invalid status.', 'INVALID_STATUS');
+
+  var progressByStatus = { 'Not Started': 0, 'Learning': 25, 'Understood': 50, 'Practiced': 75, 'Mastered': 100 };
+  var updated = [];
+  var errors  = [];
+  ids.forEach(function(id) {
+    var topic = getTopicById(id);
+    if (!topic || topic.user_id !== user.id) { errors.push(id); return; }
+    var upd = { status: payload.status, progress: progressByStatus[payload.status], updated_at: nowIso() };
+    if (payload.status === 'Mastered') { upd.completed_at = nowIso(); upd.last_review = nowIso(); upd.next_review = addDaysIso(new Date(), 30); }
+    updated.push(stripRow(updateRowByObj(SHEET_NAMES.TOPICS, topic, upd)));
+  });
+  return successResponse({ updated: updated, errors: errors }, 'Bulk status updated.');
+}
+
 function actionUpdateProgress(user, payload) {
   var topic = getTopicById(payload.id);
   if (!topic || topic.user_id !== user.id) return errorResponse('Topic not found.', 'TOPIC_NOT_FOUND');
@@ -976,7 +997,28 @@ function actionGetNotes(user, payload) {
              String(n.content || '').toLowerCase().indexOf(q) !== -1;
     });
   }
-  return successResponse(rows.map(stripRow));
+  if (payload && payload.tag) {
+    var tag = String(payload.tag).toLowerCase().replace(/^#/, '');
+    rows = rows.filter(function(n) {
+      return String(n.tags || '').toLowerCase().indexOf(tag) !== -1;
+    });
+  }
+  if (payload && payload.pinned_only) {
+    rows = rows.filter(function(n) { return n.pinned === true || n.pinned === 'TRUE' || n.pinned === 'true'; });
+  }
+  // Sort: pinned first, then newest first
+  rows.sort(function(a, b) {
+    var ap = (a.pinned === true || a.pinned === 'TRUE' || a.pinned === 'true') ? 1 : 0;
+    var bp = (b.pinned === true || b.pinned === 'TRUE' || b.pinned === 'true') ? 1 : 0;
+    if (bp !== ap) return bp - ap;
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
+  // Server-side pagination
+  var total = rows.length;
+  var limit  = Math.min(parseInt(payload && payload.limit  || 0, 10) || 100, 200);
+  var offset = parseInt(payload && payload.offset || 0, 10) || 0;
+  var page = rows.slice(offset, offset + limit).map(stripRow);
+  return successResponse({ notes: page, total: total, limit: limit, offset: offset });
 }
 
 function actionGetNote(user, payload) {
@@ -1074,11 +1116,15 @@ function actionDashboard(user) {
 
   var now = new Date();
   var dueToday = topics.filter(function(t) { return isSameDay(t.next_review, now); }).length;
-  var overdue = topics.filter(function(t) { return t.next_review && new Date(t.next_review) < now && !isSameDay(t.next_review, now); }).length;
+  var overdue  = topics.filter(function(t) { return t.next_review && new Date(t.next_review) < now && !isSameDay(t.next_review, now); }).length;
+
+  // Include stripped topics so the dashboard can populate Pinned & Goals without a second network call
+  var strippedTopics = topics.map(stripRow);
 
   return successResponse({
     user: publicUser(user), kpis: kpis, modules: moduleCards,
-    review_summary: { due_today: dueToday, overdue: overdue }
+    review_summary: { due_today: dueToday, overdue: overdue },
+    topics: strippedTopics
   });
 }
 
@@ -1108,13 +1154,61 @@ function actionAnalytics(user) {
     .map(function(t) { return { topic: t.topic, module_id: t.module_id, completed_at: t.completed_at }; })
     .sort(function(a, b) { return new Date(a.completed_at) - new Date(b.completed_at); });
 
+  // Weekly activity heatmap: count topics updated per day for past 52 weeks
+  var weeklyActivity = buildWeeklyActivity(topics, reviews);
+
+  // Month-over-month progress: last 6 months, how many topics moved to Mastered/Practiced per month
+  var monthlyProgress = buildMonthlyProgress(topics);
+
   return successResponse({
     progress_by_module: progressByModule, topics_by_status: byStatus, topics_by_priority: byPriority,
     knowledge_gaps_by_module: gapsByModule, mastered_total: byStatus['Mastered'],
     strongest_modules: sorted.slice(0, 3), weakest_modules: sorted.slice(-3).reverse(),
     topics_needing_review: topics.filter(function(t) { return t.next_review && new Date(t.next_review) <= new Date(); }).length,
-    learning_over_time: timeline, total_reviews: reviews.length
+    learning_over_time: timeline, total_reviews: reviews.length,
+    weekly_activity: weeklyActivity, monthly_progress: monthlyProgress
   });
+}
+
+function buildWeeklyActivity(topics, reviews) {
+  var countsByDate = {};
+  topics.forEach(function(t) {
+    if (t.updated_at) { var d = t.updated_at.substring(0, 10); countsByDate[d] = (countsByDate[d] || 0) + 1; }
+  });
+  reviews.forEach(function(r) {
+    if (r.review_date) { var d = r.review_date.substring(0, 10); countsByDate[d] = (countsByDate[d] || 0) + 1; }
+  });
+  var result = [];
+  var today = new Date();
+  for (var i = 363; i >= 0; i--) {
+    var d = new Date(today); d.setDate(d.getDate() - i);
+    var key = d.toISOString().substring(0, 10);
+    result.push({ date: key, count: countsByDate[key] || 0 });
+  }
+  return result;
+}
+
+function buildMonthlyProgress(topics) {
+  var months = {};
+  topics.forEach(function(t) {
+    if (t.completed_at) {
+      var m = t.completed_at.substring(0, 7); // 'YYYY-MM'
+      months[m] = (months[m] || 0) + 1;
+    }
+    if (t.updated_at && (t.status === 'Learning' || t.status === 'Understood' || t.status === 'Practiced')) {
+      var m2 = t.updated_at.substring(0, 7);
+      months[m2] = (months[m2] || 0) + 0.5; // partial credit for in-progress
+    }
+  });
+  var result = [];
+  var now = new Date();
+  for (var i = 5; i >= 0; i--) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    var key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    var label = d.toLocaleString('en', { month: 'short' }) + ' ' + d.getFullYear();
+    result.push({ month: key, label: label, count: Math.round(months[key] || 0) });
+  }
+  return result;
 }
 
 function computeKpis(topics) {
