@@ -226,6 +226,7 @@ const Profile = (function () {
 
             <div style="display:flex; gap:12px; flex-wrap:wrap;">
               <button type="submit" class="btn btn-primary">${I18n.t('profile.saveChanges')}</button>
+              <button type="button" class="btn btn-secondary" id="btn-test-ai-conn">🔌 ${I18n.t('aiSettings.testConnection')}</button>
             </div>
           </form>
         </div>
@@ -248,11 +249,11 @@ const Profile = (function () {
               <tbody id="admin-users-tbody">
                 ${(data.users || []).map(u => `
                   <tr>
-                    <td><strong>${Topics.escapeHtml(u.name || '')}</strong></td>
+                    <td><strong>${Topics.escapeHtml(u.name || u.full_name || '')}</strong></td>
                     <td>${Topics.escapeHtml(u.email || u.username || '')}</td>
                     <td><span class="badge ${u.role === 'Admin' ? 'badge-priority-high' : ''}">${u.role || 'User'}</span></td>
                     <td><span class="badge ${u.status === 'Active' ? 'badge-status-mastered' : 'badge-status-not-started'}">${u.status || 'Active'}</span></td>
-                    <td>${UI.fmtDate(u.created_at)}</td>
+                    <td>${UI.fmtDate(u.created_at || u.last_login)}</td>
                     <td>
                       ${u.id !== State.currentUser.id ? `
                         <button class="btn btn-xs btn-ghost btn-toggle-status" data-id="${u.id}" data-status="${u.status}">
@@ -271,6 +272,78 @@ const Profile = (function () {
       bindAdminEvents(container);
     }
 
+    function bindAdminEvents(container) {
+      const form = container.querySelector('#ai-settings-form');
+      if (form) {
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const submitBtn = form.querySelector('button[type="submit"]');
+          submitBtn.disabled = true;
+          try {
+            const payload = {
+              api_endpoint: form.elements['api_endpoint'].value.trim(),
+              model: form.elements['model'].value.trim(),
+              daily_count: parseInt(form.elements['daily_count'].value, 10) || 5,
+              enabled: form.elements['enabled'].checked
+            };
+            if (form.elements['api_key'].value) {
+              payload.api_key = form.elements['api_key'].value;
+            }
+            await API.updateAISettings(payload);
+            UI.toast(I18n.getLang() === 'ar' ? 'تم حفظ إعدادات الذكاء الاصطناعي بنجاح' : 'AI settings saved successfully', 'success');
+          } catch (err) {
+            UI.toastError(err);
+          } finally {
+            submitBtn.disabled = false;
+          }
+        });
+      }
+
+      const testAiBtn = container.querySelector('#btn-test-ai-conn');
+      if (testAiBtn) {
+        testAiBtn.addEventListener('click', async () => {
+          testAiBtn.disabled = true;
+          UI.toast(I18n.getLang() === 'ar' ? 'جاري اختبار الاتصال...' : 'Testing connection...', 'info');
+          try {
+            await API.testAIConnection();
+            UI.toast(I18n.getLang() === 'ar' ? 'الاتصال بالذكاء الاصطناعي ناجح' : 'AI Connection successful', 'success');
+          } catch (err) { UI.toastError(err); }
+          finally { testAiBtn.disabled = false; }
+        });
+      }
+
+      const digestBtn = container.querySelector('#send-test-digest-btn');
+      if (digestBtn) {
+        digestBtn.addEventListener('click', async () => {
+          digestBtn.disabled = true;
+          UI.toast(I18n.getLang() === 'ar' ? 'جاري إرسال البريد التجريبي...' : 'Sending test email...', 'info');
+          try {
+            await API.sendTestDigest();
+            UI.toast(I18n.getLang() === 'ar' ? 'تم إرسال التقرير التجريبي لخادم البريد' : 'Test digest email queued', 'success');
+          } catch (err) {
+            UI.toastError(err);
+          } finally {
+            digestBtn.disabled = false;
+          }
+        });
+      }
+
+      container.querySelectorAll('.btn-toggle-status').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const userId = btn.dataset.id;
+          const curStatus = btn.dataset.status;
+          const newStatus = curStatus === 'Active' ? 'Suspended' : 'Active';
+          try {
+            await API.updateUserStatus({ user_id: userId, status: newStatus });
+            UI.toast(I18n.getLang() === 'ar' ? 'تم تحديث حالة المستخدم' : 'User status updated', 'success');
+            renderAdmin(container);
+          } catch (err) {
+            UI.toastError(err);
+          }
+        });
+      });
+    }
+
     // 0ms Instant First Paint!
     drawAdminUI();
 
@@ -285,50 +358,7 @@ const Profile = (function () {
         if (batchRes.getAISettings) { aiSettings = batchRes.getAISettings; updated = true; }
         if (updated) drawAdminUI();
       }
-    `;
-
-    const testDigestBtn = container.querySelector('#send-test-digest-btn');
-    if (testDigestBtn) {
-      testDigestBtn.addEventListener('click', async () => {
-        testDigestBtn.disabled = true;
-        UI.toast(I18n.getLang() === 'ar' ? 'جاري إرسال البريد التجريبي...' : 'Sending test email...', 'info');
-        try {
-          await API.sendTestDigest();
-          UI.toast(I18n.t('digest.testDigestSent'), 'success');
-        } catch (err) { UI.toastError(err); }
-        finally { testDigestBtn.disabled = false; }
-      });
-    }
-
-    const aiForm = container.querySelector('#ai-settings-form');
-    if (aiForm) {
-      aiForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const fd = new FormData(aiForm);
-        const payload = Object.fromEntries(fd.entries());
-        payload.enabled = container.querySelector('#ai-enabled-cb').checked;
-        const btn = aiForm.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        try {
-          await API.updateAISettings(payload);
-          UI.toast(I18n.t('aiSettings.saveSuccess'), 'success');
-        } catch (err) { UI.toastError(err); }
-        finally { btn.disabled = false; }
-      });
-    }
-
-    const testAiBtn = container.querySelector('#btn-test-ai-conn');
-    if (testAiBtn) {
-      testAiBtn.addEventListener('click', async () => {
-        testAiBtn.disabled = true;
-        UI.toast(I18n.t('aiSettings.connectionTesting'), 'info');
-        try {
-          await API.testAIConnection();
-          UI.toast(I18n.t('aiSettings.connectionSuccess'), 'success');
-        } catch (err) { UI.toastError(err); }
-        finally { testAiBtn.disabled = false; }
-      });
-    }
+    }).catch(() => {});
   }
 
   return { render, renderAdmin };
