@@ -303,21 +303,30 @@ const Modules = (function () {
 
   function getFallbackInsightsLocal(moduleId) {
     const isAr = I18n.getLang() === 'ar';
-    const modulesList = (State.modulesCache && State.modulesCache.length) ? State.modulesCache : (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
-    let modObj = modulesList.find(m => String(m.id).toLowerCase() === String(moduleId).toLowerCase());
-    if (!modObj) {
-      // Fallback: extract numeric index from canonical IDs like MOD-1, MOD-2…
+    const defaultList = typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : [];
+    const stateList = (State.modulesCache && State.modulesCache.length) ? State.modulesCache : defaultList;
+
+    // 1. Direct match in DEFAULT_MODULES first by ID (e.g., MOD-1..MOD-10)
+    let defObj = defaultList.find(m => String(m.id).toLowerCase() === String(moduleId).toLowerCase());
+    
+    // 2. Direct match in State.modulesCache by ID
+    let stateObj = stateList.find(m => String(m.id).toLowerCase() === String(moduleId).toLowerCase());
+    
+    // 3. Fallback via index if numeric (MOD-10 -> idx 9)
+    if (!defObj && !stateObj) {
       const numMatch = String(moduleId || '').match(/\d+/);
       if (numMatch) {
         const idx = parseInt(numMatch[0], 10) - 1;
-        if (idx >= 0 && idx < modulesList.length) modObj = modulesList[idx];
+        if (idx >= 0 && idx < defaultList.length) defObj = defaultList[idx];
+        if (idx >= 0 && idx < stateList.length) stateObj = stateList[idx];
       }
     }
-    const modName = modObj ? I18n.localizedName(modObj) : (isAr ? 'الموديول الحالي' : 'Current Module');
 
-    // Build a composite key from the module's English name + Arabic name + moduleId for reliable matching
-    const nameEn = String(modObj ? (modObj.name_en || '') : '').toLowerCase();
-    const nameAr = String(modObj ? (modObj.name_ar || '') : '').toLowerCase();
+    const targetObj = defObj || stateObj;
+    const modName = targetObj ? I18n.localizedName(targetObj) : (isAr ? 'الموديول الحالي' : 'Current Module');
+
+    const nameEn = String(targetObj ? (targetObj.name_en || '') : '').toLowerCase();
+    const nameAr = String(targetObj ? (targetObj.name_ar || '') : '').toLowerCase();
     const idLower = String(moduleId || '').toLowerCase();
     const modLower = nameEn + ' ' + nameAr + ' ' + idLower;
 

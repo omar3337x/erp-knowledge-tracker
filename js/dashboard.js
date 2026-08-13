@@ -39,51 +39,58 @@ const Dashboard = (function () {
   async function render(container) {
     const cachedData = getCachedDashboard();
 
-    // PERF: 0ms Instant Render using cache if available — NEVER show spinner when cache exists
+    // PERF: 0ms Instant Render using cache or instant fallback data — NEVER hang on skeleton
     if (cachedData && cachedData.kpis) {
       drawDashboard(container, cachedData);
     } else {
-      // PERF: Layout-matching Skeleton Shimmers instead of generic spinner
-      container.innerHTML = `
-        ${UI.skeleton('kpi')}
-        <div style="margin-bottom:24px;">${UI.skeleton()}</div>
-        ${UI.skeleton('modules')}
-      `;
+      const fallbackData = buildFallbackDashboard();
+      drawDashboard(container, fallbackData);
     }
 
-    // PERF: Wait briefly for prefetchAll batch to populate cache before firing own request.
-    // prefetchAll fires a batch(dashboard+topics+...) — if we give it a head start,
-    // API.dashboard() will return from cache (0ms) instead of firing a duplicate GAS call.
-    if (!cachedData) {
-      // No cache at all: wait up to 3s for the prefetch batch, checking every 300ms
-      let waited = 0;
-      while (waited < 3000) {
-        await new Promise(r => setTimeout(r, 300));
-        waited += 300;
-        const earlyData = getCachedDashboard();
-        if (earlyData && earlyData.kpis) {
-          drawDashboard(container, earlyData);
-          return; // Batch populated cache — no extra request needed
-        }
-      }
-    }
-
-    // Background network fetch (reads from cache if prefetchAll batch already completed)
+    // Background network fetch (reads from cache if prefetchAll batch already completed, or fetches fresh)
     try {
       const freshData = await API.dashboard();
       saveCachedDashboard(freshData);
       
-      // PERF: Only re-render if data has changed (prevents DOM thrashing)
       const freshHash = computeHash(freshData);
       if (freshHash !== _lastRenderedHash || !cachedData) {
         drawDashboard(container, freshData);
       }
     } catch (err) {
-      if (!cachedData) {
-        container.innerHTML = UI.errorState(err);
-      }
+      // If network fails but we rendered fallback or cached data, keep the view functional
     }
   }
+
+  function buildFallbackDashboard() {
+    const modules = (State.modulesCache && State.modulesCache.length) ? State.modulesCache : (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
+    const topicsCached = (typeof API !== 'undefined' && API.cacheGet) ? (API.cacheGet('topics:{}', 'topics') || []) : [];
+    
+    const total = topicsCached.length;
+    const notStarted = topicsCached.filter(t => t.status === 'Not Started').length;
+    const learning = topicsCached.filter(t => t.status === 'Learning').length;
+    const understood = topicsCached.filter(t => t.status === 'Understood').length;
+    const practiced = topicsCached.filter(t => t.status === 'Practiced').length;
+    const mastered = topicsCached.filter(t => t.status === 'Mastered').length;
+    const progress = total ? Math.round(((mastered + practiced * 0.8 + understood * 0.5 + learning * 0.2) / total) * 100) : 0;
+
+    return {
+      kpis: {
+        overall_progress: progress,
+        total_topics: total,
+        not_started: notStarted,
+        learning: learning,
+        understood: understood,
+        practiced: practiced,
+        mastered: mastered,
+        knowledge_gaps: notStarted + learning,
+        topics_to_review: topicsCached.filter(t => t.next_review_date && new Date(t.next_review_date) <= new Date()).length
+      },
+      modules: modules.map(m => Object.assign({}, m, { progress: m.progress || 0 })),
+      topics: topicsCached,
+      review_summary: { due_today: 0, overdue: 0 }
+    };
+  }
+
 
   function drawDashboard(container, data) {
     _lastRenderedHash = computeHash(data);

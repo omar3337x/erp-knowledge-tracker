@@ -318,14 +318,43 @@ const Notes = (function () {
     }
   }
 
-  async function reloadNotes(listWrap, badgeEl, searchQuery) {
+  async function reloadNotes(listWrap, badgeEl, searchQuery, opts) {
+    opts = opts || {};
+    const forceNetwork = opts.forceNetwork || false;
+
     // Show stale data immediately if available
     if (_allNotesCache.length > 0) {
       renderModuleNotesList(listWrap, searchQuery, badgeEl);
     }
+
     try {
-      const raw = await API.notes({ module_id: _currentModuleId, search: searchQuery || '' });
-      const freshNotes = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
+      // PERF: Try batch cache first (stored as notes:{}) — filter locally, no extra GAS request
+      const batchCached = !forceNetwork && API.cacheGet('notes:{}', 'notes');
+      let freshNotes;
+      if (batchCached && Array.isArray(batchCached) && batchCached.length > 0) {
+        let filtered = batchCached;
+        if (_currentModuleId) filtered = filtered.filter(n => String(n.module_id || '') === String(_currentModuleId));
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          filtered = filtered.filter(n => String(n.title || '').toLowerCase().includes(q) || String(n.content || '').toLowerCase().includes(q));
+        }
+        freshNotes = filtered.map(normalizeNote).filter(Boolean);
+        // Background refresh after 3s to pick up new notes
+        setTimeout(() => {
+          API.notes({ module_id: _currentModuleId, search: '' })
+            .then(raw => {
+              const bg = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
+              const changed = bg.length !== _allNotesCache.length ||
+                JSON.stringify(bg.map(n => n.id + n.updated_at)) !==
+                JSON.stringify(_allNotesCache.map(n => n.id + n.updated_at));
+              if (changed) { _allNotesCache = bg; _saveNotesToLS(bg); renderModuleNotesList(listWrap, searchQuery, badgeEl); }
+            }).catch(() => {});
+        }, 3000);
+      } else {
+        const raw = await API.notes({ module_id: _currentModuleId, search: searchQuery || '' });
+        freshNotes = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
+      }
+
       const changed = freshNotes.length !== _allNotesCache.length ||
         JSON.stringify(freshNotes.map(n => n.id + n.updated_at)) !==
         JSON.stringify(_allNotesCache.map(n => n.id + n.updated_at));
