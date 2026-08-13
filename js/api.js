@@ -190,11 +190,14 @@ const API = (function () {
       activeControllers.set(options.route, controller);
     }
 
-    // PERF: Always use POST with text/plain body for Google Apps Script Web Apps.
-    // GET requests with query strings cause GAS 302 redirects to script.googleusercontent.com/macros/echo
-    // with huge user_content_key parameters that fail with 404 (Not Found).
-    // POST with text/plain body keeps the URL short and prevents 404 echo redirects completely.
-    const fetchUrl = CONFIG.API_URL;
+    // PERF: Include action & token in query parameters (short URL, < 100 chars) AND in POST body.
+    // When GAS 302 redirects POST -> GET to macros/echo, query params ensure e.parameter.action is NEVER lost,
+    // while POST body delivers the heavy payload reliably without causing 404 URL overflow errors.
+    const qsParams = { action: action || '' };
+    if (token) qsParams.token = token;
+    const qs = new URLSearchParams(qsParams).toString();
+    const fetchUrl = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs;
+
     const fetchOpts = {
       method: 'POST',
       signal: controller.signal,
