@@ -533,12 +533,12 @@ const App = (function () {
     // Start background auto-sync engine
     if (typeof AutoSync !== 'undefined') AutoSync.start();
 
-    // Trigger background reference data load & predictive prefetch
-    loadReferenceData().then(() => {
-      buildSidebarModules();
-    }).catch(() => {});
-
-    API.prefetchAll();
+    // Trigger background reference data load non-blockingly
+    setTimeout(() => {
+      loadReferenceData().then(() => {
+        buildSidebarModules();
+      }).catch(() => {});
+    }, 1200);
   }
 
 // ---------------------------------------------------------------------------

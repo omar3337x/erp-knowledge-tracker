@@ -73,9 +73,6 @@ const Auth = (function () {
       UI.toast(I18n.t('toast.loginSuccessful'), 'success');
       API.startKeepalive();
 
-      // PERF: Trigger predictive prefetch right after successful login
-      API.prefetchAll();
-
       await App.boot();
     } catch (err) {
       errEl.textContent = I18n.errorMessage(err);

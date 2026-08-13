@@ -273,7 +273,14 @@ const Modules = (function () {
   function getFallbackInsightsLocal(moduleId) {
     const isAr = I18n.getLang() === 'ar';
     const modulesList = (State.modulesCache && State.modulesCache.length) ? State.modulesCache : (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
-    const modObj = modulesList.find(m => String(m.id) === String(moduleId));
+    let modObj = modulesList.find(m => String(m.id).toLowerCase() === String(moduleId).toLowerCase());
+    if (!modObj) {
+      const numMatch = String(moduleId || '').match(/\d+/);
+      if (numMatch) {
+        const idx = parseInt(numMatch[0], 10) - 1;
+        if (idx >= 0 && idx < modulesList.length) modObj = modulesList[idx];
+      }
+    }
     const modName = modObj ? I18n.localizedName(modObj) : (isAr ? 'الموديول الحالي' : 'Current Module');
     const modLower = (String(moduleId || '') + ' ' + String(modObj ? modObj.name_en : '') + ' ' + String(modObj ? modObj.name_ar : '')).toLowerCase();
 

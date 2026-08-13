@@ -2002,7 +2002,14 @@ function getFallbackInsights(moduleId, lang) {
 
   try {
     var modules = readAllRows(SHEET_NAMES.MODULES);
-    var foundMod = modules.find(function(m) { return String(m.id) === String(moduleId); });
+    var foundMod = modules.find(function(m) { return String(m.id).toLowerCase() === String(moduleId).toLowerCase(); });
+    if (!foundMod) {
+      var numMatch = String(moduleId || '').match(/\d+/);
+      if (numMatch) {
+        var idx = parseInt(numMatch[0], 10) - 1;
+        if (idx >= 0 && idx < modules.length) foundMod = modules[idx];
+      }
+    }
     if (foundMod) {
       modNameEn = foundMod.name_en || '';
       modNameAr = foundMod.name_ar || '';
