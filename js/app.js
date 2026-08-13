@@ -297,7 +297,9 @@ const Router = (function () {
     }
     const map = {
       dashboard: 'dashboard.title', notes: 'nav.allNotes', favorites: 'nav.favorites', 'ai-insights': 'nav.aiInsights', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
-      analytics: 'analytics.title', 'system-test': 'nav.systemTest', profile: 'nav.myProfile', admin: 'admin.title'
+      analytics: 'analytics.title', 'system-test': 'nav.systemTest', 'daily-quiz': 'nav.dailyQuiz', 'multi-erp': 'nav.multiErp',
+      'journal-sim': 'nav.journalSim', 'implementer-toolkit': 'nav.implementerToolkit', 'process-flow': 'nav.processFlow', 'gantt-builder': 'nav.ganttBuilder',
+      profile: 'nav.myProfile', admin: 'admin.title'
     };
     return map[route] ? I18n.t(map[route]) : I18n.t('common.notFound');
   }
@@ -363,6 +365,12 @@ const Router = (function () {
     if (route === 'review') return Reviews.renderCenter(content);
     if (route === 'analytics') return Analytics.render(content);
     if (route === 'system-test') return SystemTest.render(content);
+    if (route === 'daily-quiz') return DailyQuiz.render(content);
+    if (route === 'multi-erp') return MultiERP.render(content);
+    if (route === 'journal-sim') return JournalSim.render(content);
+    if (route === 'implementer-toolkit') return ImplementerToolkit.render(content);
+    if (route === 'process-flow') return ProcessFlow.render(content);
+    if (route === 'gantt-builder') return GanttBuilder.render(content);
     if (route === 'profile') return Profile.render(content);
     if (route === 'admin') return Profile.renderAdmin(content);
     if (route === 'search') {

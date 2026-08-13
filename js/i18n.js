@@ -26,7 +26,9 @@ const I18N_DICT = {
     },
 
     nav: {
-      dashboard: 'Dashboard', modules: 'Modules', learning: 'Learning',
+      dashboard: 'Dashboard', modules: 'Modules', learning: 'Learning', toolsSection: 'Enterprise Tools',
+      dailyQuiz: '🎯 Daily Quiz', multiErp: '🔄 Multi-ERP Matrix', journalSim: '📑 Journal Simulator',
+      implementerToolkit: '🛠️ Implementer Toolkit', processFlow: '🔄 Process Flows', ganttBuilder: '📅 Gantt Builder',
       allNotes: 'All Notes', favorites: 'Favorites', aiInsights: 'AI Daily Insights',
       knowledgeGaps: 'Knowledge Gaps', reviewCenter: 'Review Center', analytics: 'Analytics', systemTest: '🧪 System Test',
       account: 'Account', myProfile: 'My Profile', administration: 'Administration', logout: 'Logout',
@@ -248,7 +250,9 @@ const I18N_DICT = {
     },
 
     nav: {
-      dashboard: 'لوحة التحكم', modules: 'الموديولات', learning: 'التعلّم',
+      dashboard: 'لوحة التحكم', modules: 'الموديولات', learning: 'التعلّم', toolsSection: 'الأدوات المتقدمة',
+      dailyQuiz: '🎯 التحدي اليومي', multiErp: '🔄 مقارنة الأنظمة', journalSim: '📑 محاكي القيود',
+      implementerToolkit: '🛠️ أدوات المطبق', processFlow: '🔄 خرائط العمليات', ganttBuilder: '📅 مخطط جانت',
       allNotes: 'جميع الملاحظات', favorites: 'المفضلة', aiInsights: 'رؤى الذكاء الاصطناعي',
       knowledgeGaps: 'فجوات المعرفة', reviewCenter: 'مركز المراجعة', analytics: 'التحليلات', systemTest: '🧪 الاختبار والتشخيص',
       myProfile: 'ملفي الشخصي', administration: 'الإدارة', account: 'الحساب', logout: 'تسجيل الخروج',
