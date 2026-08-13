@@ -122,30 +122,6 @@ const API = (function () {
 
   /* ------------------------------------------------------------------ */
   /* Warmup Gate — Ensures only ONE request pays the cold-start retry    */
-  /* penalty (404s). Other concurrent requests wait for warmup to finish.*/
-  /* ------------------------------------------------------------------ */
-  let _warmupPromise = null;
-  let _isWarmedUp = false;
-
-  function ensureWarmedUp() {
-    if (_isWarmedUp) return Promise.resolve();
-    if (_warmupPromise) return _warmupPromise;
-
-    _warmupPromise = rawCall('ping', {}, 1)
-      .then(() => {
-        _isWarmedUp = true;
-      })
-      .catch(() => {
-        // Even if ping fails or is ignored, clear gate so requests proceed
-        _isWarmedUp = true;
-      })
-      .finally(() => {
-        _warmupPromise = null;
-      });
-
-    return _warmupPromise;
-  }
-
   async function rawCall(action, payload, attempt) {
     attempt = attempt || 1;
 
@@ -153,11 +129,6 @@ const API = (function () {
       const err = new Error('API_URL is not configured.');
       err.code = 'NOT_CONFIGURED';
       throw err;
-    }
-
-    // Wait for warmup gate unless this IS the ping action or attempt > 1
-    if (action !== 'ping' && !_isWarmedUp && attempt === 1) {
-      await ensureWarmedUp();
     }
 
     const token = getToken();
@@ -276,7 +247,7 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   function warmup() {
     if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') return;
-    ensureWarmedUp().catch(() => {});
+    call('ping', {}).catch(() => {});
   }
 
   /* ------------------------------------------------------------------ */
