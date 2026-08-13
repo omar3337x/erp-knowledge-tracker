@@ -272,12 +272,15 @@ const Modules = (function () {
 
   function getFallbackInsightsLocal(moduleId) {
     const isAr = I18n.getLang() === 'ar';
-    const modLower = String(moduleId || '').toLowerCase();
+    const modObj = (State.modulesCache || []).find(m => String(m.id) === String(moduleId));
+    const modName = modObj ? I18n.localizedName(modObj) : (isAr ? 'الموديول الحالي' : 'Current Module');
+    const modLower = String(moduleId || '').toLowerCase() + ' ' + String(modObj ? modObj.name_en : '').toLowerCase();
 
-    if (modLower.includes('inventory') || modLower.includes('mod-1')) {
+    if (modLower.includes('inventory') || modLower.includes('mod-1') || modLower.includes('مخزون')) {
       return [
         {
-          id: 'AI-local-1',
+          id: 'AI-' + moduleId + '-1',
+          module_id: moduleId,
           title: isAr ? 'الربط التلقائي بين تقييم المخزون والقيود المحاسبية' : 'Automated Inventory Valuation & Journal Entries',
           type: 'Accounting Impact',
           content: isAr ? 'عند اختيار طريقة FIFO أو Average Cost، تأكد من ضبط إعدادات الفئات (Product Categories) على "Automated" لترحيل قيود كلفة البضاعة المباعة (COGS) وحساب الفروقات فورياً مع كل حركة مخزنية.' : 'When using FIFO or Average Cost, ensure Product Categories valuation is set to Automated to trigger real-time COGS and valuation ledger entries.',
@@ -285,7 +288,8 @@ const Modules = (function () {
           why_it_matters: isAr ? 'يمنع تسوية التكاليف يدوياً بنهاية الشهر ويضمن دقة القوائم المالية.' : 'Prevents manual month-end cost reconciliations and guarantees real-time balance sheet accuracy.'
         },
         {
-          id: 'AI-local-2',
+          id: 'AI-' + moduleId + '-2',
+          module_id: moduleId,
           title: isAr ? 'فحص التسويات المخزنية (Stock Adjustments)' : 'Audit Trail on Stock Adjustments',
           type: 'Common Mistake',
           content: isAr ? 'عدم تحديد سبب التسوية المخزنية (تلف، سرقة، عينة تجارية) يجعل تتبع الخسائر صعباً على الإدارة المالية.' : 'Not recording adjustment reason codes (damage, sample, theft) obscures variance analysis in financial reporting.',
@@ -293,7 +297,8 @@ const Modules = (function () {
           why_it_matters: isAr ? 'يساعد في تقليل الهدر وزيادة رقابة المخازن.' : 'Improves internal control and inventory shrinkage visibility.'
         },
         {
-          id: 'AI-local-3',
+          id: 'AI-' + moduleId + '-3',
+          module_id: moduleId,
           title: isAr ? 'إعادة الطلب التلقائية (Reordering Rules)' : 'Automated Reordering Rules & Buffer Safety',
           type: 'Tip',
           content: isAr ? 'حدد الحد الأدنى والأقصى لكل منتج بناءً على زمن التوريد (Lead Time) لتجنب انقطاع المخزون دون تجميد السيولة.' : 'Set Minimum and Maximum safety stock levels based on Lead Time to prevent stockouts without overcapitalizing cash.',
@@ -301,22 +306,45 @@ const Modules = (function () {
           why_it_matters: isAr ? 'رفع الكفاءة التشغيلية وحماية المبيعات من التوقف.' : 'Optimizes working capital and avoids lost sales.'
         }
       ];
+    } else if (modLower.includes('account') || modLower.includes('mod-2') || modLower.includes('حسابات')) {
+      return [
+        {
+          id: 'AI-' + moduleId + '-1',
+          module_id: moduleId,
+          title: isAr ? 'إقفال الفترات المالية وتثبيت القيود' : 'Period Lock & Journal Entry Controls',
+          type: 'Best Practice',
+          content: isAr ? 'قم بإغلاق الفترة المالية شهرياً لمنع تعديل القيود المحاسبية السابقة بعد اعتماد التقارير.' : 'Lock accounting periods monthly to prevent back-dated entries after financial statements approval.',
+          example: isAr ? 'تحديد تاريخ الإقفال (Lock Date) في نهاية كل شهر ميلادي.' : 'Set Lock Date on the last day of each calendar month.',
+          why_it_matters: isAr ? 'يحمي سلامة البيانات المالية المعتمدة أمام المراجعين والجهات الضريبية.' : 'Ensures financial integrity and compliance with external audit standards.'
+        },
+        {
+          id: 'AI-' + moduleId + '-2',
+          module_id: moduleId,
+          title: isAr ? 'تسوية الحسابات البنكية اليومية (Bank Reconciliation)' : 'Daily Automated Bank Reconciliation',
+          type: 'Process Insight',
+          content: isAr ? 'مطابقة التدفقات النقدية والودائع البنكية يومياً تكتشف الأخطاء والشيكات المعلقة مبكراً.' : 'Reconciling bank feeds daily catches duplicate transactions and uncollected checks early.',
+          example: isAr ? 'استيراد ملفات MT940 / CAMT.053 للتسوية الآلية.' : 'Import MT940 statement files for auto-matching.',
+          why_it_matters: isAr ? 'ضمان دقة الرصيد النقدي وتفادي التحايل.' : 'Guarantees accurate liquidity management and fraud protection.'
+        }
+      ];
     }
 
     return [
       {
-        id: 'AI-local-1',
-        title: isAr ? 'أفضل الممارسات لتنظيم وتوثيق موديول ' + moduleId : 'Best Practices for ' + moduleId + ' Module',
+        id: 'AI-' + moduleId + '-1',
+        module_id: moduleId,
+        title: isAr ? 'أفضل الممارسات لتنظيم وتوثيق ' + modName : 'Best Practices for ' + modName,
         type: 'Best Practice',
-        content: isAr ? 'ربط العمليات الحقلية بموديول ' + moduleId + ' يسهم في بناء قاعدة بيانات دقيقة لاتخاذ القرارات الإدارية.' : 'Integrating field operations with the ' + moduleId + ' module establishes data consistency across all business units.',
+        content: isAr ? 'ربط العمليات الحقلية بموديول ' + modName + ' يسهم في بناء قاعدة بيانات دقيقة لاتخاذ القرارات الإدارية.' : 'Integrating field operations with the ' + modName + ' module establishes data consistency across all business units.',
         example: isAr ? 'اعتماد نماذج موحدة لإدخال البيانات وتحديد الأذونات بناءً على الأدوار الوظيفية.' : 'Standardize data entry forms and enforce role-based permission controls.',
         why_it_matters: isAr ? 'تسريع الدورة التشغيلية وتقليل الأخطاء البشرية.' : 'Accelerates workflow cycle times and eliminates manual entry errors.'
       },
       {
-        id: 'AI-local-2',
-        title: isAr ? 'الرقابة والتحليل الدوري للعمليات' : 'Periodic Process Review & KPI Tracking',
+        id: 'AI-' + moduleId + '-2',
+        module_id: moduleId,
+        title: isAr ? 'الرقابة والتحليل الدوري لعمليات ' + modName : 'Periodic Process Review for ' + modName,
         type: 'Process Insight',
-        content: isAr ? 'مراجعة التقارير الدورية وتحليل الانحرافات تضمن كفاءة استخدام الموارد في موديول ' + moduleId + '.' : 'Regularly reviewing operational KPIs and variances ensures optimal resource allocation.',
+        content: isAr ? 'مراجعة التقارير الدورية وتحليل الانحرافات تضمن كفاءة استخدام الموارد في موديول ' + modName + '.' : 'Regularly reviewing operational KPIs and variances ensures optimal resource allocation in ' + modName + '.',
         example: isAr ? 'مقارنة التكاليف الفعلية بالميزانية التقديرية بشكل شهري.' : 'Compare actual operational costs against budgeted targets monthly.',
         why_it_matters: isAr ? 'تحسين الربحية وضمان الامتثال للسياسات الإدارية.' : 'Boosts profitability and maintains policy compliance.'
       }
