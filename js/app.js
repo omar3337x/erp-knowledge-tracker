@@ -250,6 +250,12 @@ const Router = (function () {
 
   async function render(route, params) {
     current = { route, params: params || {} };
+    // Auto-close sidebar on mobile/tablet when navigation occurs
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('active');
+
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     let activeSelector = `[data-route="${route}"]`;
     if (route === 'module') activeSelector = `[data-route="module"][data-module-id="${params.id}"]`;
@@ -338,8 +344,20 @@ const App = (function () {
     });
 
     document.getElementById('menu-toggle').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('open');
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+      const isOpen = sidebar.classList.toggle('open');
+      if (overlay) overlay.classList.toggle('active', isOpen);
     });
+
+    const overlay = document.getElementById('sidebar-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', () => {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+      });
+    }
 
     document.getElementById('theme-toggle').addEventListener('click', () => {
       const next = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
