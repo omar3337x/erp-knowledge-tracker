@@ -9,7 +9,7 @@
 const AIInsightsPage = (function () {
 
   async function render(container) {
-    const modules = State.modulesCache || [];
+    const modules = (State.modulesCache && State.modulesCache.length > 0) ? State.modulesCache : (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
     const isAr = I18n.getLang() === 'ar';
 
     container.innerHTML = `
@@ -62,7 +62,7 @@ const AIInsightsPage = (function () {
     const collectInsights = () => {
       let combined = [];
       modules.forEach(m => {
-        const cached = API.cacheGet('insights:' + m.id) || (typeof getFallbackInsightsLocal === 'function' ? getFallbackInsightsLocal(m.id) : []);
+        const cached = API.cacheGet('insights:' + m.id) || (typeof Modules !== 'undefined' && Modules.getFallbackInsightsLocal ? Modules.getFallbackInsightsLocal(m.id) : []);
         if (Array.isArray(cached)) {
           cached.forEach(item => {
             combined.push(Object.assign({}, item, { module_id: item.module_id || m.id }));

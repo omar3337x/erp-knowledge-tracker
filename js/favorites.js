@@ -9,7 +9,7 @@
 const Favorites = (function () {
 
   async function render(container) {
-    const modules = State.modulesCache || [];
+    const modules = (State.modulesCache && State.modulesCache.length > 0) ? State.modulesCache : (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
     const isAr = I18n.getLang() === 'ar';
 
     // 0ms Instant Load from State.favoritesCache
