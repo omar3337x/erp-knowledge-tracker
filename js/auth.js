@@ -59,6 +59,9 @@ const Auth = (function () {
     // PERF: Static spinner inside button — no layout thrashing or periodic text changes
     btn.innerHTML = `<span class="spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-inline-end:6px;"></span> ${I18n.t('auth.loginButton')}`;
 
+    // Stop any background warmup pings — they compete with the login request on GAS
+    API.stopWarmupQueue();
+
     try {
       const data = await API.login({
         identifier: document.getElementById('login-identifier').value.trim(),

@@ -58,14 +58,20 @@ const AIInsightsPage = (function () {
 
     let allInsightsList = [];
 
-    // Combine cached insights across all modules
+    // Combine cached insights across all modules — use position in DEFAULT_MODULES as stable key
     const collectInsights = () => {
       let combined = [];
-      modules.forEach(m => {
-        const cached = API.cacheGet('insights:' + m.id) || (typeof Modules !== 'undefined' && Modules.getFallbackInsightsLocal ? Modules.getFallbackInsightsLocal(m.id) : []);
+      modules.forEach((m, idx) => {
+        // Try real ID cache first, then canonical ID by index (MOD-1..MOD-10)
+        const canonicalId = DEFAULT_MODULES[idx] ? DEFAULT_MODULES[idx].id : m.id;
+        const cached = API.cacheGet('insights:' + m.id)
+          || API.cacheGet('insights:' + canonicalId)
+          || (typeof Modules !== 'undefined' && Modules.getFallbackInsightsLocal
+              ? Modules.getFallbackInsightsLocal(canonicalId)
+              : []);
         if (Array.isArray(cached)) {
           cached.forEach(item => {
-            combined.push(Object.assign({}, item, { module_id: item.module_id || m.id }));
+            combined.push(Object.assign({}, item, { module_id: m.id }));
           });
         }
       });
@@ -192,11 +198,17 @@ const AIInsightsPage = (function () {
     if (modSelect) modSelect.addEventListener('change', drawList);
     if (typeSelect) typeSelect.addEventListener('change', drawList);
 
-    // Background Async Sync across modules
-    Promise.all(modules.map(m => API.getModuleInsights(m.id).catch(() => null))).then(results => {
-      allInsightsList = collectInsights();
-      drawList();
-    });
+    // Background Async Sync — staggered 1 per second to avoid hammering GAS
+    (async () => {
+      for (let i = 0; i < modules.length; i++) {
+        await new Promise(r => setTimeout(r, i * 1200));
+        try {
+          await API.getModuleInsights(modules[i].id);
+        } catch (e) {}
+        allInsightsList = collectInsights();
+        drawList();
+      }
+    })();
   }
 
   function getBadgeClass(type) {

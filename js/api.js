@@ -138,7 +138,7 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   /* PERF: GAS Cold Start Mitigation & Exponential Backoff             */
   /* ------------------------------------------------------------------ */
-  const MAX_ATTEMPTS = 5;
+  const MAX_ATTEMPTS = 3;
   const READ_ACTIONS = new Set([
     'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
     'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping', 'batch', 'getStreak',
@@ -146,10 +146,10 @@ const API = (function () {
   ]);
 
   function _retryDelay(attempt, is429) {
-    if (is429) return Math.min(2000 * Math.pow(2, attempt - 1), 10000); // Exponential backoff for 429
-    if (attempt === 1) return 1200;
-    if (attempt === 2) return 2000;
-    return 3000;
+    if (is429) return Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff for 429
+    if (attempt === 1) return 500;  // First retry: 0.5s
+    if (attempt === 2) return 1200; // Second retry: 1.2s
+    return 2000;                    // Third retry: 2s
   }
 
   // PERF: Active Controllers for cancelable requests
@@ -320,16 +320,20 @@ const API = (function () {
     call('ping', {}).catch(() => {});
   }
 
-  // PERF: Connection Warmup Queue (3 consecutive pings spaced 2s apart before login)
+  // PERF: Connection Warmup Queue (2 consecutive pings spaced 3s apart before login)
+  let _warmupTimer = null;
   function startWarmupQueue() {
     if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') return;
     let count = 0;
-    const interval = setInterval(() => {
+    _warmupTimer = setInterval(() => {
       count++;
       warmup();
-      if (count >= 3) clearInterval(interval);
-    }, 2000);
+      if (count >= 2) { clearInterval(_warmupTimer); _warmupTimer = null; }
+    }, 3000);
     warmup(); // Initial ping
+  }
+  function stopWarmupQueue() {
+    if (_warmupTimer) { clearInterval(_warmupTimer); _warmupTimer = null; }
   }
 
   // PERF: Predictive Prefetch (Parallel background batch loading after login)
@@ -394,7 +398,7 @@ const API = (function () {
     getToken, setToken, clearToken,
     cacheGet, cacheSet, cacheBust, cacheBustAll,
     ssGet, ssSet,
-    warmup, startWarmupQueue, prefetchAll,
+    warmup, startWarmupQueue, stopWarmupQueue, prefetchAll,
     startKeepalive, stopKeepalive,
     call, rawCall, batch,
 

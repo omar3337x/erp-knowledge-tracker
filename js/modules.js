@@ -134,7 +134,12 @@ const Modules = (function () {
     const cardsContainer = wrapEl.querySelector('#ai-insights-cards-container');
     const refreshBtn = wrapEl.querySelector('#btn-refresh-ai-insights');
 
-    let currentInsights = API.cacheGet('insights:' + moduleId) || getFallbackInsightsLocal(moduleId);
+    // Compute canonical MOD-N ID by module position for reliable insight type matching
+    const modulesList = (State.modulesCache && State.modulesCache.length) ? State.modulesCache : (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
+    const modIdx = modulesList.findIndex(m => String(m.id).toLowerCase() === String(moduleId).toLowerCase());
+    const canonicalId = (modIdx >= 0 && DEFAULT_MODULES[modIdx]) ? DEFAULT_MODULES[modIdx].id : moduleId;
+
+    let currentInsights = API.cacheGet('insights:' + moduleId) || getFallbackInsightsLocal(canonicalId);
     let favoritesMap = {};
 
     const renderInsightsList = () => {
@@ -275,6 +280,7 @@ const Modules = (function () {
     const modulesList = (State.modulesCache && State.modulesCache.length) ? State.modulesCache : (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
     let modObj = modulesList.find(m => String(m.id).toLowerCase() === String(moduleId).toLowerCase());
     if (!modObj) {
+      // Fallback: extract numeric index from canonical IDs like MOD-1, MOD-2…
       const numMatch = String(moduleId || '').match(/\d+/);
       if (numMatch) {
         const idx = parseInt(numMatch[0], 10) - 1;
@@ -282,7 +288,12 @@ const Modules = (function () {
       }
     }
     const modName = modObj ? I18n.localizedName(modObj) : (isAr ? 'الموديول الحالي' : 'Current Module');
-    const modLower = (String(moduleId || '') + ' ' + String(modObj ? modObj.name_en : '') + ' ' + String(modObj ? modObj.name_ar : '')).toLowerCase();
+
+    // Build a composite key from the module's English name + Arabic name + moduleId for reliable matching
+    const nameEn = String(modObj ? (modObj.name_en || '') : '').toLowerCase();
+    const nameAr = String(modObj ? (modObj.name_ar || '') : '').toLowerCase();
+    const idLower = String(moduleId || '').toLowerCase();
+    const modLower = nameEn + ' ' + nameAr + ' ' + idLower;
 
     // 1. Inventory (المخزون)
     if (modLower.includes('inventory') || modLower.includes('mod-1') || modLower.includes('مخزون')) {
