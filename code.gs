@@ -2041,6 +2041,20 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'حدد الحد الأدنى والأقصى لكل منتج بناءً على زمن التوريد (Lead Time) لتجنب انقطاع المخزون دون تجميد السيولة.' : 'Set Minimum and Maximum safety stock levels based on Lead Time to prevent stockouts without overcapitalizing cash.',
         example: isAr ? 'منتج بـ Lead Time 10 أيام واستهلاك يومي 5 قطع -> الحد الأدنى 50 قطعة.' : 'Lead time 10 days + 5 daily sales = Min safety stock 50 units.',
         why_it_matters: isAr ? 'رفع الكفاءة التشغيلية وحماية المبيعات من التوقف.' : 'Optimizes working capital and avoids lost sales.'
+      },
+      {
+        title: isAr ? 'تفعيل تتبع الرقم التسلسلي والتشغيلة (Serial & Batch Tracking)' : 'Serial & Batch Number Lot Tracking',
+        type: 'Best Practice',
+        content: isAr ? 'تفعيل تتبع الباتش وتواريخ الصلاحية يحمي الشركات الغذائية والدوائية من تداول المنتجات المنتهية الصلاحية.' : 'Enabling Lot & Serial tracking ensures strict FEFO/FIFO dispatching and fast product recall management.',
+        example: isAr ? 'سحب دفعة منتجات محددة برقم الباتش فور اكتشاف عيب مصنعي.' : 'Isolate specific batch numbers immediately upon supplier quality advisory.',
+        why_it_matters: isAr ? 'ضمان جودة المنتجات وحماية الشركة من القضايا والتعويضات.' : 'Ensures regulatory compliance and protects brand reputation.'
+      },
+      {
+        title: isAr ? 'تحليل مخزون الراكد والبطيء (ABC & Deadstock Analysis)' : 'ABC Classification & Deadstock Reduction',
+        type: 'Process Insight',
+        content: isAr ? 'تصنيف المنتجات حسب القيمة والتداول (ABC) يركز الجهود الرقابية على 20% من المنتجات التي تشكل 80% من قيمة المخزون.' : 'Categorizing inventory into ABC tiers concentrates auditing controls on high-value A-class items.',
+        example: isAr ? 'عمل جرد أسبوعي لفئة A وجرد ربع سنوي لفئة C.' : 'Perform weekly cycle counts for A-class items and quarterly counts for C-class.',
+        why_it_matters: isAr ? 'التخلص من المخزون الميت وتحرير السيولة المجمدة.' : 'Frees up locked working capital and reduces warehouse holding costs.'
       }
     ];
   }
@@ -2061,6 +2075,27 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'مطابقة التدفقات النقدية والودائع البنكية يومياً تكتشف الأخطاء والشيكات المعلقة مبكراً.' : 'Reconciling bank feeds daily catches duplicate transactions and uncollected checks early.',
         example: isAr ? 'استيراد ملفات MT940 / CAMT.053 للتسوية الآلية.' : 'Import MT940 statement files for auto-matching.',
         why_it_matters: isAr ? 'ضمان دقة الرصيد النقدي وتفادي التحايل.' : 'Guarantees accurate liquidity management and fraud protection.'
+      },
+      {
+        title: isAr ? 'الاعتماد الآلي للفواتير والضرائب (Automated E-Invoicing & E-Tax)' : 'Automated E-Invoicing & Tax Reporting Sync',
+        type: 'Tip',
+        content: isAr ? 'ربط فواتير المبيعات والمشتريات بنظام الفوترة الإلكترونية والضريبة يضمن تقديم الإقرارات الضريبية دون أخطاء.' : 'Integrating sales and purchase invoices directly with national tax portals eliminates manual VAT reporting errors.',
+        example: isAr ? 'توليد كود QR وقيد ضريبة القيمة المضافة تلقائياً مع كل فاتورة مبيعات.' : 'Auto-generate QR XML payload and VAT output ledger entry on invoice confirmation.',
+        why_it_matters: isAr ? 'تجنب غرامات التأخير وعدم التطابق الضريبي.' : 'Prevents costly late-filing tax penalties and non-compliance fines.'
+      },
+      {
+        title: isAr ? 'تسوية حسابات الوسيط والمقاصة (Intercompany & Clearing Accounts)' : 'Intercompany & Clearing Account Settlement',
+        type: 'Accounting Impact',
+        content: isAr ? 'تصفية حسابات التحويلات البنكية وحسابات المشتريات المعلقة نهاية كل شهر يمنع تضخم الحسابات الوسيطة.' : 'Reconciling transit and clearing ledgers monthly prevents unmapped balance sheet bloat.',
+        example: isAr ? 'قيد تسوية: من ح/ البنك المستلم إلى ح/ نقدية في الطريق.' : 'Clearing entry: Dr Receiving Bank, Cr Cash-in-Transit.',
+        why_it_matters: isAr ? 'يضمن مطابقة الحسابات المالية بين الفروع والشركات الشقيقة.' : 'Guarantees clean intercompany ledger balance matching.'
+      },
+      {
+        title: isAr ? 'مراقبة الديون المعدومة وتخصيص التعثر (Bad Debts Provisioning)' : 'Bad Debts Provisioning & Aging Schedule',
+        type: 'Common Mistake',
+        content: isAr ? 'إهمال تقارير تعمير الديون (Aging Report) يؤدي إلى تراكم ديون معدومة غير مخصص لها حسابياً.' : 'Ignoring customer A/R aging buckets leads to sudden unbudgeted write-offs of bad debts.',
+        example: isAr ? 'احتساب مخصص 5% للديون المتأخرة فوق 90 يوماً و50% لفوق 180 يوماً.' : 'Provision 5% for >90 days overdue and 50% for >180 days overdue.',
+        why_it_matters: isAr ? 'حماية رأس المال العامل وصحة قائمة المركز المالي.' : 'Protects balance sheet asset quality and working capital health.'
       }
     ];
   }
@@ -2088,6 +2123,20 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'ربط البصمة ومسيرات الرواتب تمنع الأخطاء اليدوية في احتساب التأخيرات والغياب والساعات الإضافية.' : 'Linking biometric logs directly with payroll prevents manual calculation mistakes on overtime and absences.',
         example: isAr ? 'تطبيق الخصم التلقائي لغياب بدون عذر وتأكيد ساعات Overtime المعتمدة فقط.' : 'Auto-deduct unexcused absences while approving pre-authorized overtime hours.',
         why_it_matters: isAr ? 'يوفر عشرات الساعات شهرياً لفريق الموارد البشرية ويقضي على الخلافات.' : 'Saves HR teams dozens of hours monthly and eliminates employee disputes.'
+      },
+      {
+        title: isAr ? 'أتمتة طلبات الإجازات والتأشيرات (Self-Service Leave Workflow)' : 'Employee Self-Service Leave & Visa Automation',
+        type: 'Process Insight',
+        content: isAr ? 'تمكين الموظفين من تقديم طلبات الإجازات وتأشيرات الخروج والعودة عبر تطبيق الخدمة الذاتية يقلل المعاملات الورقية.' : 'Employee self-service portals streamline leave requests, exit/re-entry visas, and salary certificates without HR bottlenecks.',
+        example: isAr ? 'خصم رصيد الإجازة التلقائي فور خصم الاعتماد من المدير المباشر.' : 'Auto-deduct leave balance upon direct manager approval signoff.',
+        why_it_matters: isAr ? 'رفع رضا الموظفين وتقليل الهدر الإداري لخدمات الأفراد.' : 'Improves employee satisfaction and cuts administrative overhead.'
+      },
+      {
+        title: isAr ? 'تقييم الأداء الربعي المربوط بالحوافز (KPI & Commission Automation)' : 'Automated Commission & KPI Performance Scoring',
+        type: 'Trick',
+        content: isAr ? 'ربط تحقيق الأهداف (KPIs) ونسب المبيعات بمسيرات الرواتب آلياً يضمن توزيع العمولات والحوافز بدقة.' : 'Auto-calculating sales commissions and KPI performance bonuses inside payroll prevents manual payout errors.',
+        example: isAr ? 'إضافة نسبة عمولة المبيعات تلقائياً لمسير راتب الشريك التجاري عند تحصيل الفاتورة.' : 'Auto-add sales commission line item to payroll upon customer payment collection.',
+        why_it_matters: isAr ? 'تحفيز الفريق وزيادة الإنتاجية دون تأخير المستحقات.' : 'Drives employee motivation and eliminates incentive payout disputes.'
       }
     ];
   }
@@ -2108,6 +2157,27 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'صرف قطع الغيار من المخزن بدون ربطها برقم أمر صيانة محدد يضيع تكلفة الصيانة الحقيقية لكل معدة.' : 'Issuing spare parts without linking them to a specific Work Order hides true maintenance costs per asset.',
         example: isAr ? 'إلزام الفني بمسح باركود القطعة وإسنادها لرقم أمر الشغل قبل الإخراج من المخزن.' : 'Require technicians to scan part barcode against active Work Order ID.',
         why_it_matters: isAr ? 'تحديد المعدات المتهالكة التي تستهلك مصاريف صيانة أعلى من قيمتها.' : 'Identifies money-pit assets consuming excessive maintenance budgets.'
+      },
+      {
+        title: isAr ? 'تتبع تكلفة الصيانة لكل معدة (Total Maintenance Cost per Asset)' : 'Total Cost of Maintenance (TCM) Tracking',
+        type: 'Accounting Impact',
+        content: isAr ? 'تجميع قطع الغيار، أجور الفنيين، والخدمات الخارجية على حساب المعدة يوضح جدوى الاستمرار في تشغيلها.' : 'Aggregating spare parts, technician labor, and contractor fees against asset IDs reveals true cost of ownership.',
+        example: isAr ? 'تقرير يبين أن مصاريف صيانة معدة تجاوزت 60% من قيمة إحلالها كجديدة.' : 'Report showing asset maintenance exceeded 60% of replacement value.',
+        why_it_matters: isAr ? 'تسهيل اتخاذ قرار إحلال وتكاهين المعدات المتهالكة.' : 'Facilitates timely capital asset replacement decisions.'
+      },
+      {
+        title: isAr ? 'تفعيل بلاغات الأعطال من خطوط الإنتاج (Work Center Downtime Alerts)' : 'Automated Machine Downtime Tracking',
+        type: 'Process Insight',
+        content: isAr ? 'تسجيل ساعات توقف المعدات فورياً يتيح تقييم كفاءة التشغيل الإجمالية (OEE) وتحليل أسباب التوقف.' : 'Logging machine downtime hours automatically tracks Overall Equipment Effectiveness (OEE) and root causes.',
+        example: isAr ? 'إرسال إشعار للمهندس المسؤول فور توقف خط الإنتاج لأكثر من 15 دقيقة.' : 'Auto-alert maintenance engineer when production line halts for >15 minutes.',
+        why_it_matters: isAr ? 'تقليل ساعات التوقف الفعلي وزيادة الطاقة الإنتاجية.' : 'Maximizes production throughput and minimizes downtime losses.'
+      },
+      {
+        title: isAr ? 'إدارة عقود الصيانة الضامنة (Vendor Warranty & SLA Tracking)' : 'Vendor Warranty & SLA Management',
+        type: 'Tip',
+        content: isAr ? 'تنبيه الفنيين بوجود ضمان ساري للمعدة لمنع شراء قطع غيار أو دفع مصاريف صيانة خارج الضمان.' : 'Alerting technicians about active vendor warranties prevents paying for covered spare parts and repairs.',
+        example: isAr ? 'إظهار شارة "تحت الضمان" عند فتح أمر شغل لمعدة تم شراؤها خلال السنة الأخيرة.' : 'Display "Under Warranty" banner when creating Work Order for recently purchased assets.',
+        why_it_matters: isAr ? 'توفير آلاف الريالات والاستفادة الكاملة من الضمانات المصنعية.' : 'Saves thousands by utilizing active manufacturer warranties.'
       }
     ];
   }
@@ -2128,6 +2198,27 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'استخدام الباركود لتطابق الأصول الميدانية مع سجل الأصول الثابتة تكتشف الأصول المفقودة أو المنقولة بدون إذن.' : 'Using barcodes for annual asset audits matches physical items with Fixed Asset Register ledgers.',
         example: isAr ? 'مسح باركود الأجهزة في فرع جديد وتحديث مواقعها الجغرافية تلقائياً.' : 'Scan asset barcodes during branch inspection to update real-time asset location tags.',
         why_it_matters: isAr ? 'حماية أصول الشركة من الفقدان والسرقة وتحسين الرقابة الداخلية.' : 'Prevents asset leakage and guarantees internal audit readiness.'
+      },
+      {
+        title: isAr ? 'إدارة استبعاد وبيع الأصول الثابتة (Asset Disposal & Scrap Realization)' : 'Fixed Asset Disposal & Scrap Accounting',
+        type: 'Common Mistake',
+        content: isAr ? 'بيع أو استبعاد الأصل بدون إقفال القيمة الدفترية ومجمع الإهلاك يتسبب في أخطاء جوهرية بالأرباح والخسائر.' : 'Scrapping or selling an asset without closing its accumulated depreciation ledger distorts P&L gain/loss on disposal.',
+        example: isAr ? 'إثبات قيد التخريد: إقفال ح/ مجمع الإهلاك واحتساب صافي الربح/الخسارة الناتج عن البيع.' : 'Disposal entry: Dr Cash, Dr Accumulated Depreciation, Cr Asset Cost, Cr/Dr Gain/Loss.',
+        why_it_matters: isAr ? 'دقة التقارير المالية ومطابقة القوائم الختامية.' : 'Guarantees compliant financial gain/loss reporting on disposals.'
+      },
+      {
+        title: isAr ? 'تجميع تكاليف المشروعات قيد التنفيذ (CWIP Asset Capitalization)' : 'Capital Work-in-Progress (CWIP) Capitalization',
+        type: 'Accounting Impact',
+        content: isAr ? 'تأجيل إهلاك المشروعات الثابتة لحين اكتمال التركيب والتشغيل الفعلي وتحويلها من ح/ مشاريع تحت التنفيذ إلى أصل ثابت.' : 'Capitalizing CWIP costs into active Fixed Assets only upon commercial commissioning starts depreciation correctly.',
+        example: isAr ? 'تحويل حساب خط الإنتاج من ح/ مشاريع تحت التنفيذ إلى ح/ أصل آلات ومعدات فور التشغيل.' : 'Transfer CWIP balance to Active Machinery ledger on commercial launch date.',
+        why_it_matters: isAr ? 'تجنب تحميل الفترات المحاسبية بمصاريف إهلاك قبل بدء توليد الإيراد.' : 'Prevents premature depreciation expenses before revenue generation starts.'
+      },
+      {
+        title: isAr ? 'إعادة تقييم الأصول بالقيمة العادلة (Asset Revaluation & Impairment)' : 'Asset Revaluation & Impairment Audit Controls',
+        type: 'Best Practice',
+        content: isAr ? 'إجراء اختبار هبوط قيمة الأصول (Impairment Test) عند تراجع قيمتها السوقية لحماية القوائم المالية.' : 'Testing fixed assets for impairment when market values drop guarantees compliance with IFRS IAS 36.',
+        example: isAr ? 'إثبات قيد خسائر هبوط أصل عقاري تراجعت قيمته السوقية.' : 'Post Dr Impairment Expense, Cr Accumulated Impairment Allowance.',
+        why_it_matters: isAr ? 'عرض الأصول بقيمتها الحقيقية العادلة أمام المستثمرين والبنوك.' : 'Ensures true fair-value asset representation for stakeholders.'
       }
     ];
   }
@@ -2148,6 +2239,27 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'ربط رحلة السائق بأمر الشحن الإلكتروني يمنع تنفيذ الرحلات غير المفوترة ويضمن تحصيل مصاريف النقل.' : 'Linking driver trip dispatches to electronic waybills ensures zero unbilled freight trips.',
         example: isAr ? 'إصدار فاتورة شحن تلقائية للعميل فور تأكيد السائق الاستلام عبر تطبيق الجوال.' : 'Auto-generate freight invoice upon driver Proof of Delivery (POD) confirmation.',
         why_it_matters: isAr ? 'تسريع تحصيل الإيرادات ومنع تشغيل الشاحنات في رحلات خاصة غير مصرح بها.' : 'Accelerates cash collection and prevents unauthorized truck usage.'
+      },
+      {
+        title: isAr ? 'جدولة تراخيص الفحص والرخص (Fleet License & Renewal Pipeline)' : 'Fleet Vehicle Inspection & Registration Renewal Alerts',
+        type: 'Tip',
+        content: isAr ? 'إعداد تنبيهات آلية لتراخيص المركبات والتأمين والفحص الدوري تجنباً لحجز الشاحنات بالغرامات الميدانية.' : 'Auto-alerting fleet operations 30 days before vehicle registration and insurance expiry avoids road fines.',
+        example: isAr ? 'تنبيه مسئول الحركة قبل 30 يوماً من انتهاء رخصة سير الشاحنة.' : 'Auto-notify dispatch team 30 days prior to truck registration expiry.',
+        why_it_matters: isAr ? 'تجنب توقف الرحلات والغرامات المرورية.' : 'Prevents fleet grounding and avoids heavy traffic fines.'
+      },
+      {
+        title: isAr ? 'تتبع مسارات الشاحنات وتحديد الحمولة الزائدة (Overload & GPS Tracking)' : 'GPS Route Tracking & Axle Overload Monitoring',
+        type: 'Common Mistake',
+        content: isAr ? 'تجاوز أوزان المحاور المسموحة يتسبب في تلف الإطارات وتوقيع غرامات موازين النقل.' : 'Exceeding axle weight limits damages tires and incurs heavy weigh-station highway fines.',
+        example: isAr ? 'منع إصدار وثيقة التحرير إذا تجاوز الوزن الإجمالي الموزون الحد المسموح.' : 'Block waybill confirmation if scale weight exceeds maximum legal axle limit.',
+        why_it_matters: isAr ? 'حماية أسطول المركبات وتخفيض مصاريف صيانة الإطارات.' : 'Extends tire lifespan and prevents costly highway overload penalties.'
+      },
+      {
+        title: isAr ? 'حساب تكلفة الكيلومتر الفعلي للرحلة (Cost Per Ton/Km Ratio)' : 'Freight Profitability per Ton/Km Ratio',
+        type: 'Accounting Impact',
+        content: isAr ? 'ربط مصاريف السائق والوقود والصيانة والضرائب بحمولة الرحلة يحدد ربحية كل خط سير.' : 'Allocating driver allowances, fuel, tolls, and maintenance per trip calculates true net margin per route.',
+        example: isAr ? 'تقرير يبين أن خط نقل "الرياض - الدمام" يحقق هامش ربح 28% مقارنة بـ 12% لخط آخر.' : 'Route profitability report showing 28% margin vs 12% on low-yield trips.',
+        why_it_matters: isAr ? 'تركيز الأسطول على الخطوط والرحلات الأكثر ربحية.' : 'Focuses fleet capacity on high-margin logistics corridors.'
       }
     ];
   }
@@ -2168,6 +2280,27 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'تفعيل تنبيهات 60 يوماً قبل انتهاء العقود يزيد نسبة تجديد العقود وتخفيض فترات شغور الوحدات.' : 'Alerting property managers 60 days before lease expiration boosts tenant retention and drops vacancy rates.',
         example: isAr ? 'إرسال عروض التجديد الآلية عبر الإيميل/الواتساب للمستأجر قبل شهرين.' : 'Auto-send renewal terms via email/WhatsApp 60 days prior to contract expiry.',
         why_it_matters: isAr ? 'حماية التدفقات النقدية واستقرار عوائد المحفظة العقارية.' : 'Protects cash flow and stabilizes portfolio yield.'
+      },
+      {
+        title: isAr ? 'أتمتة الفواتير وربط الخدمات بالمستأجرين (Tenant Utility Cost Recovery)' : 'Tenant Utility & Maintenance Re-invoicing Automation',
+        type: 'Best Practice',
+        content: isAr ? 'إعادة توزيع فواتير الكهرباء والمياه والصيانة العامة على المستأجرين تلقائياً بحسب مساحة كل وحدة.' : 'Auto-allocating shared building utility and maintenance costs to tenant ledgers by square footage.',
+        example: isAr ? 'إصدار فاتورة صيانة دورية للمستأجر بحسب نسبة مساحة محله من المجمع.' : 'Auto-bill tenant for shared HVAC maintenance based on leased floor area ratio.',
+        why_it_matters: isAr ? 'منع استنزاف المصاريف التشغيلية على مالك العقار.' : 'Prevents unrecovered building operational costs from eroding owner returns.'
+      },
+      {
+        title: isAr ? 'تحصيل الإيجارات عبر بوابة الدفع السريع (Online Tenant Payment Portal)' : 'Digital Lease Payments & Auto-Receipting',
+        type: 'Process Insight',
+        content: isAr ? 'ربط التحصيل الإلكتروني والخصم المباشر بنظام العقارات يحدث رصيد المستأجر ويصدر السند فورياً.' : 'Integrating online payment portals with tenant sub-ledgers auto-posts receipts and updates balances.',
+        example: isAr ? 'تسوية الدفعة وتوليد سند القبض تلقائياً بمجرد سداد المستأجر عبر سداد/مدى.' : 'Auto-post receipt voucher upon instant tenant SADAD/Mada payment confirmation.',
+        why_it_matters: isAr ? 'تقليل الديون المعلقة وتسريع دورة التحصيل النقدية.' : 'Dramatically cuts collection delays and manual receipting work.'
+      },
+      {
+        title: isAr ? 'متابعة الصيانة الدورية للوحدات المؤجرة (Leased Unit Inspection)' : 'Periodic Leased Unit Physical Inspection Audits',
+        type: 'Common Mistake',
+        content: isAr ? 'تسليم أو استلام الوحدات دون توثيق حالة المبنى بالصور والتقرير المعتمد يسبب نزاعات الودائع الإيجارية.' : 'Handing over units without digital photo inspection logs triggers deposit security disputes upon lease termination.',
+        example: isAr ? 'تعبئة نموذج فحص الاستلام الرقمي وتوقيع المستأجر الكترونياً قبل تسليم المفاتيح.' : 'Complete digital handover checklist with signed tenant photos prior to key release.',
+        why_it_matters: isAr ? 'حماية الأصول العقارية من التلف وضمان حقوق الصيانة.' : 'Protects property value and eliminates tenant deposit settlement conflicts.'
       }
     ];
   }
@@ -2188,6 +2321,27 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'مقارنة تكاليف العمالة والمواد والعدات الفعلية ببند جدول الكميات (BOQ) فور تسجيل كل فاتورة أو صرفية.' : 'Comparing actual material, labor, and equipment expenses against BOQ baseline caps cost overruns early.',
         example: isAr ? 'تنبيه مدير المشروع فور تجاوز صرف مادة الخرسانة 90% من الميزانية المعتمدة.' : 'Trigger red flag when concrete material expenses hit 90% of allocated BOQ line item.',
         why_it_matters: isAr ? 'حماية هامش ربح المشروع وتجنب الانحرافات التكلفية الحادة.' : 'Protects project profit margins from cost overruns.'
+      },
+      {
+        title: isAr ? 'إدارة التغييرات وأوامر التكليف (Variation Orders Control)' : 'Variation Order (VO) Approval & Revenue Realization',
+        type: 'Common Mistake',
+        content: isAr ? 'تنفيذ الأعمال الإضافية للمشروع بناءً على طلبات شفهية دون أوامر تغيير مقتطعة وموثقة يضيع مستحقات المقاول.' : 'Executing unapproved scope changes without signed Variation Orders leads to uncollectible work expenses.',
+        example: isAr ? 'حظر صرف مواد العمل الإضافي لحين اعتماد الاستشاري لأمر التغيير رقم VO-04.' : 'Block material issue for extra scope until client signs Variation Order VO-04.',
+        why_it_matters: isAr ? 'ضمان فوترة كافة الأعمال الإضافية وحماية حقوق الشركة.' : 'Guarantees full customer billing for scope changes.'
+      },
+      {
+        title: isAr ? 'توزيع مصاريف الموقع غير المباشرة (Subcontractor & Overhead Distribution)' : 'Subcontractor Ledger & Site Overhead Allocation',
+        type: 'Accounting Impact',
+        content: isAr ? 'توزيع رواتب الإداريين والمعدات المشتركة ومصاريف الموقع المؤقتة على بند المشروع بحسب نسبة الإنجاز.' : 'Allocating shared site equipment, site engineers, and camp overheads by project completion percentage.',
+        example: isAr ? 'قيد توزيع مصاريف الموقع الشهرية بنسبة إنجاز كل مشروع من إجمالي الأعمال.' : 'Post monthly site overhead allocation proportional to project IPC revenue weight.',
+        why_it_matters: isAr ? 'تحديد الربحية الحقيقية والدقيقة لكل مشروع مقاولات.' : 'Reveals true net profitability per construction site.'
+      },
+      {
+        title: isAr ? 'متابعة خطاب الضمان المالي والنهائي (Letter of Guarantee LG Expiry)' : 'Letter of Guarantee (LG) Expiry & Margin Tracking',
+        type: 'Tip',
+        content: isAr ? 'تفعيل تنبيهات 45 يوماً قبل انتهاء خطابات الضمان الابتدائية والنهائية لتمديدها أو الإفراج عن الهوامش النقدية.' : 'Tracking Bank Performance & Advance Payment LG expiry dates prevents automatic cash margin liquidations.',
+        example: isAr ? 'إرسال إشعار للإدارة المالية لمخاطبة البنك لتمديد أو استرداد غطاء الضمان.' : 'Notify finance team 45 days prior to LG expiry to release banked cash margins.',
+        why_it_matters: isAr ? 'استرداد السيولة المحتجزة وتجنب مصاريف التمديد البنكية.' : 'Recovers banked cash margins and avoids unnecessary bank extension fees.'
       }
     ];
   }
@@ -2208,13 +2362,33 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'إهمال مطابقة قياسات الخزانات الأرضية Daily Dip Readings تسبب في عدم اكتشاف تهريب الوقود أو أخطاء التكاليف.' : 'Ignoring daily underground tank dip gauge checks hides fuel leaks or thermal expansion losses.',
         example: isAr ? 'فارق يظهر بين المخزون الدفتري والفعلي يتجاوز 0.5% -> إرسال فريق الفحص لمعايرة المضخات.' : 'Variance exceeding 0.5% triggers calibration and leak inspection dispatch.',
         why_it_matters: isAr ? 'تجنب الخسائر البيئية والمالية الفادحة الناجمة عن التسريبات.' : 'Prevents severe environmental and financial losses from undetected tank leaks.'
+      },
+      {
+        title: isAr ? 'مراقبة أسعار التوريد وهامش ربح لتر الوقود (Margin & Price Update Automation)' : 'Automated Fuel Retail Margin & Cost Update',
+        type: 'Accounting Impact',
+        content: isAr ? 'تحديث أسعار لتر الوقود فور اعتماد التسعيرة الرسمية يضمن دقة حساب قيود المبيعات وهامش الربح.' : 'Auto-updating pump retail prices upon official tariff changes ensures immediate gross margin accuracy.',
+        example: isAr ? 'تحديث سعر البنزين 91 تلقائياً في جميع الشاشات والمضخات بداية الشهر.' : 'Batch update 91 Octane retail price across all station POS pumps at midnight.',
+        why_it_matters: isAr ? 'حماية أرباح المحطة وتجنب الفروقات الحسابية في التكاليف.' : 'Protects retail margins and prevents inventory revaluation errors.'
+      },
+      {
+        title: isAr ? 'ربط بطاقات الأسطول والشركات بالشبكة (Fleet RFID Fueling System)' : 'Fleet RFID Smart Fueling & Direct Ledger Billing',
+        type: 'Best Practice',
+        content: isAr ? 'صرف الوقود لمركبات الشركات عبر الشريحة الذكية (RFID) يمنع التلاعب ويعكس التكلفة في حساب العميل فوراً.' : 'Dispensing fuel via smart vehicle RFID tags auto-debts corporate customer accounts without cash handling.',
+        example: isAr ? 'مسح شريحة الشاحنة على المضخة وخصم قيمة اللترات تلقائياً من رصيد الشركة.' : 'Auto-read RFID windshield tag on nozzle pick-up to charge corporate sub-ledger.',
+        why_it_matters: isAr ? 'زيادة مبيعات الآجل وسرعة تسوية فواتير كبار العملاء.' : 'Drives corporate fleet sales volume and eliminates credit billing disputes.'
+      },
+      {
+        title: isAr ? 'فحص المعايرة الفنية وحساب الفقد الحراري (Thermal Loss Calculation)' : 'Pump Meter Calibration & Thermal Expansion Audits',
+        type: 'Tip',
+        content: isAr ? 'معايرة المضخات بانتظام واحتساب الفروقات الحرارية الصيفية يحمي الخزانات من العجز الفني المنظور.' : 'Calibrating meter nozzles and accounting for fuel thermal expansion prevents unexplained stock variance.',
+        example: isAr ? 'معايرة وعاء 20 لتر القياسي شهرياً للتأكد من عدم وجود ضخ زائد عن المقدار.' : 'Calibrate 20L standard test measure monthly to verify exact nozzle dispensing accuracy.',
+        why_it_matters: isAr ? 'الالتزام بمعايير الجودة وتجنب المخالفات الرقابية.' : 'Guarantees commercial compliance and prevents customer over-dispensing losses.'
       }
     ];
   }
 
   // 10. Law Firm (المحاماة)
   if (modLower.indexOf('law') !== -1 || modLower.indexOf('legal') !== -1 || modLower.indexOf('محاماة') !== -1 || modLower.indexOf('قانون') !== -1 || /\bmod-10\b/i.test(modLower)) {
-
     return [
       {
         title: isAr ? 'متابعة مواعيد الجلسات القضائية والتنبيه الآلي (Court Session Deadlines)' : 'Court Session & Hearing Calendar Auto-Sync',
@@ -2229,9 +2403,31 @@ function getFallbackInsights(moduleId, lang) {
         content: isAr ? 'تسجيل ساعات الاستشارات والارتباطات القضائية بدقة وتخصيصها لرقم القضية يضمن صدور الفواتير بدقة.' : 'Logging attorney consultation hours against case IDs ensures accurate client billing and retainer burn tracking.',
         example: isAr ? 'تحويل 5 ساعات دراسة قضية تلقائياً إلى فاتورة العميل بناءً على السعر المتفق عليه.' : 'Convert 5 hours case research directly into client draft invoice at contracted hourly rate.',
         why_it_matters: isAr ? 'تعظيم إيرادات مكتب المحاماة وضمان شفافية أتعاب القضايا.' : 'Maximizes law firm profitability and maintains client fee transparency.'
+      },
+      {
+        title: isAr ? 'إدارة أتعاب القضايا وحسابات الأمانات (Legal Retainer & Escrow Trust Accounting)' : 'Legal Retainer Deposit & Escrow Trust Ledger Controls',
+        type: 'Accounting Impact',
+        content: isAr ? 'فصل حسابات أمانات العملاء عن الحساب الجاري للمكتب والاعتراف بالأتعاب فقط عند تقديم الخدمة فعلياً.' : 'Separating client escrow trust funds from law firm operating ledgers ensures strict legal ethics compliance.',
+        example: isAr ? 'ترحيل الأتعاب المستحقة من ح/ أمانات العملاء إلى ح/ إيرادات الاستشارات المكتسبة.' : 'Transfer earned fees from Client Trust Liability to Operating Revenue upon milestone completion.',
+        why_it_matters: isAr ? 'الالتزام بقواعد أمانات المهن القانونية وتجنب المخالفات.' : 'Ensures strict legal accounting ethics and regulatory compliance.'
+      },
+      {
+        title: isAr ? 'توثيق وإدارة أوراق القضايا الكترونياً (Case Document Archiving)' : 'Electronic Case File & Evidence Archiving',
+        type: 'Process Insight',
+        content: isAr ? 'أرشفة كافة اللوائح، العقود، والمستندات بملف القضية الرقمي يتيح الوصول الفوري للفريق القانوني من أي مكان.' : 'Archiving court pleadings, contracts, and evidence under centralized digital Case IDs enables instant team access.',
+        example: isAr ? 'ربط المذكرة الجوابية برقم القضية ليطلع عليها المحامي المساند قبل الجلسة.' : 'Attach defense brief PDF to Case ID for co-counsel review prior to hearing.',
+        why_it_matters: isAr ? 'تسريع إعداد المذكرات وحماية أصول ومستندات العملاء من الضياع.' : 'Accelerates brief drafting and secures confidential client documentation.'
+      },
+      {
+        title: isAr ? 'متابعة تحصيل الدفعات المستحقة للقضايا (Milestone Fee Collection)' : 'Legal Fee Milestone Collection & Retainer Alerts',
+        type: 'Common Mistake',
+        content: isAr ? 'الاستمرار في الترافع والعمل على القضية بعد استنفاذ الدفعة المقدمة دون مطالبتهم بالدفعة التالية يسبب تعثر التحصيل.' : 'Continuing litigation work after exhausting client retainer balance risks uncollectible legal fees.',
+        example: isAr ? 'إرسال تنبيه آلي للمحامي والعميل فور انخفاض رصيد الدفعة المقدمة عن 20%.' : 'Trigger auto-alert when client retainer balance drops below 20% threshold.',
+        why_it_matters: isAr ? 'حماية التدفقات النقدية لمكتب المحاماة وضمان التحصيل أولاً بأول.' : 'Protects law firm cash flow and eliminates overdue fee collection risks.'
       }
     ];
   }
+
 
   return [
     {

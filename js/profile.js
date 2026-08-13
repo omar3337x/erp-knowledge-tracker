@@ -172,102 +172,119 @@ const Profile = (function () {
     let aiSettingsDefault = { endpoint: 'https://router.bynara.id/v1', model: 'gemini-3.6-medium', masked_key: '••••••••••••••••', daily_count: 5, enabled: true };
     let dataDefault = { total_users: 1, active_users: 1, new_users: 0, users: [] };
 
-    // PERF: Try cache first (0ms instant render)
     let cachedData = (typeof API !== 'undefined' && API.cacheGet) ? API.cacheGet('adminUsers:{}', 'adminUsers') : null;
     let cachedAi = (typeof API !== 'undefined' && API.cacheGet) ? API.cacheGet('getAISettings:{}', 'getAISettings') : null;
-
-    if (!cachedData || !cachedAi) {
-      container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
-    }
 
     let data = cachedData || dataDefault;
     let aiSettings = cachedAi || aiSettingsDefault;
 
-    // PERF: Single batch call instead of parallel Promise.all to prevent 404 concurrency limits on GAS
-    try {
-      const batchRes = await API.batch([
-        { action: 'adminUsers', payload: {} },
-        { action: 'getAISettings', payload: {} }
-      ]);
-      if (batchRes && batchRes.adminUsers) data = batchRes.adminUsers;
-      if (batchRes && batchRes.getAISettings) aiSettings = batchRes.getAISettings;
-    } catch (err) {
-      if (!cachedData) {
-        // Fallback: try individual sequential calls
-        try { data = await API.adminUsers(); } catch (e) {}
-        try { aiSettings = await API.getAISettings(); } catch (e) {}
-      }
+    // Helper function to render admin UI
+    function drawAdminUI() {
+      container.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h2 style="margin:0;">${I18n.t('admin.title')}</h2>
+          <button class="btn btn-secondary btn-sm" id="send-test-digest-btn">📧 ${I18n.t('digest.sendTestDigest')}</button>
+        </div>
+
+        <div class="grid grid-kpi" style="margin-bottom:24px;">
+          <div class="card kpi-card"><div class="kpi-label">${I18n.t('admin.totalUsers')}</div><div class="kpi-value" id="admin-total-users">${data.total_users}</div></div>
+          <div class="card kpi-card"><div class="kpi-label">${I18n.t('admin.activeUsers')}</div><div class="kpi-value teal" id="admin-active-users">${data.active_users}</div></div>
+          <div class="card kpi-card"><div class="kpi-label">${I18n.t('admin.newUsers')}</div><div class="kpi-value brass" id="admin-new-users">${data.new_users}</div></div>
+        </div>
+
+        <!-- AI Settings Section -->
+        <div class="card" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">✨ ${I18n.t('aiSettings.title')}</h3>
+          <form id="ai-settings-form">
+            <div class="grid" style="grid-template-columns:1fr 1fr; gap:14px;">
+              <div class="field">
+                <label>${I18n.t('aiSettings.apiEndpoint')}</label>
+                <input name="api_endpoint" value="${Topics.escapeHtml(aiSettings.endpoint || 'https://router.bynara.id/v1')}" required>
+              </div>
+              <div class="field">
+                <label>${I18n.t('aiSettings.model')}</label>
+                <input name="model" value="${Topics.escapeHtml(aiSettings.model || 'gemini-3.6-medium')}" required>
+              </div>
+            </div>
+
+            <div class="grid" style="grid-template-columns:1fr 1fr; gap:14px; margin-top:10px;">
+              <div class="field">
+                <label>${I18n.t('aiSettings.apiKey')}</label>
+                <input name="api_key" type="password" placeholder="${aiSettings.masked_key || 'Leave blank to keep unchanged'}" autocomplete="off">
+                <small class="field-hint">${I18n.t('aiSettings.apiKeyHint')}</small>
+              </div>
+              <div class="field">
+                <label>${I18n.t('aiSettings.dailyCount')}</label>
+                <input name="daily_count" type="number" min="1" max="10" value="${aiSettings.daily_count || 5}" required>
+              </div>
+            </div>
+
+            <div class="field checkbox-row" style="margin-top:12px; margin-bottom:16px;">
+              <input type="checkbox" id="ai-enabled-cb" name="enabled" ${aiSettings.enabled !== false ? 'checked' : ''}>
+              <label for="ai-enabled-cb" style="margin:0;">✨ ${I18n.t('aiSettings.enableAI')}</label>
+            </div>
+
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+              <button type="submit" class="btn btn-primary">${I18n.t('profile.saveChanges')}</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- User Management Table -->
+        <div class="card">
+          <h3 style="margin-bottom:12px;">👥 ${I18n.t('admin.userManagement')}</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>${I18n.t('admin.name')}</th>
+                  <th>${I18n.t('admin.email')}</th>
+                  <th>${I18n.t('admin.role')}</th>
+                  <th>${I18n.t('admin.status')}</th>
+                  <th>${I18n.t('admin.created')}</th>
+                  <th>${I18n.t('admin.actions')}</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody">
+                ${(data.users || []).map(u => `
+                  <tr>
+                    <td><strong>${Topics.escapeHtml(u.name || '')}</strong></td>
+                    <td>${Topics.escapeHtml(u.email || u.username || '')}</td>
+                    <td><span class="badge ${u.role === 'Admin' ? 'badge-priority-high' : ''}">${u.role || 'User'}</span></td>
+                    <td><span class="badge ${u.status === 'Active' ? 'badge-status-mastered' : 'badge-status-not-started'}">${u.status || 'Active'}</span></td>
+                    <td>${UI.fmtDate(u.created_at)}</td>
+                    <td>
+                      ${u.id !== State.currentUser.id ? `
+                        <button class="btn btn-xs btn-ghost btn-toggle-status" data-id="${u.id}" data-status="${u.status}">
+                          ${u.status === 'Active' ? '⏸️ Suspend' : '▶️ Activate'}
+                        </button>
+                      ` : '<small style="color:var(--ink-soft);">(You)</small>'}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      bindAdminEvents(container);
     }
 
+    // 0ms Instant First Paint!
+    drawAdminUI();
 
-    container.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h2 style="margin:0;">${I18n.t('admin.title')}</h2>
-        <button class="btn btn-secondary btn-sm" id="send-test-digest-btn">📧 ${I18n.t('digest.sendTestDigest')}</button>
-      </div>
-
-      <div class="grid grid-kpi" style="margin-bottom:24px;">
-        <div class="card kpi-card"><div class="kpi-label">${I18n.t('admin.totalUsers')}</div><div class="kpi-value">${data.total_users}</div></div>
-        <div class="card kpi-card"><div class="kpi-label">${I18n.t('admin.activeUsers')}</div><div class="kpi-value teal">${data.active_users}</div></div>
-        <div class="card kpi-card"><div class="kpi-label">${I18n.t('admin.newUsers')}</div><div class="kpi-value brass">${data.new_users}</div></div>
-      </div>
-
-      <!-- AI Settings Section -->
-      <div class="card" style="margin-bottom:24px;">
-        <h3 style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">✨ ${I18n.t('aiSettings.title')}</h3>
-        <form id="ai-settings-form">
-          <div class="grid" style="grid-template-columns:1fr 1fr; gap:14px;">
-            <div class="field">
-              <label>${I18n.t('aiSettings.apiEndpoint')}</label>
-              <input name="api_endpoint" value="${Topics.escapeHtml(aiSettings.endpoint || 'https://router.bynara.id/v1')}" required>
-            </div>
-            <div class="field">
-              <label>${I18n.t('aiSettings.model')}</label>
-              <input name="model" value="${Topics.escapeHtml(aiSettings.model || 'gemini-3.6-medium')}" required>
-            </div>
-          </div>
-
-          <div class="grid" style="grid-template-columns:1fr 1fr; gap:14px; margin-top:10px;">
-            <div class="field">
-              <label>${I18n.t('aiSettings.apiKey')}</label>
-              <input name="api_key" type="password" placeholder="${aiSettings.masked_key || 'Leave blank to keep unchanged'}" autocomplete="off">
-              <small class="field-hint">${I18n.t('aiSettings.apiKeyHint')}</small>
-            </div>
-            <div class="field">
-              <label>${I18n.t('aiSettings.dailyCount')}</label>
-              <input name="daily_count" type="number" min="1" max="10" value="${aiSettings.daily_count || 5}" required>
-            </div>
-          </div>
-
-          <div class="field checkbox-row" style="margin-top:12px; margin-bottom:16px;">
-            <input type="checkbox" id="ai-enabled-cb" name="enabled" ${aiSettings.enabled !== false ? 'checked' : ''}>
-            <label for="ai-enabled-cb" style="margin:0;">✨ ${I18n.t('aiSettings.enableAI')}</label>
-          </div>
-
-          <div style="display:flex; gap:12px; flex-wrap:wrap;">
-            <button type="submit" class="btn btn-primary">${I18n.t('profile.saveChanges')}</button>
-            <button type="button" class="btn btn-secondary" id="btn-test-ai-conn">🔌 ${I18n.t('aiSettings.testConnection')}</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>${I18n.t('admin.name')}</th><th>${I18n.t('admin.username')}</th><th>${I18n.t('admin.role')}</th><th>${I18n.t('admin.progress')}</th><th>${I18n.t('admin.topics')}</th><th>${I18n.t('admin.lastLogin')}</th></tr></thead>
-          <tbody>
-            ${data.users.map(u => `
-              <tr>
-                <td>${Topics.escapeHtml(u.full_name)}</td>
-                <td class="mono">${u.username}</td>
-                <td>${u.role}</td>
-                <td class="mono">${u.overall_progress}%</td>
-                <td class="mono">${u.total_topics}</td>
-                <td class="mono">${UI.fmtDate(u.last_login)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
+    // PERF: Async Background Network Fetch (never blocks 0ms UI)
+    API.batch([
+      { action: 'adminUsers', payload: {} },
+      { action: 'getAISettings', payload: {} }
+    ]).then(batchRes => {
+      if (batchRes && typeof batchRes === 'object') {
+        let updated = false;
+        if (batchRes.adminUsers) { data = batchRes.adminUsers; updated = true; }
+        if (batchRes.getAISettings) { aiSettings = batchRes.getAISettings; updated = true; }
+        if (updated) drawAdminUI();
+      }
     `;
 
     const testDigestBtn = container.querySelector('#send-test-digest-btn');
