@@ -180,13 +180,15 @@ const API = (function () {
     const qs = new URLSearchParams(qsParams).toString();
     const fetchUrl = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs;
 
-    const isReadAction = READ_ACTIONS.has(action);
+    // PERF: Google Apps Script Web Apps handle GET (doGet) natively without 302 -> macros/echo 404 POST redirect bugs.
+    // Use GET whenever total URL length is < 2000 characters. Fallback to POST for heavy payloads.
+    const useGet = fetchUrl.length < 2000;
     const fetchOpts = {
-      method: isReadAction ? 'GET' : 'POST',
+      method: useGet ? 'GET' : 'POST',
       signal: controller.signal
     };
 
-    if (!isReadAction) {
+    if (!useGet) {
       fetchOpts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
       fetchOpts.body = JSON.stringify({ action: action || '', payload: payload || {}, token: token || '' });
     }
