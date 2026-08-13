@@ -1568,8 +1568,13 @@ function actionGetStreak(user) {
 // ---------------------------------------------------------------------------
 
 function actionSendTestDigest(user) {
-  sendWeeklyDigestForUser(user);
-  return successResponse({ sent: true }, 'Test digest sent successfully.');
+  try {
+    if (!user || !user.email) return errorResponse('User email is missing.', 'MISSING_EMAIL');
+    sendWeeklyDigestForUser(user);
+    return successResponse({ sent: true, recipient: user.email }, 'Test digest email sent to ' + user.email);
+  } catch (err) {
+    return errorResponse('Failed to send email: ' + err.message, 'EMAIL_FAILED');
+  }
 }
 
 function sendWeeklyDigest() {
@@ -1610,10 +1615,12 @@ function sendWeeklyDigestForUser(user) {
     return nr >= now && nr <= next7;
   }).length;
 
-  var streakData = actionGetStreak(user).data;
+  var streakRes = actionGetStreak(user);
+  var streakData = (streakRes && streakRes.data) ? streakRes.data : { current_streak: 0 };
   var overallProgress = averageProgress(topics);
   var isAr = user.language === 'ar';
 
+  var clientUrl = (typeof CONFIG_CLIENT_URL !== 'undefined' && CONFIG_CLIENT_URL) ? CONFIG_CLIENT_URL : '#';
   var subject = isAr ? '📊 الملخص الأسبوعي لتعلّم ERP - ' + user.full_name : '📊 Your Weekly ERP Learning Digest - ' + user.full_name;
 
   var htmlBody = isAr ?
@@ -1627,7 +1634,7 @@ function sendWeeklyDigestForUser(user) {
         '<li>🔄 <strong>مراجعات تمت هذا الأسبوع:</strong> ' + reviews + '</li>' +
         '<li>📅 <strong>مواضيع مستحقة للمراجعة الأسبوع القادم:</strong> ' + dueNextWeek + '</li>' +
       '</ul>' +
-      '<p style="margin-top:20px;"><a href="' + (CONFIG_CLIENT_URL || '#') + '" style="background:#b5772e; color:#fff; padding:10px 18px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block;">افتح المنصة وواصل التعلّم</a></p>' +
+      '<p style="margin-top:20px;"><a href="' + clientUrl + '" style="background:#b5772e; color:#fff; padding:10px 18px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block;">افتح المنصة وواصل التعلّم</a></p>' +
     '</div>' :
     '<div style="font-family:sans-serif; color:#333; line-height:1.6; max-width:600px; margin:0 auto; padding:20px; border:1px solid #e0e0e0; border-radius:8px;">' +
       '<h2 style="color:#b5772e;">📊 Your Weekly ERP Learning Digest</h2>' +
@@ -1639,7 +1646,7 @@ function sendWeeklyDigestForUser(user) {
         '<li>🔄 <strong>Reviews Completed This Week:</strong> ' + reviews + '</li>' +
         '<li>📅 <strong>Topics Due for Review Next Week:</strong> ' + dueNextWeek + '</li>' +
       '</ul>' +
-      '<p style="margin-top:20px;"><a href="' + (CONFIG_CLIENT_URL || '#') + '" style="background:#b5772e; color:#fff; padding:10px 18px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block;">Open Tracker &amp; Keep Learning</a></p>' +
+      '<p style="margin-top:20px;"><a href="' + clientUrl + '" style="background:#b5772e; color:#fff; padding:10px 18px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block;">Open Tracker &amp; Keep Learning</a></p>' +
     '</div>';
 
   MailApp.sendEmail({

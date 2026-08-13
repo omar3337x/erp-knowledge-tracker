@@ -10,17 +10,133 @@
  */
 
 const Analytics = (function () {
+  let _lastHash = '';
 
-  async function render(container) {
-    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
-    let data;
-    try {
-      data = await API.analytics();
-    } catch (err) {
-      container.innerHTML = UI.errorState(err);
-      return;
+  function computeHash(data) {
+    if (!data) return '';
+    return JSON.stringify([
+      data.mastered_total,
+      data.topics_needing_review,
+      data.total_reviews,
+      data.progress_by_module ? data.progress_by_module.map(m => m.progress) : []
+    ]);
+  }
+
+  function deriveAnalyticsFromMemory() {
+    const topics = State.topicsCache || API._dashboardTopics || [];
+    const modules = State.modulesCache || [];
+    if (!topics.length && !modules.length) return null;
+
+    const statusCounts = { 'Not Started': 0, 'Learning': 0, 'Understood': 0, 'Practiced': 0, 'Mastered': 0 };
+    const priorityCounts = { 'Low': 0, 'Medium': 0, 'High': 0, 'Critical': 0 };
+
+    const modMap = {};
+    modules.forEach(m => {
+      modMap[m.id] = { module_id: m.id, name_en: m.name_en, name_ar: m.name_ar, total: 0, sumProgress: 0, gaps: 0 };
+    });
+
+    topics.forEach(t => {
+      if (statusCounts.hasOwnProperty(t.status)) statusCounts[t.status]++;
+      if (priorityCounts.hasOwnProperty(t.priority)) priorityCounts[t.priority]++;
+
+      if (modMap[t.module_id]) {
+        modMap[t.module_id].total++;
+        modMap[t.module_id].sumProgress += (Number(t.progress) || 0);
+        if (t.status !== 'Mastered' && t.status !== 'Practiced') {
+          modMap[t.module_id].gaps++;
+        }
+      }
+    });
+
+    const progressByModule = Object.values(modMap).map(m => ({
+      module_id: m.module_id,
+      name_en: m.name_en,
+      name_ar: m.name_ar,
+      progress: m.total ? Math.round(m.sumProgress / m.total) : 0,
+      total: m.total
+    }));
+
+    const gapsByModule = Object.values(modMap).map(m => ({
+      module_id: m.module_id,
+      name_en: m.name_en,
+      name_ar: m.name_ar,
+      gaps: m.gaps
+    }));
+
+    const sortedMods = progressByModule.filter(m => m.total > 0).sort((a, b) => b.progress - a.progress);
+    const now = new Date();
+    const timeline = topics.filter(t => t.completed_at)
+      .map(t => ({ topic: t.topic, module_id: t.module_id, completed_at: t.completed_at }))
+      .sort((a, b) => new Date(a.completed_at) - new Date(b.completed_at));
+
+    const countsByDate = {};
+    topics.forEach(t => {
+      if (t.updated_at) {
+        const d = String(t.updated_at).substring(0, 10);
+        countsByDate[d] = (countsByDate[d] || 0) + 1;
+      }
+    });
+
+    const weeklyActivity = [];
+    const today = new Date();
+    for (let i = 363; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().substring(0, 10);
+      weeklyActivity.push({ date: key, count: countsByDate[key] || 0 });
     }
 
+    const months = {};
+    topics.forEach(t => {
+      if (t.completed_at) {
+        const m = String(t.completed_at).substring(0, 7);
+        months[m] = (months[m] || 0) + 1;
+      }
+    });
+    const monthlyProgress = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      const label = d.toLocaleString('en', { month: 'short' }) + ' ' + d.getFullYear();
+      monthlyProgress.push({ month: key, label: label, count: Math.round(months[key] || 0) });
+    }
+
+    return {
+      progress_by_module: progressByModule,
+      topics_by_status: statusCounts,
+      topics_by_priority: priorityCounts,
+      knowledge_gaps_by_module: gapsByModule,
+      mastered_total: statusCounts['Mastered'] || 0,
+      strongest_modules: sortedMods.slice(0, 3),
+      weakest_modules: sortedMods.slice(-3).reverse(),
+      topics_needing_review: topics.filter(t => t.next_review && new Date(t.next_review) <= now).length,
+      learning_over_time: timeline,
+      total_reviews: 0,
+      weekly_activity: weeklyActivity,
+      monthly_progress: monthlyProgress
+    };
+  }
+
+  async function render(container) {
+    const memoryData = API.cacheGet('analytics:') || deriveAnalyticsFromMemory();
+    if (memoryData) {
+      drawAnalytics(container, memoryData);
+    } else {
+      container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
+    }
+
+    try {
+      const freshData = await API.analytics();
+      if (computeHash(freshData) !== _lastHash) {
+        drawAnalytics(container, freshData);
+      }
+    } catch (err) {
+      if (!memoryData) container.innerHTML = UI.errorState(err);
+    }
+  }
+
+  function drawAnalytics(container, data) {
+    _lastHash = computeHash(data);
     const modName = (m) => I18n.getLang() === 'ar' ? (m.name_ar || m.name_en) : (m.name_en || m.name_ar);
     const isAr = I18n.getLang() === 'ar';
 

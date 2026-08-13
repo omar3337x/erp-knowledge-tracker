@@ -98,16 +98,21 @@ const Dashboard = (function () {
       <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px; margin-bottom:28px;">
 
         <!-- 🔥 Study Streak Widget -->
-        <div class="card streak-widget-card" id="streak-widget-container">
-          <div class="streak-header">
-            <h3 style="font-size:16px; font-weight:700; margin:0; display:flex; align-items:center; gap:6px;">
-              🔥 ${I18n.t('dashboard.studyStreak')}
-            </h3>
-            <span class="badge" style="background:var(--rust-soft); color:var(--rust); font-weight:700;" id="streak-badge-current">0d</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:13px;">
-            <span>${I18n.t('dashboard.currentStreak')}: <strong id="streak-val-current" class="mono">0</strong></span>
-            <span>🏆 ${I18n.t('dashboard.longestStreak')}: <strong id="streak-val-longest" class="mono">0</strong></span>
+        <div class="card streak-widget-card" id="streak-widget-container" style="padding:18px; display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div class="streak-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h3 style="font-size:16px; font-weight:700; margin:0; display:flex; align-items:center; gap:6px;">
+                🔥 ${I18n.t('dashboard.studyStreak')}
+              </h3>
+              <span class="badge" style="background:var(--rust-soft); color:var(--rust); font-weight:700;" id="streak-badge-current">0d</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:13px;">
+              <span>${I18n.t('dashboard.currentStreak')}: <strong id="streak-val-current" class="mono">0</strong></span>
+              <span>🏆 ${I18n.t('dashboard.longestStreak')}: <strong id="streak-val-longest" class="mono">0</strong></span>
+            </div>
+            <p style="font-size:12px; color:var(--ink-soft); margin:0 0 12px; line-height:1.4;">
+              ${isAr ? 'تُسجل أيام التعلّم اليومية تلقائياً بمجرد إضافة، مراجعة، أو تحديث أي موضوع!' : 'Tracks your active learning days automatically when adding or reviewing topics!'}
+            </p>
           </div>
           <div class="streak-7days" id="streak-7days-circles">
             ${Array(7).fill(0).map((_, i) => `<div class="streak-day-circle">—</div>`).join('')}

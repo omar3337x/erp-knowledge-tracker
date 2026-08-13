@@ -923,3 +923,48 @@ tbody tr:has(.topic-select-cb:checked) {
 .gauge-bar-fill {
   transition: width 0.7s cubic-bezier(.4,0,.2,1);
 }
+
+/* --------------------------------------------------------------------------- */
+/* 🔥 STREAK WIDGET STYLES                                                      */
+/* --------------------------------------------------------------------------- */
+.streak-widget-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.streak-7days {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  margin-top: 10px;
+}
+
+.streak-day-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.streak-day-circle.active {
+  border: 2px solid var(--rust);
+  background: var(--rust-soft);
+  color: var(--rust);
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(181, 119, 46, 0.25);
+}

@@ -452,7 +452,7 @@ const API = (function () {
 
     // Dashboard / analytics
     dashboard : (opts) => call('dashboard', {}, opts),
-    analytics : (opts) => call('analytics', {}, Object.assign({ priority: 'LOW' }, opts || {})),
+    analytics : (opts) => call('analytics', {}, opts),
 
     // Streaks
     getStreak : () => call('getStreak', {}),
