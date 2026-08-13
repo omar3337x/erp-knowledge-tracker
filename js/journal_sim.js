@@ -1,6 +1,6 @@
 /**
  * js/journal_sim.js
- * 📑 AI Journal Entry Generator — Natural Language Business Event Analyzer + Static Fallback.
+ * 📑 AI Journal Entry Generator — Natural Language Business Event Analyzer + Page Template Integration.
  */
 
 const JournalSim = (function () {
@@ -10,8 +10,7 @@ const JournalSim = (function () {
       id: 'tx-1', title_ar: '📦 1. استلام شحنة مشتريات (Goods Receipt Note - GRN)', title_en: '1. Goods Receipt Note (GRN)',
       amount: 10000, debit_account_ar: 'حـ/ المخزون (Inventory Asset Account)', debit_account_en: 'Inventory Asset Account',
       credit_account_ar: 'حـ/ المشتريات المعلقة (GR/IR Interim Accrual)', credit_account_en: 'GR/IR Interim Accrual Account',
-      bs_asset_change: 10000, bs_liability_change: 10000, bs_equity_change: 0, pnl_revenue_change: 0, pnl_expense_change: 0,
-      explanation_ar: 'إثبات استلام البضاعة بالمخزن: زيادة الأصول (المخزون) بـ 10,000 مقابل تسليج التزام مؤقت (GR/IR) حتى وصول فاتورة المورد.',
+      explanation_ar: 'إثبات استلام البضاعة بالمخزن: زيادة الأصول (المخزون) بـ 10,000 مقابل تسجيل التزام مؤقت (GR/IR) حتى وصول فاتورة المورد.',
       explanation_en: 'Increases Inventory Asset by 10,000 while establishing a temporary GR/IR liability until invoice verification.'
     }
   ];
@@ -83,21 +82,32 @@ const JournalSim = (function () {
       aiBtn.addEventListener('click', async () => {
         const text = promptInput.value.trim();
         const modId = modSelect ? modSelect.value : 'MOD-1';
-        const isAr = I18n.getLang() === 'ar';
 
         box.innerHTML = UI.skeleton('cards');
 
         const res = await AIService.ask('journal_sim', text || 'Purchase goods on credit', { moduleId: modId });
 
-        if (res.success && res.text) {
-          box.innerHTML = `
-            <div class="card" style="border-inline-start:4px solid var(--brass);">
-              <h3 style="margin-bottom:12px;">📑 ${isAr ? 'تحليل القيد والتأثير المالي المحاسبي بالـ AI' : 'AI Journal Entry & Impact Analysis'}</h3>
-              <div style="font-size:13.5px; line-height:1.6; color:var(--ink);">
-                ${AIService.formatMarkdown(res.text)}
-              </div>
-            </div>
-          `;
+        if (res.success) {
+          let parsedData = res.parsed || {};
+          let debitAcc = 'حـ/ المخزون / الأصول الثابتة (Inventory / Fixed Assets Account)';
+          let creditAcc = 'حـ/ الموردين / المشتريات المعلقة (Accounts Payable / GR/IR)';
+          let amt = 10000;
+
+          // Attempt extracting accounts from parsed entries
+          if (parsedData.entries && Array.isArray(parsedData.entries) && parsedData.entries.length >= 2) {
+            debitAcc = parsedData.entries[0].account || parsedData.entries[0].account_name || debitAcc;
+            creditAcc = parsedData.entries[1].account || parsedData.entries[1].account_name || creditAcc;
+            amt = parsedData.entries[0].debit || parsedData.entries[0].amount || amt;
+          }
+
+          box.innerHTML = renderSimulation({
+            title: text || 'قيد محاسبي متولد بالـ AI',
+            amount: amt,
+            debit_account: debitAcc,
+            credit_account: creditAcc,
+            explanation: parsedData.message || parsedData.title || text,
+            rawAiText: res.text
+          });
         } else {
           box.innerHTML = renderSimulation(select ? select.value : TRANSACTIONS[0].id);
         }
@@ -105,16 +115,30 @@ const JournalSim = (function () {
     }
   }
 
-  function renderSimulation(txId) {
+  function renderSimulation(txData) {
     const isAr = I18n.getLang() === 'ar';
-    const tx = TRANSACTIONS.find(t => t.id === txId) || TRANSACTIONS[0];
+    let tx = null;
 
-    return `
+    if (typeof txData === 'string') {
+      tx = TRANSACTIONS.find(t => t.id === txData) || TRANSACTIONS[0];
+    } else if (typeof txData === 'object' && txData !== null) {
+      tx = txData;
+    } else {
+      tx = TRANSACTIONS[0];
+    }
+
+    const title = tx.title || (isAr ? tx.title_ar : tx.title_en) || 'القيد المحاسبي';
+    const amount = (typeof tx.amount === 'number') ? tx.amount : 10000;
+    const debitAccount = tx.debit_account || (isAr ? tx.debit_account_ar : tx.debit_account_en) || 'حـ/ الحساب المدين';
+    const creditAccount = tx.credit_account || (isAr ? tx.credit_account_ar : tx.credit_account_en) || 'حـ/ الحساب الدائن';
+    const explanation = tx.explanation || (isAr ? tx.explanation_ar : tx.explanation_en) || '';
+
+    let html = `
       <div class="card" style="margin-bottom:20px; border-inline-start:4px solid var(--brass);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-          <h3 style="font-size:15px; margin:0;">${isAr ? 'القيد المحاسبي المتولد تلقائياً (Journal Entry)' : 'Generated Double-Entry Journal'}</h3>
+          <h3 style="font-size:15px; margin:0;">📑 ${Topics.escapeHtml(title)}</h3>
           <span class="badge badge-priority-high" style="font-family:var(--font-mono); font-size:13px;">
-            ${tx.amount.toLocaleString()} EGP / USD
+            ${amount.toLocaleString()} EGP / USD
           </span>
         </div>
 
@@ -131,25 +155,38 @@ const JournalSim = (function () {
             <tbody>
               <tr>
                 <td><span class="badge badge-status-mastered" style="font-size:11px;">${isAr ? 'مدين (Dr)' : 'Debit (Dr)'}</span></td>
-                <td><strong>${isAr ? tx.debit_account_ar : tx.debit_account_en}</strong></td>
-                <td style="text-align:end; font-family:var(--font-mono); font-weight:700; color:var(--teal);">${tx.amount.toLocaleString()}</td>
+                <td><strong>${Topics.escapeHtml(debitAccount)}</strong></td>
+                <td style="text-align:end; font-family:var(--font-mono); font-weight:700; color:var(--teal);">${amount.toLocaleString()}</td>
                 <td style="text-align:end; font-family:var(--font-mono); color:var(--ink-soft);">0</td>
               </tr>
               <tr>
                 <td><span class="badge badge-status-learning" style="font-size:11px;">${isAr ? 'دائن (Cr)' : 'Credit (Cr)'}</span></td>
-                <td><strong>${isAr ? tx.credit_account_ar : tx.credit_account_en}</strong></td>
+                <td><strong>${Topics.escapeHtml(creditAccount)}</strong></td>
                 <td style="text-align:end; font-family:var(--font-mono); color:var(--ink-soft);">0</td>
-                <td style="text-align:end; font-family:var(--font-mono); font-weight:700; color:var(--brass-deep);">${tx.amount.toLocaleString()}</td>
+                <td style="text-align:end; font-family:var(--font-mono); font-weight:700; color:var(--brass-deep);">${amount.toLocaleString()}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <p style="margin:0; font-size:13px; color:var(--ink-soft); line-height:1.5;">
-          💡 <strong>${isAr ? 'التوضيح المحاسبي:' : 'Accounting Explanation:'}</strong> ${isAr ? tx.explanation_ar : tx.explanation_en}
-        </p>
+        ${explanation ? `
+          <p style="margin:0; font-size:13px; color:var(--ink-soft); line-height:1.5;">
+            💡 <strong>${isAr ? 'التوضيح المحاسبي والدورة الإجرائية:' : 'Accounting Explanation:'}</strong> ${explanation}
+          </p>
+        ` : ''}
       </div>
     `;
+
+    // Render detailed steps/workflow cards if present
+    if (tx.rawAiText) {
+      html += `
+        <div style="margin-top:16px;">
+          ${AIService.formatMarkdown(tx.rawAiText)}
+        </div>
+      `;
+    }
+
+    return html;
   }
 
   return { render };
