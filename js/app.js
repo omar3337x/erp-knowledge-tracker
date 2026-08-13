@@ -414,20 +414,26 @@ const App = (function () {
   }
 
   // Loads everything needed after a successful login/session restore, then
-  // shows the app shell and renders the current route.
+  // shows the app shell and renders the current route instantly (0ms).
   async function boot() {
     Auth.showApp();
     if (State.currentUser && State.currentUser.language && State.currentUser.language !== I18n.getLang()) {
       I18n.setLang(State.currentUser.language);
     }
-    // Always ensure reference data is loaded (uses LS + memory cache — fast).
-    try { await loadReferenceData(); } catch (err) { UI.toastError(err); }
+    
+    // Build sidebar & UI controls instantly with available/default modules
     buildSidebarModules();
     if (State.currentUser && State.currentUser.role === 'Admin') {
       document.getElementById('nav-admin').classList.remove('hidden');
     }
+
     const h = Router.decodeHash();
     Router.render(h.route, h.params);
+
+    // Ensure full reference data is loaded in background if not already cached
+    loadReferenceData().then(() => {
+      buildSidebarModules();
+    }).catch(() => {});
   }
 
   async function init() {
