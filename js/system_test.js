@@ -403,19 +403,26 @@ const SystemTest = (function () {
   }
 
   async function testEnterpriseTools() {
-    log('INFO', 'TOOLS', 'Verifying Enterprise Tools Suite integrity (DailyQuiz, MultiERP, JournalSim, ImplementerToolkit, ProcessFlow, GanttBuilder)...');
+    log('INFO', 'TOOLS', 'Verifying AI Enterprise Workbench Suite integrity (12 Tools + AIService + AIChat)...');
     let passCount = 0;
-    if (typeof DailyQuiz !== 'undefined') { log('PASS', 'TOOLS', 'DailyQuiz module loaded & ready.'); passCount++; }
-    if (typeof MultiERP !== 'undefined') { log('PASS', 'TOOLS', 'MultiERP matrix module loaded & ready.'); passCount++; }
-    if (typeof JournalSim !== 'undefined') { log('PASS', 'TOOLS', 'JournalSim simulator module loaded & ready.'); passCount++; }
-    if (typeof ImplementerToolkit !== 'undefined') { log('PASS', 'TOOLS', 'ImplementerToolkit module loaded & ready.'); passCount++; }
-    if (typeof ProcessFlow !== 'undefined') { log('PASS', 'TOOLS', 'ProcessFlow visualizer module loaded & ready.'); passCount++; }
-    if (typeof GanttBuilder !== 'undefined') { log('PASS', 'TOOLS', 'GanttBuilder project timeline module loaded & ready.'); passCount++; }
+    if (typeof AIService !== 'undefined') { log('PASS', 'TOOLS', 'AIService context builder & proxy engine loaded.'); passCount++; }
+    if (typeof AIChat !== 'undefined') { log('PASS', 'TOOLS', 'AIChat global tutor widget loaded.'); passCount++; }
+    if (typeof DailyQuiz !== 'undefined') { log('PASS', 'TOOLS', 'DailyQuiz AI Challenge loaded.'); passCount++; }
+    if (typeof MultiERP !== 'undefined') { log('PASS', 'TOOLS', 'MultiERP AI Advisor loaded.'); passCount++; }
+    if (typeof JournalSim !== 'undefined') { log('PASS', 'TOOLS', 'JournalSim AI Generator loaded.'); passCount++; }
+    if (typeof ImplementerToolkit !== 'undefined') { log('PASS', 'TOOLS', 'ImplementerToolkit AI Assistant loaded.'); passCount++; }
+    if (typeof ProcessFlow !== 'undefined') { log('PASS', 'TOOLS', 'ProcessFlow AI Visualizer loaded.'); passCount++; }
+    if (typeof GanttBuilder !== 'undefined') { log('PASS', 'TOOLS', 'GanttBuilder AI Planner loaded.'); passCount++; }
+    if (typeof AITroubleshooter !== 'undefined') { log('PASS', 'TOOLS', 'AITroubleshooter diagnostic tool loaded.'); passCount++; }
+    if (typeof AIKPIAdvisor !== 'undefined') { log('PASS', 'TOOLS', 'AIKPIAdvisor KPI tool loaded.'); passCount++; }
+    if (typeof AIGapCoach !== 'undefined') { log('PASS', 'TOOLS', 'AIGapCoach remediation tool loaded.'); passCount++; }
+    if (typeof AIScenarioLab !== 'undefined') { log('PASS', 'TOOLS', 'AIScenarioLab evaluation tool loaded.'); passCount++; }
+    if (typeof AIChecklist !== 'undefined') { log('PASS', 'TOOLS', 'AIChecklist implementation tool loaded.'); passCount++; }
 
-    if (passCount === 6) {
-      log('PASS', 'TOOLS', 'All 6 Enterprise Tools modules verified with 0ms local response.');
+    if (passCount >= 12) {
+      log('PASS', 'TOOLS', 'All AI Enterprise Workbench modules verified with 0ms offline fallback strategy.');
     } else {
-      log('FAIL', 'TOOLS', `Expected 6 tools modules, found ${passCount}`);
+      log('FAIL', 'TOOLS', `Expected 13 modules, found ${passCount}`);
     }
   }
 

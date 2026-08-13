@@ -259,6 +259,7 @@ function handleRequest(action, payload, token) {
       case 'testAIConnection':     return jsonResponse(withAuth(token, function(user){ return actionTestAIConnection(user); }));
       case 'getAISettings':        return jsonResponse(withAuth(token, function(user){ return actionGetAISettings(user); }));
       case 'updateAISettings':     return jsonResponse(withAuth(token, function(user){ return actionUpdateAISettings(user, payload); }));
+      case 'askAI':                return jsonResponse(withAuth(token, function(user){ return actionAskAI(user, payload); }));
       case 'getFavorites':         return jsonResponse(withAuth(token, function(user){ return actionGetFavorites(user); }));
       case 'addFavorite':          return jsonResponse(withAuth(token, function(user){ return actionAddFavorite(user, payload); }));
       case 'removeFavorite':       return jsonResponse(withAuth(token, function(user){ return actionRemoveFavorite(user, payload); }));
@@ -1850,6 +1851,57 @@ function actionTestAIConnection(user) {
   ];
   var raw = callAI(prompt);
   return successResponse({ status: 'ok', raw: raw }, 'AI connection successful.');
+}
+
+function actionAskAI(user, payload) {
+  try {
+    var tool = payload.tool || 'tutor';
+    var userPromptText = payload.prompt || '';
+    var context = payload.context || {};
+    var lang = user.language || payload.language || 'ar';
+    var isAr = lang === 'ar';
+
+    var systemMsg = isAr
+      ? 'أنت مستشار وحبير أنظمة ERP متخصص للغاية، دقيق، محترف وعملي. تجيب بتنسيق JSON نظيف ومنظم دون اختراع أرقام أو فوتشرات غير حقيقية.'
+      : 'You are an expert ERP Functional Consultant & Solution Architect. You provide concise, highly accurate, structured responses in JSON.';
+
+    var contextStr = 'User Language: ' + lang + '\n' +
+      'Module ID: ' + (context.module_id || 'N/A') + '\n' +
+      'Module Name: ' + (context.module_name || 'N/A') + '\n' +
+      'Category Name: ' + (context.category_name || 'N/A') + '\n' +
+      'Topic Name: ' + (context.topic_name || 'N/A') + '\n' +
+      'Knowledge Gaps: ' + (context.knowledge_gaps || 'None') + '\n' +
+      'Mastered Count: ' + (context.mastered_count || '0') + '\n' +
+      'User Level: ' + (context.user_level || 'Intermediate') + '\n\n';
+
+    var userMsg = contextStr + (userPromptText ? ('Request: ' + userPromptText) : ('Generate dynamic content for tool: ' + tool));
+
+    var messages = [
+      { role: 'system', content: systemMsg },
+      { role: 'user', content: userMsg }
+    ];
+
+    var rawRes = callAI(messages);
+    var cleanJson = rawRes.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+    var parsed = null;
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch (e) {
+      var match = cleanJson.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      if (match) {
+        try { parsed = JSON.parse(match[0]); } catch (ex) {}
+      }
+    }
+
+    return successResponse({
+      text: rawRes,
+      parsed: parsed,
+      tool: tool
+    }, 'AI generated successfully.');
+  } catch (err) {
+    return errorResponse('AI Generation failed: ' + err.message, 'AI_ERROR');
+  }
 }
 
 function actionGetAISettings(user) {

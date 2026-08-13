@@ -1,49 +1,30 @@
 /**
  * js/implementer_toolkit.js
- * Comprehensive ERP Implementer Toolkit across ALL 10 ERP Modules.
- * UAT Test Cases & Data Migration Readiness Checklists.
- * 0ms Instant local render with CSV export capabilities.
+ * 🛠️ AI Implementer Toolkit — AI ERP Implementation Assistant + Static Fallback.
  */
 
 const ImplementerToolkit = (function () {
 
   const UAT_TEST_CASES = [
-    { id: 'UAT-01', module_id: 'MOD-1', category: 'المخزون', scenario_ar: 'اختبار تقييم Automated FIFO وحظر السحب بالسالب', scenario_en: 'Automated FIFO Costing & Negative Stock Prohibition Test', expected_ar: 'المنع الفوري وحفظ التكلفة مع إشعار تحذير للمستودع', expected_en: 'System blocks transaction with warning message', status: 'Passed' },
-    { id: 'UAT-02', module_id: 'MOD-2', category: 'الحسابات', scenario_ar: 'اختبار توازن القيد الافتتاحي وفروق العملات غير المحققة', scenario_en: 'Opening Balance Journal Balancing & Unrealized FX Revaluation', expected_ar: 'قبول القيد المتوازن وتصنيف أرباح/خسائر العملة بقائمة الدخل', expected_en: 'Journal accepted with zero variance and proper FX classification', status: 'Passed' },
-    { id: 'UAT-03', module_id: 'MOD-3', category: 'المشتريات', scenario_ar: 'اختبار المطابقة الثلاثية 3-Way Matching وفاتورة المورد', scenario_en: '3-Way Matching Validation (PO vs GRN vs Vendor Invoice)', expected_ar: 'الرفض التلقائي للسداد عند وجود اختلاف بالسعر أو الكمية', expected_en: 'Automated hold on payment if price/qty variance exceeds tolerance', status: 'Passed' },
-    { id: 'UAT-04', module_id: 'MOD-4', category: 'المبيعات', scenario_ar: 'حظر أمر المبيعات عند تجاوز الحد الائتماني للعميل', scenario_en: 'Credit Limit Checking on Sales Order Confirmation', expected_ar: 'حظر التسليم وتحويل الأمر إلى موافقة المدير المالي', expected_en: 'Order locked and escalated for Financial Director approval', status: 'Passed' },
-    { id: 'UAT-05', module_id: 'MOD-5', category: 'الموارد البشرية', scenario_ar: 'احتساب مسير الرواتب الشهري وترحيل القيد للـ G/L', scenario_en: 'Monthly Payroll Run Computation & Automatic G/L Posting', expected_ar: 'خصم التأمينات والضرائب وتوزيع الصافي بحسابات البنك', expected_en: 'Accurate net salary calculation & G/L journal generation', status: 'Passed' },
-    { id: 'UAT-06', module_id: 'MOD-6', category: 'التصنيع', scenario_ar: 'انفجار قائمة المكونات (BOM Explosion) وصرف الخامات للمصنع', scenario_en: 'BOM Explosion & Production Work Order Raw Material Issue', expected_ar: 'خصم المواد الخام وإثبات الإنتاج التام بالتكلفة المعيارية', expected_en: 'Raw materials deducted and finished goods received at standard cost', status: 'Passed' },
-    { id: 'UAT-07', module_id: 'MOD-7', category: 'المشاريع', scenario_ar: 'تسجيل ساعات العمل (Timesheets) واحتساب ربحية المشروع', scenario_en: 'Timesheet Billing & Project Milestone Revenue Recognition', expected_ar: 'ربط التكاليف بالمراحل واحتساب نسبة الإنجاز والربحية', expected_en: 'Costs allocated to WBS with accurate POC revenue recognition', status: 'Passed' },
-    { id: 'UAT-08', module_id: 'MOD-8', category: 'الأصول والظروف', scenario_ar: 'تشغيل الإهلاك الشهري التلقائي واستبعاد أصل مكهّن', scenario_en: 'Automated Monthly Depreciation Run & Fixed Asset Disposal', expected_ar: 'خفض الرصيد الدفتري وتسجيل أرباح/خسائر الاستبعاد', expected_en: 'Depreciation posted & gain/loss recognized on disposal', status: 'Passed' },
-    { id: 'UAT-09', module_id: 'MOD-9', category: 'الجودة والخدمات', scenario_ar: 'فحص شحنة مشتريات وتحويل التالف لمخزن الحجر الصحي', scenario_en: 'Quality Inspection Sampling & Quarantine Warehouse Transfer', expected_ar: 'حظر الصرف وحجز الكميات الفاسدة لتسويتها مع المورد', expected_en: 'Defective items quarantined and blocked from sales allocation', status: 'Passed' },
-    { id: 'UAT-10', module_id: 'MOD-10', category: 'القانونية والامتثال', scenario_ar: 'فحص تعارض الصلاحيات (SoD Analysis) وتوليد التوقيع الرقمي', scenario_en: 'Segregation of Duties (SoD) Audit & Contract E-Signature', expected_ar: 'حظر الصلاحيات المتعارضة وأرشفة العقد برمز تشفير', expected_en: 'Conflicting roles blocked and contract archived with e-signature', status: 'Passed' }
+    { id: 'UAT-01', module_id: 'MOD-1', category: 'المخزون', scenario_ar: 'اختبار تقييم Automated FIFO وحظر السحب بالسالب', scenario_en: 'Automated FIFO Costing & Negative Stock Prohibition Test', expected_ar: 'المنع الفوري وحفظ التكلفة مع إشعار تحذير للمستودع', expected_en: 'System blocks transaction with warning message', status: 'Passed' }
   ];
 
   const MIGRATION_CHECKLIST = [
-    { id: 'MIG-01', step_ar: 'MOD-1: تجهيز كروت الأصناف، فئات التقييم، وتوزيع المستودعات (Item Master)', step_en: 'MOD-1: Item Master Data, Valuation Classes & Warehouses', required: true },
-    { id: 'MIG-02', step_ar: 'MOD-2: مراجعة دليل الحسابات المستهدف وميزان المراجعة الافتتاحي (COA & Trial Balance)', step_en: 'MOD-2: Target Chart of Accounts & Opening Trial Balance', required: true },
-    { id: 'MIG-03', step_ar: 'MOD-3: تجهيز قائمة الموردين والأرصدة المفتوحة المتبقية (Open Vendor POs & Balances)', step_en: 'MOD-3: Vendor Master, Tax IDs & Open Purchase Orders', required: true },
-    { id: 'MIG-04', step_ar: 'MOD-4: تجهيز قائمة العملاء والحدود الائتمانية والأسعار (Customer Master & Limits)', step_en: 'MOD-4: Customer Master, Pricelists & Credit Limits', required: true },
-    { id: 'MIG-05', step_ar: 'MOD-5: البيانات الأساسية للموظفين، عقود العمل، والهياكل الراتبية (HR & Contracts)', step_en: 'MOD-5: Employee Records, Contracts & Salary Structures', required: true },
-    { id: 'MIG-06', step_ar: 'MOD-6: قائمة المكونات (BOM) ومحطات العمل للتصنيع (BOMs & Workcenters)', step_en: 'MOD-6: Bills of Materials (BOM) & Work Center Routings', required: true },
-    { id: 'MIG-07', step_ar: 'MOD-7: هيكل تفتيت أعمال المشاريع المفتوحة (Open Projects & WBS Structures)', step_en: 'MOD-7: Active Projects WBS & Opening Invoiced Amounts', required: true },
-    { id: 'MIG-08', step_ar: 'MOD-8: سجل الأصول الثابتة وقيم الإهلاك التاريخي (Fixed Assets Register)', step_en: 'MOD-8: Fixed Assets Register & Accumulated Depreciation', required: true },
-    { id: 'MIG-09', step_ar: 'MOD-9: نقاط ومواصفات فحص الجودة وتذاكر الدعم المفتوحة (Quality Inspection Specs)', step_en: 'MOD-9: Quality Inspection Standards & Open Support Cases', required: true },
-    { id: 'MIG-10', step_ar: 'MOD-10: عقود الشركة، التراخيص، ومصفوفة الصلاحيات (Legal Contracts & SoD Matrix)', step_en: 'MOD-10: Legal Contracts, Licensing & SoD Security Matrix', required: true }
+    { id: 'MIG-01', step_ar: 'MOD-1: تجهيز كروت الأصناف، فئات التقييم، وتوزيع المستودعات (Item Master)', step_en: 'MOD-1: Item Master Data, Valuation Classes & Warehouses', required: true }
   ];
 
   function render(container) {
     const isAr = I18n.getLang() === 'ar';
+    const modules = State.modulesCache || (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
 
     container.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
         <div>
           <h2 style="margin:0; display:flex; align-items:center; gap:8px;">
-            🛠️ ${isAr ? 'حزمة أدوات استشاري ومطبق الـ ERP (شاملة الـ 10 موديولات)' : 'ERP Implementer Toolkit (All 10 Modules)'}
+            🛠️ ${isAr ? 'مساعد واستشاري تنفيذ مشاريع الـ ERP بالـ AI' : 'AI ERP Implementation Assistant'}
           </h2>
           <small style="color:var(--ink-soft);">
-            ${isAr ? 'قوالب سيناريوهات اختبارات القبول (UAT) وقوائم نقل وتجهيز البيانات (Data Migration)' : 'User Acceptance Testing (UAT) templates & Data Migration checklists'}
+            ${isAr ? 'توليد سيناريوهات UAT، خطة نقل البيانات، مصفوفة الصلاحيات، وسجل المخاطر بالـ AI' : 'AI-generated UAT scenarios, Data Migration plans, Risk Registers & Role matrices'}
           </small>
         </div>
 
@@ -54,7 +35,28 @@ const ImplementerToolkit = (function () {
         </div>
       </div>
 
-      <!-- Section Tabs -->
+      <!-- Scope Form Card -->
+      <div class="card" style="margin-bottom:20px; border-inline-start:4px solid var(--brass);">
+        <div style="display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:200px;">
+            <label class="field-label" style="font-size:12px; font-weight:700;">${isAr ? 'الموديول المستهدف' : 'Target Module'}</label>
+            <select id="toolkit-mod-select" class="field" style="margin:0;">
+              ${modules.map(m => `<option value="${m.id}">${I18n.getLang() === 'ar' ? m.name_ar : m.name_en} (${m.id})</option>`).join('')}
+            </select>
+          </div>
+
+          <div style="flex:2; min-width:260px;">
+            <label class="field-label" style="font-size:12px; font-weight:700;">${isAr ? 'نوع الشركة والنطاق (Scope)' : 'Company Type & Project Scope'}</label>
+            <input type="text" id="toolkit-scope-input" class="field" placeholder="${isAr ? 'مثال: شركة تصنيع وتجزئة بـ 50 مستخدم في مصر والدول العربية...' : 'e.g. Manufacturing & Retail company with 50 users...'}" style="margin:0;">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="toolkit-ai-gen-btn" style="width:100%;">
+          🧠 ${isAr ? 'توليد خطة التنفيذ واختبارات القبول بالـ AI' : 'Generate AI Implementation Plan'}
+        </button>
+      </div>
+
+      <!-- Tabs -->
       <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid var(--line); padding-bottom:10px;">
         <button class="btn btn-ghost active-tab-btn" id="tab-uat-btn">🧪 ${isAr ? 'اختبارات القبول (UAT Cases)' : 'UAT Test Cases'}</button>
         <button class="btn btn-ghost" id="tab-mig-btn">📦 ${isAr ? 'قائمة تجهيز البيانات (Data Migration)' : 'Migration Checklist'}</button>
@@ -123,6 +125,9 @@ const ImplementerToolkit = (function () {
   }
 
   function bindEvents(container) {
+    const aiBtn = container.querySelector('#toolkit-ai-gen-btn');
+    const modSelect = container.querySelector('#toolkit-mod-select');
+    const scopeInput = container.querySelector('#toolkit-scope-input');
     const exportBtn = container.querySelector('#toolkit-export-csv-btn');
     const uatTabBtn = container.querySelector('#tab-uat-btn');
     const migTabBtn = container.querySelector('#tab-mig-btn');
@@ -142,10 +147,33 @@ const ImplementerToolkit = (function () {
       });
     }
 
-    if (exportBtn) {
-      exportBtn.addEventListener('click', () => {
-        exportUATCSV();
+    if (aiBtn && scopeInput && tabContent) {
+      aiBtn.addEventListener('click', async () => {
+        const text = scopeInput.value.trim();
+        const modId = modSelect ? modSelect.value : 'MOD-1';
+        const isAr = I18n.getLang() === 'ar';
+
+        tabContent.innerHTML = UI.skeleton('cards');
+
+        const res = await AIService.ask('implementer', text || 'Full implementation blueprint & UAT cases', { moduleId: modId });
+
+        if (res.success && res.text) {
+          tabContent.innerHTML = `
+            <div class="card" style="border-inline-start:4px solid var(--brass);">
+              <h3 style="margin-bottom:12px;">🛠️ ${isAr ? 'خطة التنفيذ وسيناريوهات UAT المتخصصة بالـ AI' : 'AI ERP Implementation Plan & UAT'}</h3>
+              <div style="font-size:13.5px; line-height:1.6; color:var(--ink);">
+                ${AIService.formatMarkdown(res.text)}
+              </div>
+            </div>
+          `;
+        } else {
+          tabContent.innerHTML = renderUATSection();
+        }
       });
+    }
+
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => exportUATCSV());
     }
   }
 
