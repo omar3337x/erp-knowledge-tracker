@@ -190,10 +190,11 @@ const API = (function () {
       activeControllers.set(options.route, controller);
     }
 
-    // Ensure action query parameter is attached to URL so Google Apps Script 302 redirect (macros/echo -> doGet)
-    // preserves e.parameter.action even if the browser converts redirected POST to GET.
+    // Ensure action and token query parameters are attached to URL so Google Apps Script 302 redirect (macros/echo -> doGet)
+    // preserves e.parameter.action and e.parameter.token even if the browser converts redirected POST to GET.
     const urlParams = new URLSearchParams();
     if (action) urlParams.append('action', action);
+    if (token) urlParams.append('token', token);
     const fetchUrl = urlParams.toString() ? `${CONFIG.API_URL}?${urlParams.toString()}` : CONFIG.API_URL;
 
     const fetchOpts = {

@@ -80,11 +80,11 @@ const AIService = (function () {
         language: I18n.getLang()
       });
 
-      if (res && res.success && res.data) {
+      if (res && (res.text || res.parsed)) {
         return {
           success: true,
-          text: res.data.text || '',
-          parsed: res.data.parsed || null,
+          text: res.text || '',
+          parsed: res.parsed || null,
           tool: tool
         };
       }
