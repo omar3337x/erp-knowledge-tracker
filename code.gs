@@ -62,7 +62,7 @@ var SCHEMA_VERSION_TARGET = '4';
 // actions run without locking so parallel requests from the same page
 // execute concurrently instead of queuing behind each other.
 var WRITE_ACTIONS = {
-  signup: 1, login: 1, logout: 1,
+  signup: 1,
   updateProfile: 1, changePassword: 1,
   createTopic: 1, updateTopic: 1, deleteTopic: 1, updateStatus: 1, updateProgress: 1,
   saveKnowledge: 1,

@@ -1,22 +1,51 @@
 /**
  * js/dashboard.js
- * Renders the main Dashboard: KPI row, Pinned Items Widget (📌), Learning Goals (🎯), Module Cards, Review Summary.
+ * Renders the main Dashboard with Stale-While-Revalidate instant load (0ms).
+ * Features: KPI row, Pinned Items Widget (📌), Learning Goals (🎯), Module Cards, Review Summary.
  */
 
 const Dashboard = (function () {
 
   let _prefetchDone = false;
+  const DASHBOARD_LS_KEY = 'erp_dashboard_cache_v1';
+
+  function getCachedDashboard() {
+    try {
+      const raw = localStorage.getItem(DASHBOARD_LS_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function saveCachedDashboard(data) {
+    try {
+      if (data) localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(data));
+    } catch (e) {}
+  }
 
   async function render(container) {
-    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
-    let data;
-    try {
-      data = await API.dashboard();
-    } catch (err) {
-      container.innerHTML = UI.errorState(err);
-      return;
+    const cachedData = getCachedDashboard();
+
+    // ── 0ms Instant Render using cached dashboard if available ─────────
+    if (cachedData && cachedData.kpis) {
+      drawDashboard(container, cachedData);
+    } else {
+      container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
     }
 
+    // ── Network fetch in background / parallel ────────────────────────
+    try {
+      const freshData = await API.dashboard();
+      saveCachedDashboard(freshData);
+      // Re-render only if data wasn't rendered yet or changed
+      drawDashboard(container, freshData);
+    } catch (err) {
+      if (!cachedData) {
+        container.innerHTML = UI.errorState(err);
+      }
+    }
+  }
+
+  function drawDashboard(container, data) {
     const k = data.kpis;
     const isAr = I18n.getLang() === 'ar';
 
@@ -25,6 +54,7 @@ const Dashboard = (function () {
 
     const pinnedTopics = allTopics.filter(t => t.pinned === true || t.pinned === 'TRUE' || t.pinned === 'true' || t.pinned === 1);
     const goalsTopics  = allTopics.filter(t => t.target_date && t.status !== 'Mastered');
+
     // Seed the in-memory API cache so subsequent pages (module, gaps, review) get topics instantly
     if (allTopics.length) API._dashboardTopics = allTopics;
 
@@ -41,7 +71,7 @@ const Dashboard = (function () {
         ${kpiCard(I18n.t('dashboard.toReview'), k.topics_to_review, 'rust')}
       </div>
 
-      ${data.review_summary.due_today + data.review_summary.overdue > 0 ? `
+      ${data.review_summary && (data.review_summary.due_today + data.review_summary.overdue > 0) ? `
       <div class="card" style="margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
         <div>${I18n.t('dashboard.overdueAndDue', { overdue: data.review_summary.overdue, due: data.review_summary.due_today })}</div>
         <button class="btn btn-sm btn-primary" data-route="review">${I18n.t('dashboard.goToReview')}</button>
@@ -123,13 +153,11 @@ const Dashboard = (function () {
     if (!_prefetchDone) {
       _prefetchDone = true;
       setTimeout(() => {
-        // Pre-warm topics cache
         API.topics({}).catch(() => {});
-        // Pre-warm notes cache (fetches all notes so All Notes page renders instantly)
         setTimeout(() => {
           API.notes({ module_id: '', search: '' }).catch(() => {});
           API.reviews().catch(() => {});
-        }, 800);
+        }, 500);
       }, 200);
     }
   }
