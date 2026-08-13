@@ -190,11 +190,12 @@ const API = (function () {
       activeControllers.set(options.route, controller);
     }
 
-    // PERF: Always send clean POST request to CONFIG.API_URL with text/plain body.
-    // Query string parameters cause Google Apps Script edge CDN to issue 302 redirects to macros/echo
-    // with huge user_content_key parameters that fail with HTTP 404 (Not Found).
-    // Clean POST with text/plain body delivers action, payload, and token directly into doPost(e) with 0 errors.
-    const fetchUrl = CONFIG.API_URL;
+    // Ensure action query parameter is attached to URL so Google Apps Script 302 redirect (macros/echo -> doGet)
+    // preserves e.parameter.action even if the browser converts redirected POST to GET.
+    const urlParams = new URLSearchParams();
+    if (action) urlParams.append('action', action);
+    const fetchUrl = urlParams.toString() ? `${CONFIG.API_URL}?${urlParams.toString()}` : CONFIG.API_URL;
+
     const fetchOpts = {
       method: 'POST',
       signal: controller.signal,
