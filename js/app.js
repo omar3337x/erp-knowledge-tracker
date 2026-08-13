@@ -439,7 +439,7 @@ const App = (function () {
   }
 
   function bindStaticNav() {
-    document.querySelectorAll('#sidebar-nav > .nav-item').forEach(btn => {
+    document.querySelectorAll('#sidebar-nav .nav-item').forEach(btn => {
       btn.addEventListener('click', () => Router.go(btn.dataset.route));
     });
 
@@ -809,6 +809,7 @@ const KeyboardShortcuts = (function () {
     bindStaticNav();
     bindLanguageSwitch();
     KeyboardShortcuts.init();
+    Router.init();
     if (typeof AIChat !== 'undefined') AIChat.init();
 
     const restored = await Auth.tryRestoreSession();
