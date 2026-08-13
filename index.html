@@ -131,9 +131,11 @@
         <h1 class="topbar-title" id="page-title">Dashboard</h1>
       </div>
         <div class="topbar-actions">
-          <div class="search-box">
+          <div class="search-box" id="global-search-container">
             <span class="icon">&#128269;</span>
-            <input id="global-search" type="text" data-i18n-placeholder="nav.searchPlaceholder" placeholder="Search topics across all modules...">
+            <input id="global-search" type="text" data-i18n-placeholder="nav.searchPlaceholder" placeholder="Search topics across all modules..." autocomplete="off">
+            <button type="button" class="search-clear-btn" id="global-search-clear" title="Clear search">✕</button>
+            <div class="search-results-dropdown" id="global-search-dropdown"></div>
           </div>
           <div class="lang-switch">
             <button class="lang-btn" data-lang="en">EN</button>

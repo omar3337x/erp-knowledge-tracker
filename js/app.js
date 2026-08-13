@@ -487,17 +487,128 @@ const App = (function () {
       Topics.openAddModal(defaultModuleId, () => Router.reload());
     });
 
-    // PERF: Debounced Global Search (300ms)
-    const search = document.getElementById('global-search');
-    if (search) {
-      const debouncedSearch = UI.debounce((val) => {
-        if (val.trim()) Router.go('search', { q: val.trim() });
-      }, 300);
+    // Live Global Search with instant dropdown results & keyboard navigation
+    bindGlobalSearch();
+  }
 
-      search.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') debouncedSearch(search.value);
+  function bindGlobalSearch() {
+    const search = document.getElementById('global-search');
+    const dropdown = document.getElementById('global-search-dropdown');
+    const clearBtn = document.getElementById('global-search-clear');
+    if (!search || !dropdown) return;
+
+    async function doLiveSearch(q) {
+      q = (q || '').trim();
+      if (!q) {
+        dropdown.classList.remove('active');
+        dropdown.innerHTML = '';
+        return;
+      }
+
+      let topics = [];
+      try {
+        topics = await API.topics({ search: q });
+      } catch (e) {
+        topics = [];
+      }
+
+      if (!topics || !topics.length) {
+        dropdown.innerHTML = `
+          <div style="padding:12px 14px; font-size:12.5px; color:var(--ink-soft); text-align:center;">
+            ${I18n.getLang() === 'ar' ? 'لا توجد مواضيع مطابقة' : 'No matching topics found'}
+          </div>
+        `;
+        dropdown.classList.add('active');
+        return;
+      }
+
+      const isAr = I18n.getLang() === 'ar';
+      const topResults = topics.slice(0, 6);
+
+      dropdown.innerHTML = topResults.map((t, idx) => {
+        const mod = (State.modulesCache || []).find(m => m.id === t.module_id);
+        const modName = mod ? I18n.localizedName(mod) : (t.module_id || '');
+        const title = isAr ? (t.title_ar || t.title_en || '') : (t.title_en || t.title_ar || '');
+        return `
+          <div class="search-result-item" data-idx="${idx}" data-topic-id="${t.id}">
+            <div class="search-result-info">
+              <div class="search-result-title">${Topics.escapeHtml(title)}</div>
+              <div class="search-result-meta">${Topics.escapeHtml(modName)} • <span class="badge badge-status-${(t.status || 'not-started').toLowerCase().replace(/\s+/g, '-')}">${t.status || 'Not Started'}</span></div>
+            </div>
+            <span style="color:var(--brass); font-size:12px;">➔</span>
+          </div>
+        `;
+      }).join('') + `
+        <div class="search-dropdown-footer" id="search-view-all">
+          🔍 ${isAr ? `عرض جميع النتائج (${topics.length})` : `View all results (${topics.length})`}
+        </div>
+      `;
+
+      dropdown.classList.add('active');
+
+      dropdown.querySelectorAll('.search-result-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const tId = item.dataset.topicId;
+          const targetTopic = topics.find(t => t.id === tId);
+          dropdown.classList.remove('active');
+          if (targetTopic) Topics.openDetailModal(targetTopic);
+        });
+      });
+
+      const viewAllBtn = dropdown.querySelector('#search-view-all');
+      if (viewAllBtn) {
+        viewAllBtn.addEventListener('click', () => {
+          dropdown.classList.remove('active');
+          Router.go('search', { q });
+        });
+      }
+    }
+
+    const debouncedLiveSearch = UI.debounce((val) => doLiveSearch(val), 200);
+
+    search.addEventListener('input', () => {
+      debouncedLiveSearch(search.value);
+    });
+
+    search.addEventListener('focus', () => {
+      if (search.value.trim()) doLiveSearch(search.value);
+    });
+
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        dropdown.classList.remove('active');
+        if (search.value.trim()) Router.go('search', { q: search.value.trim() });
+      } else if (e.key === 'Escape') {
+        dropdown.classList.remove('active');
+      }
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        search.value = '';
+        dropdown.classList.remove('active');
+        dropdown.innerHTML = '';
+        search.focus();
       });
     }
+
+    // Close dropdown on click outside
+    document.addEventListener('click', (e) => {
+      const container = document.getElementById('global-search-container');
+      if (container && !container.contains(e.target)) {
+        dropdown.classList.remove('active');
+      }
+    });
+
+    // Global Shortcut: Ctrl+K to focus search
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        search.focus();
+        search.select();
+      }
+    });
   }
 
   /**

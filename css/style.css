@@ -108,6 +108,53 @@ button{ font-family:inherit; cursor:pointer; }
 
 .sidebar-footer{ padding:12px; border-top:1px solid rgba(255,255,255,.08); }
 
+/* ---------------------------------------------------------------------- */
+/* Custom Luxury Scrollbars (WebKit & Firefox)                             */
+/* ---------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 160, 190, 0.25);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brass);
+}
+
+/* Sidebar Specific Scrollbar (Sleek Dark Luxe) */
+.sidebar-nav::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+.sidebar-nav::-webkit-scrollbar-track,
+.sidebar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+}
+.sidebar-nav::-webkit-scrollbar-thumb,
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 99px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover,
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: var(--brass);
+}
+
+/* Firefox Scrollbar Rules */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 160, 190, 0.25) transparent;
+}
+.sidebar-nav, .sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(0, 0, 0, 0.15);
+}
+
 /* --- Main --------------------------------------------------------------- */
 .main{ margin-inline-start:var(--sidebar-w); flex:1; min-width:0; display:flex; flex-direction:column; }
 .topbar{
@@ -228,9 +275,126 @@ tbody tr:hover{ background:var(--line-soft); }
 /* ---------------------------------------------------------------------- */
 .toolbar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px; }
 .toolbar .field{ margin-bottom:0; min-width:150px; }
-.search-box{ position:relative; flex:1; min-width:200px; }
-.search-box input{ padding-inline-start:32px; }
-.search-box .icon{ position:absolute; inset-inline-start:10px; top:50%; transform:translateY(-50%); opacity:.5; }
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+  max-width: 480px;
+}
+.search-box input {
+  width: 100%;
+  padding: 8px 36px;
+  padding-inline-start: 36px;
+  padding-inline-end: 36px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  color: var(--ink);
+  font-size: 13px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+.search-box input:focus {
+  border-color: var(--brass);
+  background: var(--paper);
+  box-shadow: 0 0 0 3px rgba(199, 154, 46, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+  outline: none;
+}
+.search-box .icon {
+  position: absolute;
+  inset-inline-start: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--brass);
+  font-size: 14px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+.search-box .search-clear-btn {
+  position: absolute;
+  inset-inline-end: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 50%;
+  display: none;
+}
+.search-box .search-clear-btn:hover {
+  color: var(--rust);
+  background: var(--line-soft);
+}
+.search-box input:not(:placeholder-shown) ~ .search-clear-btn {
+  display: block;
+}
+
+/* Live Search Dropdown Popup */
+.search-results-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  inset-inline-start: 0;
+  inset-inline-end: 0;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  max-height: 380px;
+  overflow-y: auto;
+  display: none;
+  backdrop-filter: blur(8px);
+}
+.search-results-dropdown.active {
+  display: block;
+}
+.search-result-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  transition: background 0.15s ease;
+}
+.search-result-item:last-child {
+  border-bottom: none;
+}
+.search-result-item:hover,
+.search-result-item.selected {
+  background: var(--line-soft);
+}
+.search-result-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.search-result-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.search-result-meta {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.search-dropdown-footer {
+  padding: 8px 14px;
+  background: var(--line-soft);
+  font-size: 11.5px;
+  color: var(--brass);
+  text-align: center;
+  font-weight: 600;
+  cursor: pointer;
+}
 
 /* ---------------------------------------------------------------------- */
 /* Modal / toast / states                                                 */
