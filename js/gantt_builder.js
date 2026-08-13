@@ -1,14 +1,16 @@
 /**
  * js/gantt_builder.js
- * 📅 AI Gantt Project Plan Builder — AI ERP Implementation Planner + Static Fallback.
+ * 📅 AI Gantt Implementation Planner — Interactive Project Timeline Engine + Page Template Integration.
  */
 
 const GanttBuilder = (function () {
 
   const PROJECT_PHASES = [
-    { id: 'PH-1', phase_ar: '1️⃣ الاكتشاف وتحليل الفجوات (Discovery & Fit-Gap)', phase_en: 'Discovery & Fit-Gap Analysis', duration: 'W1 - W3 (3 Wks)', progress: 100, owner_ar: 'استشاري الحلول', owner_en: 'Solution Architect', status: 'Completed' },
-    { id: 'PH-2', phase_ar: '2️⃣ التصميم وإعداد المخطط (Solution Blueprint)', phase_en: 'Solution Design & Blueprint', duration: 'W4 - W7 (4 Wks)', progress: 100, owner_ar: 'استشاري الوظائف', owner_en: 'Functional Lead', status: 'Completed' },
-    { id: 'PH-3', phase_ar: '3️⃣ البناء والتهيئة البرمجية (Build & Configuration)', phase_en: 'Build, Config & Customization', duration: 'W8 - W14 (7 Wks)', progress: 75, owner_ar: 'فريق التطوير والتهيئة', owner_en: 'Dev & Config Team', status: 'In Progress' }
+    { id: 'W1-W2', phase_ar: '1. اكتشاف وتحليل النطاق (Discovery & Blueprinting)', phase_en: '1. Discovery & Blueprinting', duration: '2 Weeks', owner_ar: 'استشاري النظام + مدير المشروع', owner_en: 'Lead Consultant & PM', progress: 100, status: 'Completed' },
+    { id: 'W3-W5', phase_ar: '2. بناء ودورة إعداد النظام (System Configuration & Build)', phase_en: '2. System Configuration & Build', duration: '3 Weeks', owner_ar: 'فريق التطبيق المباشر', owner_en: 'Implementation Team', progress: 80, status: 'In Progress' },
+    { id: 'W6-W7', phase_ar: '3. تجهيز ونقل البيانات التاريخية (Data Migration)', phase_en: '3. Data Migration & Cleaning', duration: '2 Weeks', owner_ar: 'مدير المستودع + الحسابات', owner_en: 'Data Stewards', progress: 40, status: 'In Progress' },
+    { id: 'W8-W9', phase_ar: '4. اختبارات القبول والتدريب (UAT & End-user Training)', phase_en: '4. UAT & User Training', duration: '2 Weeks', owner_ar: 'المستخدمين النهائين (Key Users)', owner_en: 'Key Users & PM', progress: 0, status: 'Not Started' },
+    { id: 'W10', phase_ar: '5. التشغيل الفعلي والدعم المباشر (Go-Live & Hypercare)', phase_en: '5. Go-Live & Hypercare', duration: '1 Week', owner_ar: 'الفريق التنفيذي بالكامل', owner_en: 'All Stakeholders', progress: 0, status: 'Not Started' }
   ];
 
   function render(container) {
@@ -19,42 +21,37 @@ const GanttBuilder = (function () {
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
         <div>
           <h2 style="margin:0; display:flex; align-items:center; gap:8px;">
-            📅 ${isAr ? 'مخطط جانت وتخطيط المشاريع بالذكاء الاصطناعي' : 'AI ERP Implementation Gantt Planner'}
+            📅 ${isAr ? 'مخطط جانت وتخطيط المشاريع بالذكاء الاصطناعي' : 'AI ERP Gantt Timeline & Project Planner'}
           </h2>
           <small style="color:var(--ink-soft);">
-            ${isAr ? 'توليد الجدول الزمني والمراحل والمهام والمسار الحرج لمشاريع الـ ERP بالـ AI' : 'Generate WBS project timeline tasks, durations, dependencies & critical path with AI'}
+            ${isAr ? 'توليد الجدول الزمني والمراحل والمهام والمسار الحرج لمشاريع الـ ERP بالـ AI' : 'Generate complete implementation phases, task breakdown & critical path timelines'}
           </small>
         </div>
 
-        <div>
-          <button class="btn btn-primary" id="gantt-export-csv-btn">
-            📥 ${isAr ? 'تصدير الجدول لـ CSV' : 'Export Timeline (CSV)'}
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn btn-secondary" id="gantt-export-csv-btn">
+            📥 ${isAr ? 'تصدير الجدول لـ CSV' : 'Export CSV'}
+          </button>
+          <select id="gantt-mod-select" class="field" style="margin:0; padding:8px 12px; font-weight:600;">
+            ${modules.map(m => `<option value="${m.id}">${I18n.getLang() === 'ar' ? m.name_ar : m.name_en}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <!-- AI Prompt Input -->
+      <div class="card" style="margin-bottom:20px; border-inline-start:4px solid var(--brass);">
+        <label class="field-label" style="font-size:12px; font-weight:700; color:var(--ink-soft); display:block; margin-bottom:8px;">
+          ${isAr ? 'نطاق المشروع ودرجة التعقيد:' : 'Project Scope & Complexity Prompt:'}
+        </label>
+        <div style="display:flex; gap:10px;">
+          <input type="text" id="gantt-scope-input" class="field" placeholder="${isAr ? 'مثال: تطبيق موديول المخزون والمشتريات لشركة مقاولات متعددة الفروع خلال 90 يوم...' : 'e.g. Implement Inventory & Purchasing for multi-branch company in 90 days...'}" style="margin:0; flex:1;">
+          <button class="btn btn-primary" id="gantt-ai-gen-btn">
+            🧠 ${isAr ? 'توليد المخطط الزمني والمسار الحرج بالـ AI' : 'Generate Gantt Plan'}
           </button>
         </div>
       </div>
 
-      <!-- Scope Setup Card -->
-      <div class="card" style="margin-bottom:20px; border-inline-start:4px solid var(--brass);">
-        <div style="display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
-          <div style="flex:1; min-width:180px;">
-            <label class="field-label" style="font-size:12px; font-weight:700;">${isAr ? 'الموديول' : 'Module'}</label>
-            <select id="gantt-mod-select" class="field" style="margin:0;">
-              ${modules.map(m => `<option value="${m.id}">${I18n.getLang() === 'ar' ? m.name_ar : m.name_en}</option>`).join('')}
-            </select>
-          </div>
-
-          <div style="flex:2; min-width:260px;">
-            <label class="field-label" style="font-size:12px; font-weight:700;">${isAr ? 'نطاق المشروع ودرجة التعقيد' : 'Project Scope & Complexity'}</label>
-            <input type="text" id="gantt-scope-input" class="field" placeholder="${isAr ? 'مثال: تطبيق موديول المخزون والحسابات لـ 100 مستخدم مع ربط معملي و 3 مستودعات...' : 'e.g. 100 users, 3 warehouses, high customization...'}" style="margin:0;">
-          </div>
-        </div>
-
-        <button class="btn btn-primary" id="gantt-ai-gen-btn" style="width:100%;">
-          🧠 ${isAr ? 'توليد المخطط الزمني والمسار الحرج بالـ AI' : 'Generate AI Gantt Plan'}
-        </button>
-      </div>
-
-      <div id="gantt-table-container">
+      <div id="gantt-table-box">
         ${renderGanttTable()}
       </div>
     `;
@@ -64,10 +61,10 @@ const GanttBuilder = (function () {
 
   function bindEvents(container) {
     const aiBtn = container.querySelector('#gantt-ai-gen-btn');
-    const scopeInput = container.querySelector('#gantt-scope-input');
     const modSelect = container.querySelector('#gantt-mod-select');
+    const scopeInput = container.querySelector('#gantt-scope-input');
+    const tableBox = container.querySelector('#gantt-table-box');
     const exportBtn = container.querySelector('#gantt-export-csv-btn');
-    const tableBox = container.querySelector('#gantt-table-container');
 
     if (aiBtn && scopeInput && tableBox) {
       aiBtn.addEventListener('click', async () => {
@@ -79,15 +76,35 @@ const GanttBuilder = (function () {
 
         const res = await AIService.ask('gantt_builder', text || 'Full ERP implementation timeline & critical path', { moduleId: modId });
 
-        if (res.success && res.text) {
-          tableBox.innerHTML = `
-            <div class="card" style="border-inline-start:4px solid var(--brass);">
-              <h3 style="margin-bottom:12px;">📅 ${isAr ? 'خطة مخطط جانت والمسار الحرج بالـ AI' : 'AI Gantt Timeline & Critical Path'}</h3>
-              <div style="font-size:13.5px; line-height:1.6; color:var(--ink);">
-                ${AIService.formatMarkdown(res.text)}
+        if (res.success) {
+          let parsedData = res.parsed || {};
+          let customPhases = [];
+
+          if (parsedData.steps && Array.isArray(parsedData.steps)) {
+            customPhases = parsedData.steps.map((s, idx) => ({
+              id: s.duration || s.time || `Phase ${idx + 1}`,
+              phase_ar: s.name || s.step_name || s.title || `المرحلة ${idx + 1}`,
+              phase_en: s.name || s.title || `Phase ${idx + 1}`,
+              duration: s.duration || s.time || '1 Week',
+              owner_ar: s.owner || s.role || s.responsible || 'فريق التطبيق',
+              owner_en: s.owner || 'Implementation Team',
+              progress: Math.min(100, Math.max(0, 100 - (idx * 20))),
+              status: idx === 0 ? 'Completed' : (idx === 1 ? 'In Progress' : 'Not Started')
+            }));
+          }
+
+          if (customPhases.length > 0) {
+            tableBox.innerHTML = renderGanttTable(customPhases, res.text);
+          } else {
+            tableBox.innerHTML = `
+              <div class="card" style="border-inline-start:4px solid var(--brass);">
+                <h3 style="margin-bottom:12px;">📅 ${isAr ? 'خطة مخطط جانت والمسار الحرج بالـ AI' : 'AI Gantt Timeline & Critical Path'}</h3>
+                <div style="font-size:13.5px; line-height:1.6; color:var(--ink);">
+                  ${AIService.formatMarkdown(res.text)}
+                </div>
               </div>
-            </div>
-          `;
+            `;
+          }
         } else {
           tableBox.innerHTML = renderGanttTable();
         }
@@ -99,15 +116,17 @@ const GanttBuilder = (function () {
     }
   }
 
-  function renderGanttTable() {
+  function renderGanttTable(phasesList, rawText) {
     const isAr = I18n.getLang() === 'ar';
-    return `
+    const phases = (Array.isArray(phasesList) && phasesList.length) ? phasesList : PROJECT_PHASES;
+
+    let html = `
       <div class="card" style="padding:0; overflow:hidden; margin-bottom:20px;">
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Code</th>
+                <th>Code / Time</th>
                 <th>${isAr ? 'مرحلة المشروع (Phase)' : 'Project Phase'}</th>
                 <th>${isAr ? 'المدة الزمنية' : 'Duration'}</th>
                 <th>${isAr ? 'المسئول' : 'Owner'}</th>
@@ -116,23 +135,23 @@ const GanttBuilder = (function () {
               </tr>
             </thead>
             <tbody>
-              ${PROJECT_PHASES.map(p => `
+              ${phases.map(p => `
                 <tr>
-                  <td><strong style="font-family:var(--font-mono); font-size:12px;">${p.id}</strong></td>
-                  <td><strong>${isAr ? p.phase_ar : p.phase_en}</strong></td>
-                  <td><span class="badge badge-priority-medium" style="font-family:var(--font-mono);">${p.duration}</span></td>
-                  <td><small style="color:var(--ink-soft);">${isAr ? p.owner_ar : p.owner_en}</small></td>
+                  <td><strong style="font-family:var(--font-mono); font-size:12px;">${Topics.escapeHtml(p.id)}</strong></td>
+                  <td><strong>${Topics.escapeHtml(isAr ? (p.phase_ar || p.phase_en) : (p.phase_en || p.phase_ar))}</strong></td>
+                  <td><span class="badge badge-priority-medium" style="font-family:var(--font-mono);">${Topics.escapeHtml(p.duration)}</span></td>
+                  <td><small style="color:var(--ink-soft);">${Topics.escapeHtml(isAr ? (p.owner_ar || p.owner_en) : (p.owner_en || p.owner_ar))}</small></td>
                   <td>
                     <div style="display:flex; align-items:center; gap:10px;">
                       <div style="flex:1; height:8px; background:var(--line-soft); border-radius:99px; overflow:hidden;">
-                        <div style="width:${p.progress}%; height:100%; background:var(--brass); border-radius:99px;"></div>
+                        <div style="width:${p.progress || 0}%; height:100%; background:var(--brass); border-radius:99px;"></div>
                       </div>
-                      <span style="font-family:var(--font-mono); font-size:11.5px; font-weight:700; width:35px;">${p.progress}%</span>
+                      <span style="font-family:var(--font-mono); font-size:11.5px; font-weight:700; width:35px;">${p.progress || 0}%</span>
                     </div>
                   </td>
                   <td>
                     <span class="badge ${p.status === 'Completed' ? 'badge-status-mastered' : (p.status === 'In Progress' ? 'badge-status-learning' : 'badge-status-not-started')}">
-                      ${p.status}
+                      ${Topics.escapeHtml(p.status)}
                     </span>
                   </td>
                 </tr>
@@ -142,10 +161,16 @@ const GanttBuilder = (function () {
         </div>
       </div>
     `;
+
+    if (rawText && (!phasesList || !phasesList.length)) {
+      html += `<div style="margin-top:16px;">${AIService.formatMarkdown(rawText)}</div>`;
+    }
+
+    return html;
   }
 
   function exportGanttCSV() {
-    let csv = 'ID,Phase,Duration,Owner,Progress,Status\n';
+    let csv = 'Phase ID,Phase Name,Duration,Owner,Progress,Status\n';
     PROJECT_PHASES.forEach(p => {
       csv += `"${p.id}","${p.phase_en}","${p.duration}","${p.owner_en}","${p.progress}%","${p.status}"\n`;
     });
@@ -153,9 +178,9 @@ const GanttBuilder = (function () {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `ERP_Gantt_Timeline_${Date.now()}.csv`;
+    link.download = `ERP_Gantt_Plan_${Date.now()}.csv`;
     link.click();
-    UI.toast(I18n.getLang() === 'ar' ? 'تم تصدير الجدول الزمني بنجاح' : 'Gantt timeline CSV exported', 'success');
+    UI.toast(I18n.getLang() === 'ar' ? 'تم تصدير ملف جانت بنجاح' : 'Gantt CSV exported', 'success');
   }
 
   return { render };

@@ -1865,6 +1865,12 @@ function actionAskAI(user, payload) {
       ? 'أنت مستشار وخبير أنظمة ERP متخصص للغاية، دقيق، محترف وعملي. تقدم إجاباتك بتنسيق منظم احترافي بأقسام وعناوين واضحة وبطاقات مقارنة وأمثلة عملية وبنود محددة دون اختراع أرقام أو فوتشرات غير حقيقية.'
       : 'You are an expert ERP Functional Consultant & Solution Architect. Provide concise, highly accurate, beautifully structured responses with section headers, bullet points, and practical business scenarios.';
 
+    if (tool === 'journal_sim') {
+      systemMsg = isAr
+        ? 'أنت محاكي ومولد قيود محاسبية بالذكاء الاصطناعي لـ ERP. وظيفتك استخراج القيد المحاسبي المزدوج (Debit & Credit) للحركة المدخلة فورياً، وتحديد اسم حساب المدين والدائن والمبلغ والتأثير المالي على الميزانية العمومية دون كتابة مقالات غير متعلقة بالقيد.'
+        : 'You are an ERP Journal Entry Generator. Extract exact debit_account, credit_account, amount, and accounting impact explanation for the given business transaction.';
+    }
+
     var contextStr = 'User Language: ' + lang + '\n' +
       'Module ID: ' + (context.module_id || 'N/A') + '\n' +
       'Module Name: ' + (context.module_name || 'N/A') + '\n' +

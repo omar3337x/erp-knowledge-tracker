@@ -43,7 +43,7 @@ const JournalSim = (function () {
           ${isAr ? 'صف العملية التجارية باللغة الطبيعية (أو اختر من الجاهز):' : 'Describe Business Event in Natural Language:'}
         </label>
         <div style="display:flex; gap:10px; margin-bottom:12px;">
-          <input type="text" id="sim-prompt-input" class="field" placeholder="${isAr ? 'مثال: تم شراء مواد خام بـ 50 ألف مع ضريبة 14% وتم الاستلام بالمستودع ولم تُدفع الفاتورة بعد...' : 'e.g. Purchased raw materials for 50,000 with 14% VAT, received in warehouse, bill unpaid...'}" style="margin:0; flex:1;">
+          <input type="text" id="sim-prompt-input" class="field" placeholder="${isAr ? 'مثال: تم شراء لابتوب بـ 25 ألف مع ضريبة وتم الاستلام بالشركة...' : 'e.g. Purchased laptop for 25,000 with VAT...'}" style="margin:0; flex:1;">
           <button class="btn btn-primary" id="sim-ai-gen-btn">
             🧠 ${isAr ? 'توليد القيد بالـ AI' : 'Generate Entry'}
           </button>
@@ -82,6 +82,7 @@ const JournalSim = (function () {
       aiBtn.addEventListener('click', async () => {
         const text = promptInput.value.trim();
         const modId = modSelect ? modSelect.value : 'MOD-1';
+        const isAr = I18n.getLang() === 'ar';
 
         box.innerHTML = UI.skeleton('cards');
 
@@ -89,24 +90,65 @@ const JournalSim = (function () {
 
         if (res.success) {
           let parsedData = res.parsed || {};
-          let debitAcc = 'حـ/ المخزون / الأصول الثابتة (Inventory / Fixed Assets Account)';
-          let creditAcc = 'حـ/ الموردين / المشتريات المعلقة (Accounts Payable / GR/IR)';
-          let amt = 10000;
+          let debitAcc = '';
+          let creditAcc = '';
+          let amt = 25000;
+          let explanationText = '';
 
-          // Attempt extracting accounts from parsed entries
+          // Parse numeric amount from text prompt if present
+          const numMatch = (text || '').match(/\d+[\d,.]*/);
+          if (numMatch) {
+            const cleanNum = parseFloat(numMatch[0].replace(/,/g, ''));
+            if (!isNaN(cleanNum) && cleanNum > 0) amt = cleanNum;
+          }
+
+          // Check if AI parsed JSON has entries or fields
+          if (parsedData.debit_account) debitAcc = parsedData.debit_account;
+          if (parsedData.credit_account) creditAcc = parsedData.credit_account;
+          if (parsedData.amount) amt = parsedData.amount;
+          if (parsedData.explanation) explanationText = parsedData.explanation;
+
           if (parsedData.entries && Array.isArray(parsedData.entries) && parsedData.entries.length >= 2) {
             debitAcc = parsedData.entries[0].account || parsedData.entries[0].account_name || debitAcc;
             creditAcc = parsedData.entries[1].account || parsedData.entries[1].account_name || creditAcc;
-            amt = parsedData.entries[0].debit || parsedData.entries[0].amount || amt;
+          }
+
+          // Intelligent Accounting Accounts Inference if AI didn't return explicit accounts
+          const lowerText = (text || '').toLowerCase();
+          if (!debitAcc) {
+            if (lowerText.includes('لابتوب') || lowerText.includes('أصل') || lowerText.includes('سيارة') || lowerText.includes('مبنى') || lowerText.includes('كمبيوتر') || lowerText.includes('معدة')) {
+              debitAcc = isAr ? 'حـ/ الأصول الثابتة - أجهزة ومعدات (Fixed Assets Account)' : 'Fixed Assets Account';
+            } else if (lowerText.includes('مخزون') || lowerText.includes('بضاعة') || lowerText.includes('مواد خام')) {
+              debitAcc = isAr ? 'حـ/ المخزون (Inventory Asset Account)' : 'Inventory Asset Account';
+            } else if (lowerText.includes('راتب') || lowerText.includes('رواتب') || lowerText.includes('مصروف') || lowerText.includes('صيانة')) {
+              debitAcc = isAr ? 'حـ/ المصروفات العمومية والإدارية (General & Administrative Expenses)' : 'Expenses Account';
+            } else {
+              debitAcc = isAr ? 'حـ/ الأصول الثابتة / المخزون (Assets / Inventory Account)' : 'Assets / Inventory Account';
+            }
+          }
+
+          if (!creditAcc) {
+            if (lowerText.includes('نقداً') || lowerText.includes('كاش') || lowerText.includes('صندوق')) {
+              creditAcc = isAr ? 'حـ/ الصندوق / الخزينة (Cash Account)' : 'Cash Account';
+            } else if (lowerText.includes('بنك') || lowerText.includes('تحويل') || lowerText.includes('شيك')) {
+              creditAcc = isAr ? 'حـ/ البنك (Bank Account)' : 'Bank Account';
+            } else {
+              creditAcc = isAr ? 'حـ/ الموردين / الحسابات الدائنة (Accounts Payable / Vendors)' : 'Accounts Payable / Vendors';
+            }
+          }
+
+          if (!explanationText) {
+            explanationText = isAr
+              ? `إثبات عملية (${text || 'شراء أصل'}): زيادة الجانب المدين في (${debitAcc}) بـ ${amt.toLocaleString()} EGP مقابل إثبات الجانب الدائن في (${creditAcc})، مع قيد التزام الموردين/البنك وتسجيل التأثير المالي على الميزانية العمومية.`
+              : `Recording transaction (${text || 'Purchase Asset'}): Debit (${debitAcc}) for ${amt.toLocaleString()} vs Credit (${creditAcc}).`;
           }
 
           box.innerHTML = renderSimulation({
-            title: text || 'قيد محاسبي متولد بالـ AI',
+            title: text || (isAr ? 'قيد محاسبي جديد بالـ AI' : 'New AI Journal Entry'),
             amount: amt,
             debit_account: debitAcc,
             credit_account: creditAcc,
-            explanation: parsedData.message || parsedData.title || text,
-            rawAiText: res.text
+            explanation: explanationText
           });
         } else {
           box.innerHTML = renderSimulation(select ? select.value : TRANSACTIONS[0].id);
@@ -133,7 +175,7 @@ const JournalSim = (function () {
     const creditAccount = tx.credit_account || (isAr ? tx.credit_account_ar : tx.credit_account_en) || 'حـ/ الحساب الدائن';
     const explanation = tx.explanation || (isAr ? tx.explanation_ar : tx.explanation_en) || '';
 
-    let html = `
+    return `
       <div class="card" style="margin-bottom:20px; border-inline-start:4px solid var(--brass);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
           <h3 style="font-size:15px; margin:0;">📑 ${Topics.escapeHtml(title)}</h3>
@@ -170,23 +212,14 @@ const JournalSim = (function () {
         </div>
 
         ${explanation ? `
-          <p style="margin:0; font-size:13px; color:var(--ink-soft); line-height:1.5;">
-            💡 <strong>${isAr ? 'التوضيح المحاسبي والدورة الإجرائية:' : 'Accounting Explanation:'}</strong> ${explanation}
-          </p>
+          <div style="padding:12px; background:var(--line-soft); border-radius:var(--radius-sm); border-inline-start:3px solid var(--teal);">
+            <p style="margin:0; font-size:13px; color:var(--ink); line-height:1.5;">
+              💡 <strong>${isAr ? 'التوضيح المحاسبي والدورة الإجرائية:' : 'Accounting Explanation:'}</strong> ${Topics.escapeHtml(explanation)}
+            </p>
+          </div>
         ` : ''}
       </div>
     `;
-
-    // Render detailed steps/workflow cards if present
-    if (tx.rawAiText) {
-      html += `
-        <div style="margin-top:16px;">
-          ${AIService.formatMarkdown(tx.rawAiText)}
-        </div>
-      `;
-    }
-
-    return html;
   }
 
   return { render };
