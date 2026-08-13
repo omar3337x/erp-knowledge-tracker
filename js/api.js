@@ -186,26 +186,18 @@ const API = (function () {
       activeControllers.set(options.route, controller);
     }
 
-    const qsParams = { action: action || '', token: token || '' };
-    if (payload && typeof payload === 'object' && Object.keys(payload).length > 0) {
-      qsParams.payload = JSON.stringify(payload);
-    }
-    const qs = new URLSearchParams(qsParams).toString();
-    const fetchUrl = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs;
-
-    // PERF: Google Apps Script Web Apps handle GET (doGet) natively without 302 -> macros/echo 404 POST redirect bugs.
-    // Use GET whenever total URL length is < 2000 characters. Fallback to POST for heavy payloads.
-    const useGet = fetchUrl.length < 2000;
+    // PERF: Always use POST with text/plain body for Google Apps Script Web Apps.
+    // GET requests with query strings cause GAS 302 redirects to script.googleusercontent.com/macros/echo
+    // with huge user_content_key parameters that fail with 404 (Not Found).
+    // POST with text/plain body keeps the URL short and prevents 404 echo redirects completely.
+    const fetchUrl = CONFIG.API_URL;
     const fetchOpts = {
-      method: useGet ? 'GET' : 'POST',
+      method: 'POST',
       signal: controller.signal,
-      credentials: 'omit'  // Suppress "Tracking Prevention blocked storage" browser warnings
+      credentials: 'omit', // Suppress "Tracking Prevention blocked storage" browser warnings
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: action || '', payload: payload || {}, token: token || '' })
     };
-
-    if (!useGet) {
-      fetchOpts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
-      fetchOpts.body = JSON.stringify({ action: action || '', payload: payload || {}, token: token || '' });
-    }
 
     let res;
     try {
