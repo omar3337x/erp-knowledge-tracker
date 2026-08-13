@@ -170,27 +170,16 @@ const API = (function () {
       activeControllers.set(options.route, controller);
     }
 
-    const qs = new URLSearchParams({ action, token });
-    if (payload && Object.keys(payload).length) {
-      qs.set('payload', payloadStr);
-    }
-    const url = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs.toString();
-
-    let fetchUrl, fetchOpts;
-
-    if (url.length <= 7500) {
-      fetchUrl = url;
-      fetchOpts = { method: 'GET', signal: controller.signal };
-    } else {
-      // PERF: Payload > 7.5KB → CORS POST
-      fetchUrl = CONFIG.API_URL;
-      fetchOpts = {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action, payload: payload || {}, token }),
-        signal: controller.signal
-      };
-    }
+    // PERF: Send all requests as POST with text/plain content type.
+    // This avoids Google Apps Script's 302 -> macros/echo 404 redirect entirely,
+    // avoids CORS preflight OPTIONS delays, and removes URL query string length limits.
+    const fetchUrl = CONFIG.API_URL;
+    const fetchOpts = {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, payload: payload || {}, token }),
+      signal: controller.signal
+    };
 
     let res;
     try {
