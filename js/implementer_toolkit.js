@@ -1,25 +1,36 @@
 /**
  * js/implementer_toolkit.js
- * ERP Implementer Toolkit — UAT Scenarios Generator & Data Migration Checklists.
+ * Comprehensive ERP Implementer Toolkit across ALL 10 ERP Modules.
+ * UAT Test Cases & Data Migration Readiness Checklists.
  * 0ms Instant local render with CSV export capabilities.
  */
 
 const ImplementerToolkit = (function () {
 
   const UAT_TEST_CASES = [
-    { id: 'UAT-01', module_id: 'MOD-1', category: 'المخزون', scenario_ar: 'إنشاء صنف جديد وتقييم طريقة Automated FIFO', scenario_en: 'Create new Product with Automated FIFO Costing', expected_ar: 'الإنشاء بنجاح وتوجيه حـ/ المخزون وحـ/ COGS تلقائياً', expected_en: 'Success with automated Inventory & COGS account mapping', status: 'Passed' },
-    { id: 'UAT-02', module_id: 'MOD-1', category: 'المخزون', scenario_ar: 'محاولة صرف صنف بالسالب عند إيقاف السحب بالسالب', scenario_en: 'Attempt negative stock issue when negative stock is disabled', expected_ar: 'ظهور رسالة خطأ تمنع إتمام الحركة', expected_en: 'System blocks transaction with warning message', status: 'Passed' },
-    { id: 'UAT-03', module_id: 'MOD-2', category: 'الحسابات', scenario_ar: 'ترحيل قيد افتتاحي متوازن بدليل الحسابات', scenario_en: 'Post balanced Opening Balance journal entry in COA', expected_ar: 'قبول القيد دون وجود فرق بين المدين والدائن', expected_en: 'Entry accepted with zero Debit/Credit variance', status: 'Passed' },
-    { id: 'UAT-04', module_id: 'MOD-3', category: 'المشتريات', scenario_ar: 'توليد فاتورة مورد بمطابقة ثلاثية (3-Way Matching)', scenario_en: 'Generate Vendor Invoice with 3-Way Match validation', expected_ar: 'مطابقة الأسعار والكميات مع إذن الاستلام وأمر الشراء', expected_en: 'Price & quantity match PO and Goods Receipt Note', status: 'Passed' },
-    { id: 'UAT-05', module_id: 'MOD-4', category: 'المبيعات', scenario_ar: 'اعتماد أمر مبيعات بحد ائتماني متجاوز للعميل', scenario_en: 'Confirm Sales Order exceeding customer Credit Limit', expected_ar: 'حظر أمر المبيعات وتحويله لاعتماد مدير المبيعات', expected_en: 'Order blocked and sent for Sales Manager approval', status: 'Passed' }
+    { id: 'UAT-01', module_id: 'MOD-1', category: 'المخزون', scenario_ar: 'اختبار تقييم Automated FIFO وحظر السحب بالسالب', scenario_en: 'Automated FIFO Costing & Negative Stock Prohibition Test', expected_ar: 'المنع الفوري وحفظ التكلفة مع إشعار تحذير للمستودع', expected_en: 'System blocks transaction with warning message', status: 'Passed' },
+    { id: 'UAT-02', module_id: 'MOD-2', category: 'الحسابات', scenario_ar: 'اختبار توازن القيد الافتتاحي وفروق العملات غير المحققة', scenario_en: 'Opening Balance Journal Balancing & Unrealized FX Revaluation', expected_ar: 'قبول القيد المتوازن وتصنيف أرباح/خسائر العملة بقائمة الدخل', expected_en: 'Journal accepted with zero variance and proper FX classification', status: 'Passed' },
+    { id: 'UAT-03', module_id: 'MOD-3', category: 'المشتريات', scenario_ar: 'اختبار المطابقة الثلاثية 3-Way Matching وفاتورة المورد', scenario_en: '3-Way Matching Validation (PO vs GRN vs Vendor Invoice)', expected_ar: 'الرفض التلقائي للسداد عند وجود اختلاف بالسعر أو الكمية', expected_en: 'Automated hold on payment if price/qty variance exceeds tolerance', status: 'Passed' },
+    { id: 'UAT-04', module_id: 'MOD-4', category: 'المبيعات', scenario_ar: 'حظر أمر المبيعات عند تجاوز الحد الائتماني للعميل', scenario_en: 'Credit Limit Checking on Sales Order Confirmation', expected_ar: 'حظر التسليم وتحويل الأمر إلى موافقة المدير المالي', expected_en: 'Order locked and escalated for Financial Director approval', status: 'Passed' },
+    { id: 'UAT-05', module_id: 'MOD-5', category: 'الموارد البشرية', scenario_ar: 'احتساب مسير الرواتب الشهري وترحيل القيد للـ G/L', scenario_en: 'Monthly Payroll Run Computation & Automatic G/L Posting', expected_ar: 'خصم التأمينات والضرائب وتوزيع الصافي بحسابات البنك', expected_en: 'Accurate net salary calculation & G/L journal generation', status: 'Passed' },
+    { id: 'UAT-06', module_id: 'MOD-6', category: 'التصنيع', scenario_ar: 'انفجار قائمة المكونات (BOM Explosion) وصرف الخامات للمصنع', scenario_en: 'BOM Explosion & Production Work Order Raw Material Issue', expected_ar: 'خصم المواد الخام وإثبات الإنتاج التام بالتكلفة المعيارية', expected_en: 'Raw materials deducted and finished goods received at standard cost', status: 'Passed' },
+    { id: 'UAT-07', module_id: 'MOD-7', category: 'المشاريع', scenario_ar: 'تسجيل ساعات العمل (Timesheets) واحتساب ربحية المشروع', scenario_en: 'Timesheet Billing & Project Milestone Revenue Recognition', expected_ar: 'ربط التكاليف بالمراحل واحتساب نسبة الإنجاز والربحية', expected_en: 'Costs allocated to WBS with accurate POC revenue recognition', status: 'Passed' },
+    { id: 'UAT-08', module_id: 'MOD-8', category: 'الأصول والظروف', scenario_ar: 'تشغيل الإهلاك الشهري التلقائي واستبعاد أصل مكهّن', scenario_en: 'Automated Monthly Depreciation Run & Fixed Asset Disposal', expected_ar: 'خفض الرصيد الدفتري وتسجيل أرباح/خسائر الاستبعاد', expected_en: 'Depreciation posted & gain/loss recognized on disposal', status: 'Passed' },
+    { id: 'UAT-09', module_id: 'MOD-9', category: 'الجودة والخدمات', scenario_ar: 'فحص شحنة مشتريات وتحويل التالف لمخزن الحجر الصحي', scenario_en: 'Quality Inspection Sampling & Quarantine Warehouse Transfer', expected_ar: 'حظر الصرف وحجز الكميات الفاسدة لتسويتها مع المورد', expected_en: 'Defective items quarantined and blocked from sales allocation', status: 'Passed' },
+    { id: 'UAT-10', module_id: 'MOD-10', category: 'القانونية والامتثال', scenario_ar: 'فحص تعارض الصلاحيات (SoD Analysis) وتوليد التوقيع الرقمي', scenario_en: 'Segregation of Duties (SoD) Audit & Contract E-Signature', expected_ar: 'حظر الصلاحيات المتعارضة وأرشفة العقد برمز تشفير', expected_en: 'Conflicting roles blocked and contract archived with e-signature', status: 'Passed' }
   ];
 
   const MIGRATION_CHECKLIST = [
-    { id: 'MIG-01', step_ar: 'تجهيز دليل الحسابات المستهدف (Chart of Accounts)', step_en: 'Chart of Accounts (COA) Structure & Codes', required: true },
-    { id: 'MIG-02', step_ar: 'تجهيز دليل الأصناف والرموز الشريطية (Item Master Data)', step_en: 'Item Master & Barcodes Data Clean-up', required: true },
-    { id: 'MIG-03', step_ar: 'تجهيز كروت العملاء والموردين وتحديد الفئات الضريبية', step_en: 'Customer & Vendor Master Data with Tax IDs', required: true },
-    { id: 'MIG-04', step_ar: 'تجهيز الأرصدة الافتتاحية للمخزون (Opening Inventory Valuation)', step_en: 'Opening Inventory On-Hand Balances & Costing', required: true },
-    { id: 'MIG-05', step_ar: 'تجهيز ميزان المراجعة الافتتاحي (Opening Trial Balance)', step_en: 'Opening Trial Balance & G/L Balances', required: true }
+    { id: 'MIG-01', step_ar: 'MOD-1: تجهيز كروت الأصناف، فئات التقييم، وتوزيع المستودعات (Item Master)', step_en: 'MOD-1: Item Master Data, Valuation Classes & Warehouses', required: true },
+    { id: 'MIG-02', step_ar: 'MOD-2: مراجعة دليل الحسابات المستهدف وميزان المراجعة الافتتاحي (COA & Trial Balance)', step_en: 'MOD-2: Target Chart of Accounts & Opening Trial Balance', required: true },
+    { id: 'MIG-03', step_ar: 'MOD-3: تجهيز قائمة الموردين والأرصدة المفتوحة المتبقية (Open Vendor POs & Balances)', step_en: 'MOD-3: Vendor Master, Tax IDs & Open Purchase Orders', required: true },
+    { id: 'MIG-04', step_ar: 'MOD-4: تجهيز قائمة العملاء والحدود الائتمانية والأسعار (Customer Master & Limits)', step_en: 'MOD-4: Customer Master, Pricelists & Credit Limits', required: true },
+    { id: 'MIG-05', step_ar: 'MOD-5: البيانات الأساسية للموظفين، عقود العمل، والهياكل الراتبية (HR & Contracts)', step_en: 'MOD-5: Employee Records, Contracts & Salary Structures', required: true },
+    { id: 'MIG-06', step_ar: 'MOD-6: قائمة المكونات (BOM) ومحطات العمل للتصنيع (BOMs & Workcenters)', step_en: 'MOD-6: Bills of Materials (BOM) & Work Center Routings', required: true },
+    { id: 'MIG-07', step_ar: 'MOD-7: هيكل تفتيت أعمال المشاريع المفتوحة (Open Projects & WBS Structures)', step_en: 'MOD-7: Active Projects WBS & Opening Invoiced Amounts', required: true },
+    { id: 'MIG-08', step_ar: 'MOD-8: سجل الأصول الثابتة وقيم الإهلاك التاريخي (Fixed Assets Register)', step_en: 'MOD-8: Fixed Assets Register & Accumulated Depreciation', required: true },
+    { id: 'MIG-09', step_ar: 'MOD-9: نقاط ومواصفات فحص الجودة وتذاكر الدعم المفتوحة (Quality Inspection Specs)', step_en: 'MOD-9: Quality Inspection Standards & Open Support Cases', required: true },
+    { id: 'MIG-10', step_ar: 'MOD-10: عقود الشركة، التراخيص، ومصفوفة الصلاحيات (Legal Contracts & SoD Matrix)', step_en: 'MOD-10: Legal Contracts, Licensing & SoD Security Matrix', required: true }
   ];
 
   function render(container) {
@@ -29,7 +40,7 @@ const ImplementerToolkit = (function () {
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
         <div>
           <h2 style="margin:0; display:flex; align-items:center; gap:8px;">
-            🛠️ ${isAr ? 'حزمة أدوات استشاري ومطبق الـ ERP' : 'ERP Implementer Toolkit'}
+            🛠️ ${isAr ? 'حزمة أدوات استشاري ومطبق الـ ERP (شاملة الـ 10 موديولات)' : 'ERP Implementer Toolkit (All 10 Modules)'}
           </h2>
           <small style="color:var(--ink-soft);">
             ${isAr ? 'قوالب سيناريوهات اختبارات القبول (UAT) وقوائم نقل وتجهيز البيانات (Data Migration)' : 'User Acceptance Testing (UAT) templates & Data Migration checklists'}

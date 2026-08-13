@@ -143,7 +143,7 @@ const DailyQuiz = (function () {
       </div>
 
       <!-- Question Card -->
-      <div class="card" style="margin-bottom:20px;">
+      <div class="card" id="quiz-card" style="margin-bottom:20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
           <span class="badge badge-status-learning">${q.module_name}</span>
           <small style="color:var(--ink-soft); font-family:var(--font-mono);">#${q.id} of ${QUIZ_QUESTIONS.length}</small>
@@ -242,7 +242,7 @@ const DailyQuiz = (function () {
     const q = QUIZ_QUESTIONS[qIdx];
     const isAr = I18n.getLang() === 'ar';
 
-    const card = container.querySelector('.card');
+    const card = container.querySelector('#quiz-card');
     if (!card) return;
 
     card.innerHTML = `
