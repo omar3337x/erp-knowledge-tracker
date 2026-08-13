@@ -255,9 +255,6 @@ const Modules = (function () {
     return 'ai-type-default';
   }
 
-    Categories.renderSection(catWrap, moduleId, topics, onCategoryChange);
-  }
-
   function _buildCatOptions(moduleId) {
     return State.categoriesForModule(moduleId)
       .map(c => `<option value="${c.id}">${I18n.localizedName(c)}</option>`)

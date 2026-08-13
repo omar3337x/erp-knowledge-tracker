@@ -16,8 +16,7 @@ const Favorites = (function () {
       _favoritesCache = await API.getFavorites();
       if (!Array.isArray(_favoritesCache)) _favoritesCache = [];
     } catch (err) {
-      container.innerHTML = UI.errorState(err);
-      return;
+      _favoritesCache = [];
     }
 
     const isAr = I18n.getLang() === 'ar';
