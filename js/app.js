@@ -546,6 +546,8 @@ const KeyboardShortcuts = (function () {
 
   function init() {
     window.addEventListener('keydown', (e) => {
+      if (!e.key) return;
+
       // Esc closes open modal regardless of target
       if (e.key === 'Escape') {
         UI.closeModal();
@@ -553,7 +555,7 @@ const KeyboardShortcuts = (function () {
       }
 
       // Search focus: / or Ctrl+K
-      if ((e.key === '/' && !isEditing(e)) || (e.ctrlKey && e.key.toLowerCase() === 'k')) {
+      if ((e.key === '/' && !isEditing(e)) || (e.ctrlKey && typeof e.key === 'string' && e.key.toLowerCase() === 'k')) {
         e.preventDefault();
         const searchInput = document.getElementById('global-search');
         if (searchInput) searchInput.focus();
