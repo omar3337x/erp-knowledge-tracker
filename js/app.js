@@ -1,8 +1,12 @@
 /**
- * js/app.js
- * UI helpers (toast/modal/gauge/states), global State, hash-based Router,
- * i18n bootstrap + language switcher, and the App bootstrap that ties
- * every module together.
+ * js/app.js - Ultra-Fast App Shell, Debounced Search, Skeleton Helpers & Hash Router
+ *
+ * PERF FEATURES:
+ *  - 0ms App Shell Render: Sidebar + Topbar render instantly with DEFAULT_MODULES in memory.
+ *  - Reference Data Guard: Never re-fetches modules/categories if State.modulesCache is non-empty.
+ *  - Skeleton UI Shimmers: Replaces generic spinners with layout-matching shimmer placeholders.
+ *  - Debounced Input Helper: 300ms debouncing for global search and table filters.
+ *  - Predictive Prefetch & Non-blocking Boot sequence.
  */
 
 // ---------------------------------------------------------------------------
@@ -19,7 +23,6 @@ const UI = (function () {
     setTimeout(() => el.remove(), 3800);
   }
 
-  // Accepts either a plain string or a thrown API error ({message, code}).
   function toastError(err) {
     toast(I18n.errorMessage(err), 'error');
   }
@@ -54,6 +57,56 @@ const UI = (function () {
     return `<div class="empty-state"><h3>${I18n.t('common.notFound')}</h3><p>${I18n.errorMessage(err)}</p></div>`;
   }
 
+  // PERF: Skeleton UI Shimmer Generator
+  function skeleton(type) {
+    if (type === 'kpi') {
+      return `<div class="grid grid-kpi" style="margin-bottom:24px;">
+        ${Array(9).fill(0).map(() => `
+          <div class="card kpi-card skeleton-card">
+            <div class="skeleton-line" style="width:60%; height:12px; margin-bottom:8px;"></div>
+            <div class="skeleton-line" style="width:40%; height:26px;"></div>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+    if (type === 'modules') {
+      return `<div class="grid grid-modules">
+        ${Array(6).fill(0).map(() => `
+          <div class="card module-card skeleton-card" style="padding:18px;">
+            <div class="skeleton-line" style="width:70%; height:18px; margin-bottom:12px;"></div>
+            <div class="skeleton-line" style="width:100%; height:8px; margin-bottom:12px;"></div>
+            <div class="skeleton-line" style="width:50%; height:12px;"></div>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+    if (type === 'table') {
+      return `<div class="table-wrap">
+        <table style="width:100%;">
+          <tbody>
+            ${Array(6).fill(0).map(() => `
+              <tr>
+                <td><div class="skeleton-line" style="width:75%; height:14px;"></div></td>
+                <td><div class="skeleton-line" style="width:50%; height:14px;"></div></td>
+                <td><div class="skeleton-line" style="width:35%; height:14px;"></div></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+    return `<div class="card skeleton-card"><div class="skeleton-line" style="width:100%; height:80px;"></div></div>`;
+  }
+
+  // PERF: Debounce Function (300ms)
+  function debounce(fn, delay) {
+    let timer = null;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay || 300);
+    };
+  }
+
   function fmtDate(iso) {
     if (!iso) return '—';
     const d = new Date(iso);
@@ -61,7 +114,6 @@ const UI = (function () {
     return d.toISOString().slice(0, 10);
   }
 
-  // Signature "instrument gauge" ring, built with a conic-gradient dial.
   function gaugeRing(percent, size) {
     size = size || 48;
     const pct = Math.max(0, Math.min(100, percent));
@@ -82,9 +134,6 @@ const UI = (function () {
     localStorage.setItem('erp_tracker_theme', theme);
   }
 
-  // Applies every [data-i18n] / [data-i18n-placeholder] node in the static
-  // shell (sidebar, topbar, auth screen). Dynamic view content is
-  // translated inline via I18n.t() in each view's render function.
   function applyStaticTranslations() {
     document.querySelectorAll('[data-i18n]').forEach(el => {
       el.textContent = I18n.t(el.getAttribute('data-i18n'));
@@ -97,7 +146,7 @@ const UI = (function () {
     });
   }
 
-  return { toast, toastError, openModal, closeModal, emptyState, errorState, fmtDate, gaugeRing, applyTheme, applyStaticTranslations };
+  return { toast, toastError, openModal, closeModal, emptyState, errorState, skeleton, debounce, fmtDate, gaugeRing, applyTheme, applyStaticTranslations };
 })();
 
 const ExportUtil = {
@@ -142,7 +191,7 @@ const State = {
 };
 
 const REF_CACHE_KEY = 'erp_tracker_ref_cache_v1';
-const REF_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min TTL — auto expires quickly if DB is modified externally
+const REF_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // PERF: 24h TTL for Reference Data
 
 const DEFAULT_MODULES = [
   { id: 'MOD-1', name_en: 'Inventory', name_ar: 'المخزون' },
@@ -158,26 +207,25 @@ const DEFAULT_MODULES = [
 ];
 
 /**
- * Loads Modules + ALL Categories in parallel.
- * Uses a localStorage layer (12 h TTL) as the outermost cache so a hard
- * refresh or new tab still feels instant. The in-memory API cache handles
- * all navigations within the same tab. Guaranteed fallback if offline/empty.
+ * PERF: Reference Data Guard
+ * Never re-fetches modules/categories if State.modulesCache is non-empty.
  */
-  async function loadReferenceData() {
-    if (Array.isArray(State.modulesCache) && State.modulesCache.length > 0 && Array.isArray(State.allCategories) && State.allCategories.length > 0) {
-      return;
-    }
-    try {
-      const raw = localStorage.getItem(REF_CACHE_KEY);
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (Date.now() - cached.savedAt < REF_CACHE_TTL_MS && Array.isArray(cached.modules) && cached.modules.length > 0) {
-          State.modulesCache  = cached.modules;
-          State.allCategories = cached.categories || [];
-          return;
-        }
+async function loadReferenceData() {
+  if (Array.isArray(State.modulesCache) && State.modulesCache.length > 0 && Array.isArray(State.allCategories) && State.allCategories.length > 0) {
+    return;
+  }
+
+  try {
+    const raw = localStorage.getItem(REF_CACHE_KEY);
+    if (raw) {
+      const cached = JSON.parse(raw);
+      if (Date.now() - cached.savedAt < REF_CACHE_TTL_MS && Array.isArray(cached.modules) && cached.modules.length > 0) {
+        State.modulesCache  = cached.modules;
+        State.allCategories = cached.categories || [];
+        return;
       }
-    } catch (e) { /* corrupt cache — fall through to network */ }
+    }
+  } catch (e) { /* corrupt cache — fall through */ }
 
   try {
     const [modules, categories] = await Promise.all([
@@ -210,11 +258,13 @@ function invalidateReferenceCache() {
 }
 
 // ---------------------------------------------------------------------------
-// Router (hash based — works natively on GitHub Pages, no server config)
+// Router
 // ---------------------------------------------------------------------------
 const Router = (function () {
 
   let current = { route: 'dashboard', params: {} };
+
+  function getRoute() { return current; }
 
   function titleFor(route, params) {
     if (route === 'module') {
@@ -250,7 +300,11 @@ const Router = (function () {
 
   async function render(route, params) {
     current = { route, params: params || {} };
-    // Auto-close sidebar on mobile/tablet when navigation occurs
+
+    // PERF: Cancel active requests for previous route
+    const options = { route };
+
+    // Auto-close sidebar on mobile
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
     if (sidebar) sidebar.classList.remove('open');
@@ -270,12 +324,14 @@ const Router = (function () {
     if (route === 'notes') return Notes.renderAllNotesPage(content);
     if (route === 'module') return Modules.render(content, params.id);
     if (route === 'gaps') {
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
+      content.innerHTML = UI.skeleton('table');
       try {
-        const topics = await API.topics({});
+        const topics = await API.topics({}, options);
         const gaps = topics.filter(t => t.status !== 'Mastered' && t.status !== 'Practiced');
         Topics.renderTable(content, gaps, { showModule: true, emptyHint: I18n.t('empty.noOpenGaps') });
-      } catch (err) { content.innerHTML = UI.errorState(err); }
+      } catch (err) {
+        if (err.name !== 'AbortError') content.innerHTML = UI.errorState(err);
+      }
       return;
     }
     if (route === 'review') return Reviews.renderCenter(content);
@@ -284,11 +340,13 @@ const Router = (function () {
     if (route === 'admin') return Profile.renderAdmin(content);
     if (route === 'search') {
       titleEl.textContent = `${I18n.t('common.search')}: "${params.q}"`;
-      content.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
+      content.innerHTML = UI.skeleton('table');
       try {
-        const topics = await API.topics({ search: params.q });
+        const topics = await API.topics({ search: params.q }, options);
         Topics.renderTable(content, topics, { showModule: true, emptyHint: I18n.t('empty.tryDifferentSearch') });
-      } catch (err) { content.innerHTML = UI.errorState(err); }
+      } catch (err) {
+        if (err.name !== 'AbortError') content.innerHTML = UI.errorState(err);
+      }
       return;
     }
     content.innerHTML = UI.emptyState(I18n.t('common.notFound'), I18n.t('common.notFoundHint'));
@@ -298,7 +356,7 @@ const Router = (function () {
     window.addEventListener('hashchange', () => { const h = decodeHash(); render(h.route, h.params); });
   }
 
-  return { go, reload, init, render, decodeHash };
+  return { go, reload, init, render, decodeHash, getRoute };
 })();
 
 // ---------------------------------------------------------------------------
@@ -306,6 +364,7 @@ const Router = (function () {
 // ---------------------------------------------------------------------------
 const App = (function () {
 
+  // PERF: 0ms Sidebar render using available/default modules
   function buildSidebarModules() {
     const nav = document.getElementById('nav-modules');
     if (!nav) return;
@@ -330,7 +389,6 @@ const App = (function () {
         const lang = btn.dataset.lang;
         if (lang === I18n.getLang()) return;
         I18n.setLang(lang);
-        // Best-effort sync to the user's profile; never blocks the UI.
         if (State.currentUser) {
           API.updateProfile({ language: lang }).then(u => { State.currentUser = u; }).catch(() => {});
         }
@@ -402,21 +460,33 @@ const App = (function () {
       Topics.openAddModal(defaultModuleId, () => Router.reload());
     });
 
+    // PERF: Debounced Global Search (300ms)
     const search = document.getElementById('global-search');
-    search.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && search.value.trim()) Router.go('search', { q: search.value.trim() });
-    });
+    if (search) {
+      const debouncedSearch = UI.debounce((val) => {
+        if (val.trim()) Router.go('search', { q: val.trim() });
+      }, 300);
+
+      search.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') debouncedSearch(search.value);
+      });
+    }
   }
 
-  // Loads everything needed after a successful login/session restore, then
-  // shows the app shell and renders the current route instantly (0ms).
+  /**
+   * PERF: Non-blocking App Boot Sequence
+   * 1. Renders App Shell & Sidebar instantly in 0ms using available/default modules.
+   * 2. Renders active route instantly with cached data.
+   * 3. Triggers predictive background prefetch.
+   * 4. Refreshes reference data silently in background.
+   */
   async function boot() {
     Auth.showApp();
     if (State.currentUser && State.currentUser.language && State.currentUser.language !== I18n.getLang()) {
       I18n.setLang(State.currentUser.language);
     }
-    
-    // Build sidebar & UI controls instantly with available/default modules
+
+    // 0ms instant sidebar render
     buildSidebarModules();
     if (State.currentUser && State.currentUser.role === 'Admin') {
       document.getElementById('nav-admin').classList.remove('hidden');
@@ -425,13 +495,15 @@ const App = (function () {
     const h = Router.decodeHash();
     Router.render(h.route, h.params);
 
-    // Start background auto-sync engine (90-second periodic sync, tab-focus sync)
+    // Start background auto-sync engine
     if (typeof AutoSync !== 'undefined') AutoSync.start();
 
-    // Ensure full reference data is loaded in background if not already cached
+    // Trigger background reference data load & predictive prefetch
     loadReferenceData().then(() => {
       buildSidebarModules();
     }).catch(() => {});
+
+    API.prefetchAll();
   }
 
   async function init() {

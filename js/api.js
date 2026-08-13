@@ -1,36 +1,33 @@
 /**
- * js/api.js
- * Thin wrapper around the Google Apps Script Web App API.
+ * js/api.js - High Performance Frontend API Layer for Google Apps Script Web App
  *
- * POST as text/plain to avoid CORS preflight (standard GAS workaround).
- *
- * Performance layers (fastest to slowest):
- *  1. In-memory cache  — 0.07ms, per tab session.
- *  2. localStorage cache — 0.1ms, survives refresh. Topics/dashboard cached 10 min.
- *  3. In-flight dedup  — concurrent identical calls share one Promise.
- *  4. Network → GAS    — 1-14s depending on cold start state.
- *
- * Cold-start mitigation:
- *  - Warmup ping fires on page load (before login) so GAS wakes up while
- *    the user types their credentials (~10-15s window = enough to warm up).
- *  - Keepalive ping every 4 min after login to stay warm.
- *  - Exponential-backoff retry loop: retries up to 8× on 404 / parse error.
- *    This rides out a GAS cold start (~14s) automatically with no user impact.
+ * PERF FEATURES:
+ *  - L0 Memory Cache (Map with distinct TTLs: 24h ref, 30m dashboard, 15m topics/reviews, 10m notes)
+ *  - L1 localStorage Cache with Version Invalidation (v4.0)
+ *  - L2 sessionStorage Cache for transient filters & UI state
+ *  - Connection Warmup Queue (3-4 ping sequence at DOMContentLoaded to eliminate cold starts)
+ *  - Aggressive 2-min Keepalive + Inactivity Wakeup (mousemove/click ping trigger after 3m silence)
+ *  - Predictive Prefetch (Parallel background batch loading after login)
+ *  - Batch API Support (API.batch() combining multiple read actions in 1 payload)
+ *  - In-flight Request Deduplication with 10s Safety Timeout
+ *  - Request Prioritization (HIGH for current view, LOW via requestIdleCallback)
+ *  - Cancelable Requests via AbortController
+ *  - Exponential Backoff for HTTP 429 & 404 Cold Start Statuses
+ *  - navigator.sendBeacon for instant 0ms Logout
  */
 
 const SESSION_KEY = 'erp_tracker_session_token';
+const APP_VERSION = 'v4.0';
 
 const API = (function () {
 
-  /* ------------------------------------------------------------------ */
-  /* Token helpers                                                       */
-  /* ------------------------------------------------------------------ */
+  // PERF: Token Management
   function getToken() { return localStorage.getItem(SESSION_KEY) || ''; }
   function setToken(t) { if (t) localStorage.setItem(SESSION_KEY, t); }
   function clearToken() { localStorage.removeItem(SESSION_KEY); }
 
   /* ------------------------------------------------------------------ */
-  /* In-flight deduplication                                             */
+  /* PERF: In-Flight Request Deduplication with 10s Timeout Guard      */
   /* ------------------------------------------------------------------ */
   const inFlight = new Map();
   function dedupeKey(action, payload) {
@@ -38,24 +35,26 @@ const API = (function () {
   }
 
   /* ------------------------------------------------------------------ */
-  /* In-memory cache (per tab session)                                  */
+  /* PERF: Multi-Tier Caching (L0 Memory, L1 localStorage, L2 session)  */
   /* ------------------------------------------------------------------ */
   const _mem = new Map();
+
+  // PERF: L0 Memory TTLs per data classification
   const MEM_TTL = {
-    validateSession: 5  * 60 * 1000,
-    currentUser    : 5  * 60 * 1000,
-    modules        : 60 * 60 * 1000,
-    categories     : 60 * 60 * 1000,
-    topics         : 5  * 60 * 1000,
-    topic          : 5  * 60 * 1000,
-    knowledge      : 5  * 60 * 1000,
-    reviews        : 5  * 60 * 1000,
-    dashboard      : 3  * 60 * 1000,
-    analytics      : 10 * 60 * 1000,
-    adminUsers     : 3  * 60 * 1000,
-    notes          : 5  * 60 * 1000,
-    note           : 5  * 60 * 1000,
+    modules        : 24 * 60 * 60 * 1000, // 24h
+    categories     : 24 * 60 * 60 * 1000, // 24h
+    dashboard      : 30 * 60 * 1000,      // 30m
+    topics         : 15 * 60 * 1000,      // 15m
+    topic          : 15 * 60 * 1000,      // 15m
+    reviews        : 15 * 60 * 1000,      // 15m
+    analytics      : 15 * 60 * 1000,      // 15m
+    notes          : 10 * 60 * 1000,      // 10m
+    note           : 10 * 60 * 1000,      // 10m
+    knowledge      : 15 * 60 * 1000,      // 15m
+    validateSession: 10 * 60 * 1000,      // 10m
+    currentUser    : 10 * 60 * 1000,      // 10m
   };
+
   function memGet(key) {
     const e = _mem.get(key);
     if (!e) return null;
@@ -63,55 +62,69 @@ const API = (function () {
     return e.data;
   }
   function memSet(key, data, action) {
-    _mem.set(key, { data, expiresAt: Date.now() + (MEM_TTL[action] || 60000) });
+    _mem.set(key, { data, expiresAt: Date.now() + (MEM_TTL[action] || 600000) });
   }
 
-  /* ------------------------------------------------------------------ */
-  /* localStorage cache (survives page refresh)                         */
-  /* ------------------------------------------------------------------ */
-  const LS_ACTIONS = new Set(['topics', 'reviews', 'dashboard', 'analytics', 'notes']);
-  const LS_TTL = {
-    topics   : 10 * 60 * 1000,
-    reviews  : 10 * 60 * 1000,
-    dashboard:  5 * 60 * 1000,
-    analytics: 15 * 60 * 1000,
-    notes    : 10 * 60 * 1000,
-  };
-  const LS_PREFIX = 'erp_api_v3:';
+  // PERF: L1 localStorage Cache with Version Invalidation
+  const LS_ACTIONS = new Set(['modules', 'categories', 'topics', 'reviews', 'dashboard', 'analytics', 'notes']);
+  const LS_PREFIX = `erp_cache_${APP_VERSION}:`;
 
   function lsGet(key, action) {
     if (!LS_ACTIONS.has(action)) return null;
     try {
       const raw = localStorage.getItem(LS_PREFIX + key);
       if (!raw) return null;
-      const { data, expiresAt } = JSON.parse(raw);
-      if (Date.now() > expiresAt) { localStorage.removeItem(LS_PREFIX + key); return null; }
+      const { data, expiresAt, ver } = JSON.parse(raw);
+      if (ver !== APP_VERSION || Date.now() > expiresAt) {
+        localStorage.removeItem(LS_PREFIX + key);
+        return null;
+      }
       return data;
     } catch (e) { return null; }
   }
+
   function lsSet(key, data, action) {
     if (!LS_ACTIONS.has(action)) return;
     try {
       localStorage.setItem(LS_PREFIX + key, JSON.stringify({
-        data, expiresAt: Date.now() + (LS_TTL[action] || 5 * 60 * 1000)
+        data,
+        ver: APP_VERSION,
+        expiresAt: Date.now() + (MEM_TTL[action] || 600000)
       }));
     } catch (e) { /* storage full — non-fatal */ }
   }
+
   function lsBust(...actions) {
-    Object.keys(localStorage)
-      .filter(k => k.startsWith(LS_PREFIX))
-      .forEach(k => {
-        const action = k.slice(LS_PREFIX.length).split(':')[0];
-        if (actions.includes(action)) localStorage.removeItem(k);
-      });
-  }
-  function lsBustAll() {
-    Object.keys(localStorage).filter(k => k.startsWith(LS_PREFIX)).forEach(k => localStorage.removeItem(k));
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith(LS_PREFIX))
+        .forEach(k => {
+          const action = k.slice(LS_PREFIX.length).split(':')[0];
+          if (actions.includes(action)) localStorage.removeItem(k);
+        });
+    } catch (e) {}
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Combined cache                                                      */
-  /* ------------------------------------------------------------------ */
+  function lsBustAll() {
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('erp_cache_'))
+        .forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+  }
+
+  // PERF: L2 sessionStorage Cache for Transient Filter States
+  function ssGet(key) {
+    try {
+      const raw = sessionStorage.getItem(`erp_ss:${key}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function ssSet(key, val) {
+    try { sessionStorage.setItem(`erp_ss:${key}`, JSON.stringify(val)); } catch (e) {}
+  }
+
+  // PERF: Combined Cache Lookup (L0 -> L1)
   function cacheGet(key, action) { return memGet(key) ?? lsGet(key, action); }
   function cacheSet(key, data, action) { memSet(key, data, action); lsSet(key, data, action); }
   function cacheBust(...actions) {
@@ -120,16 +133,24 @@ const API = (function () {
   }
   function cacheBustAll() { _mem.clear(); lsBustAll(); }
 
+  /* ------------------------------------------------------------------ */
+  /* PERF: GAS Cold Start Mitigation & Exponential Backoff             */
+  /* ------------------------------------------------------------------ */
   const MAX_ATTEMPTS = 5;
-  // Delay schedule (ms): 1200ms on first retry (gives GAS cold-start time to complete), then 2000, 3000
-  function _retryDelay(attempt) {
+
+  function _retryDelay(attempt, is429) {
+    if (is429) return Math.min(2000 * Math.pow(2, attempt - 1), 10000); // Exponential backoff for 429
     if (attempt === 1) return 1200;
     if (attempt === 2) return 2000;
     return 3000;
   }
 
-  async function rawCall(action, payload, attempt) {
+  // PERF: Active Controllers for cancelable requests
+  const activeControllers = new Map();
+
+  async function rawCall(action, payload, attempt, options) {
     attempt = attempt || 1;
+    options = options || {};
 
     if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') {
       const err = new Error('API_URL is not configured.');
@@ -140,8 +161,15 @@ const API = (function () {
     const token = getToken();
     const payloadStr = JSON.stringify(payload || {});
 
-    // Always encode as GET query params — GAS doGet handles all actions.
-    // This avoids 302→echo→404 and CORS preflight entirely.
+    // PERF: AbortController for cancelable requests
+    const controller = new AbortController();
+    if (options.route) {
+      if (activeControllers.has(options.route)) {
+        activeControllers.get(options.route).abort();
+      }
+      activeControllers.set(options.route, controller);
+    }
+
     const qs = new URLSearchParams({ action, token });
     if (payload && Object.keys(payload).length) {
       qs.set('payload', payloadStr);
@@ -151,42 +179,49 @@ const API = (function () {
     let fetchUrl, fetchOpts;
 
     if (url.length <= 7500) {
-      // Normal GET — works for all reads and most writes
       fetchUrl = url;
-      fetchOpts = { method: 'GET' };
+      fetchOpts = { method: 'GET', signal: controller.signal };
     } else {
-      // Payload too large for GET (e.g. base64 image) — send as no-cors POST.
-      // no-cors means we can't read the response, so the caller must rely on
-      // optimistic UI (which is already in place for all write operations).
+      // PERF: Payload > 7.5KB → CORS POST
       fetchUrl = CONFIG.API_URL;
       fetchOpts = {
         method: 'POST',
-        mode: 'no-cors',
-        body: JSON.stringify({ action, payload: payload || {}, token })
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, payload: payload || {}, token }),
+        signal: controller.signal
       };
-      // Fire and forget — no response to parse
-      fetch(fetchUrl, fetchOpts).catch(() => {});
-      return {};  // Optimistic UI already applied; background sync will fix up on next fetch
     }
 
     let res;
     try {
       res = await fetch(fetchUrl, fetchOpts);
     } catch (networkErr) {
+      if (networkErr.name === 'AbortError') throw networkErr; // Request intentionally canceled
       if (attempt < MAX_ATTEMPTS) {
-        await _sleep(_retryDelay(attempt));
-        return rawCall(action, payload, attempt + 1);
+        await _sleep(_retryDelay(attempt, false));
+        return rawCall(action, payload, attempt + 1, options);
       }
       const err = new Error('Network error contacting the API.');
       err.code = 'NETWORK_ERROR';
       throw err;
     }
 
-    // GAS 302→echo→404: cold start. Retry automatically.
+    // PERF: 429 Too Many Requests Handling
+    if (res.status === 429) {
+      if (attempt < MAX_ATTEMPTS) {
+        await _sleep(_retryDelay(attempt, true));
+        return rawCall(action, payload, attempt + 1, options);
+      }
+      const err = new Error('Rate limit exceeded. Please wait a moment.');
+      err.code = 'RATE_LIMIT';
+      throw err;
+    }
+
+    // PERF: GAS 302 -> echo -> 404 Cold Start Retry
     if (res.status === 404) {
       if (attempt < MAX_ATTEMPTS) {
-        await _sleep(_retryDelay(attempt));
-        return rawCall(action, payload, attempt + 1);
+        await _sleep(_retryDelay(attempt, false));
+        return rawCall(action, payload, attempt + 1, options);
       }
       const err = new Error('Service temporarily unavailable. Please try again.');
       err.code = 'SERVICE_UNAVAILABLE';
@@ -197,8 +232,8 @@ const API = (function () {
     try { json = await res.json(); }
     catch (parseErr) {
       if (attempt < MAX_ATTEMPTS) {
-        await _sleep(_retryDelay(attempt));
-        return rawCall(action, payload, attempt + 1);
+        await _sleep(_retryDelay(attempt, false));
+        return rawCall(action, payload, attempt + 1, options);
       }
       const err = new Error('Unexpected response from the API.');
       err.code = 'SERVER_ERROR';
@@ -212,65 +247,144 @@ const API = (function () {
       throw err;
     }
 
-    _isWarmedUp = true; // Mark as warmed up on any successful API call
     return json.data;
   }
 
   function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   /* ------------------------------------------------------------------ */
-  /* Cached read call                                                    */
+  /* PERF: Cached Read Calls & Prioritization                           */
   /* ------------------------------------------------------------------ */
   const READ_ACTIONS = new Set([
     'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
-    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping'
+    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping', 'batch'
   ]);
 
-  async function call(action, payload) {
-    if (!READ_ACTIONS.has(action)) return rawCall(action, payload);
+  async function call(action, payload, options) {
+    if (!READ_ACTIONS.has(action)) return rawCall(action, payload, 1, options);
 
     const key = dedupeKey(action, payload);
 
-    // L1: memory, L2: localStorage
+    // L0 / L1 Cache check (0ms / 1ms)
     const cached = cacheGet(key, action);
     if (cached !== null) return cached;
 
-    // L3: in-flight dedup
+    // In-flight Deduplication with 10s Timeout Guard
     if (inFlight.has(key)) return inFlight.get(key);
 
-    // L4: network
-    const promise = rawCall(action, payload)
+    const executeCall = () => rawCall(action, payload, 1, options)
       .then(data => { cacheSet(key, data, action); return data; })
-      .finally(() => inFlight.delete(key));
+      .finally(() => { inFlight.delete(key); });
+
+    // PERF: Request Prioritization (LOW priority runs via requestIdleCallback)
+    let promise;
+    if (options && options.priority === 'LOW' && typeof window.requestIdleCallback === 'function') {
+      promise = new Promise((resolve, reject) => {
+        window.requestIdleCallback(() => { executeCall().then(resolve).catch(reject); });
+      });
+    } else {
+      promise = executeCall();
+    }
+
+    // 10s Safety Timeout on in-flight promise to prevent permanent memory lock
+    const timeoutGuard = setTimeout(() => { inFlight.delete(key); }, 10000);
+    promise.finally(() => clearTimeout(timeoutGuard));
 
     inFlight.set(key, promise);
     return promise;
   }
 
   /* ------------------------------------------------------------------ */
-  /* Warmup — fires BEFORE login so GAS wakes up while user types.     */
-  /* Uses call() so in-flight deduplication prevents duplicate pings.  */
+  /* PERF: Batch Requests (combines multiple read actions in 1 payload) */
+  /* ------------------------------------------------------------------ */
+  async function batch(requests) {
+    if (!Array.isArray(requests) || !requests.length) return {};
+    try {
+      const data = await rawCall('batch', { requests });
+      if (data && typeof data === 'object') {
+        Object.entries(data).forEach(([act, resData]) => {
+          if (resData !== null) cacheSet(dedupeKey(act, {}), resData, act);
+        });
+      }
+      return data;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* PERF: Pre-warm Strategy & Connection Warmup Queue                  */
   /* ------------------------------------------------------------------ */
   function warmup() {
     if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') return;
     call('ping', {}).catch(() => {});
   }
 
+  // PERF: Connection Warmup Queue (3 consecutive pings spaced 2s apart before login)
+  function startWarmupQueue() {
+    if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') return;
+    let count = 0;
+    const interval = setInterval(() => {
+      count++;
+      warmup();
+      if (count >= 3) clearInterval(interval);
+    }, 2000);
+    warmup(); // Initial ping
+  }
+
+  // PERF: Predictive Prefetch (Parallel background batch loading after login)
+  function prefetchAll() {
+    if (!getToken()) return;
+    setTimeout(() => {
+      batch([
+        { action: 'dashboard', payload: {} },
+        { action: 'topics', payload: {} },
+        { action: 'notes', payload: {} },
+        { action: 'reviews', payload: {} }
+      ]).catch(() => {});
+    }, 300);
+  }
+
   /* ------------------------------------------------------------------ */
-  /* Keepalive — every 4 min after login to stay warm                  */
+  /* PERF: Aggressive Keepalive (2 min) + Inactivity Wakeup Listener    */
   /* ------------------------------------------------------------------ */
   let _keepaliveTimer = null;
+  let _lastActivityTime = Date.now();
+
   function startKeepalive() {
     if (_keepaliveTimer) return;
-    // Set 4-min recurring ping (warmup/session-restore already handled startup)
-    _keepaliveTimer = setInterval(_silentPing, 4 * 60 * 1000);
+    _keepaliveTimer = setInterval(_silentPing, 2 * 60 * 1000); // 2 min interval
+    _bindInactivityListener();
   }
+
   function stopKeepalive() {
     if (_keepaliveTimer) { clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
   }
+
   function _silentPing() {
     if (!getToken()) { stopKeepalive(); return; }
     call('ping', {}).catch(() => {});
+  }
+
+  function _bindInactivityListener() {
+    const onUserInteraction = () => {
+      const now = Date.now();
+      // If user was inactive for > 3 minutes, fire ping immediately to re-heat connection
+      if (now - _lastActivityTime > 3 * 60 * 1000) {
+        warmup();
+      }
+      _lastActivityTime = now;
+    };
+    ['mousemove', 'click', 'keydown', 'touchstart'].forEach(evt => {
+      window.addEventListener(evt, onUserInteraction, { passive: true });
+    });
+  }
+
+  // Auto-trigger warmup queue at DOMContentLoaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startWarmupQueue);
+  } else {
+    startWarmupQueue();
   }
 
   /* ------------------------------------------------------------------ */
@@ -278,13 +392,25 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   return {
     getToken, setToken, clearToken,
-    cacheBust, cacheBustAll,
-    warmup, startKeepalive, stopKeepalive,
+    cacheGet, cacheSet, cacheBust, cacheBustAll,
+    ssGet, ssSet,
+    warmup, startWarmupQueue, prefetchAll,
+    startKeepalive, stopKeepalive,
+    call, rawCall, batch,
 
     // Auth
     signup        : (p) => rawCall('signup', Object.assign({ language: (window.I18n ? I18n.getLang() : 'en') }, p)),
     login         : (p) => rawCall('login', p),
-    logout        : ()  => rawCall('logout', {}),
+    logout        : ()  => {
+      // PERF: sendBeacon for instant 0ms logout
+      const token = getToken();
+      if (token && navigator.sendBeacon && CONFIG.API_URL) {
+        const url = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + new URLSearchParams({ action: 'logout', token }).toString();
+        navigator.sendBeacon(url);
+      } else {
+        rawCall('logout', {}).catch(() => {});
+      }
+    },
     validateSession: () => call('validateSession', {}),
     currentUser   : ()  => call('currentUser', {}),
     updateProfile : (p) => rawCall('updateProfile', p),
@@ -299,7 +425,7 @@ const API = (function () {
     toggleCategoryStatus: async (id) => { const r = await rawCall('toggleCategoryStatus', { id }); cacheBust('categories'); return r; },
 
     // Topics
-    topics  : (f)  => call('topics', f || {}),
+    topics  : (f, opts) => call('topics', f || {}, opts),
     topic   : (id) => call('topic', { id }),
     createTopic: async (p) => { const r = await rawCall('createTopic', p); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
     updateTopic: async (p) => { const r = await rawCall('updateTopic', p); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
@@ -312,12 +438,9 @@ const API = (function () {
     knowledge    : (topicId) => call('knowledge', { topic_id: topicId }),
     saveKnowledge: async (p) => { const r = await rawCall('saveKnowledge', p); cacheBust('knowledge', 'topic'); return r; },
 
-    // Notes — paginated server-side. Returns { notes, total, limit, offset }.
-    // notes(opts) accepts: { module_id, search, tag, pinned_only, limit, offset }
+    // Notes
     notes : (opts) => call('notes', opts || {}).then(r => {
-      // Server returns { notes: [...], total, limit, offset } — extract the array for callers
       if (r && Array.isArray(r.notes)) { API._lastNotesMeta = { total: r.total, limit: r.limit, offset: r.offset }; return r.notes; }
-      // Legacy fallback (old server): r is already an array
       return Array.isArray(r) ? r : [];
     }),
     note      : (id) => call('note', { id }),
@@ -331,8 +454,8 @@ const API = (function () {
     markReviewed: async (id, p) => { const r = await rawCall('markReviewed', Object.assign({ id }, p || {})); cacheBust('reviews', 'topic', 'dashboard'); return r; },
 
     // Dashboard / analytics
-    dashboard : () => call('dashboard', {}),
-    analytics : () => call('analytics', {}),
+    dashboard : (opts) => call('dashboard', {}, opts),
+    analytics : (opts) => call('analytics', {}, Object.assign({ priority: 'LOW' }, opts || {})),
 
     // Admin
     adminUsers: () => call('adminUsers', {}),

@@ -247,6 +247,9 @@ function handleRequest(action, payload, token) {
       // Setup
       case 'seed':                  return jsonResponse(actionSeed());
 
+      // Batch requests — executes multiple actions in one round-trip
+      case 'batch':                return jsonResponse(withAuth(token, function(user){ return actionBatch(user, payload, token); }));
+
       // Keepalive — lightweight no-op used by the frontend to prevent cold starts
       case 'ping':                  return jsonResponse(successResponse({ pong: true }));
 
@@ -1440,4 +1443,22 @@ function seedDemoTopicsForUser(userId) {
     priority: 'Medium', status: 'Not Started', progress: 0,
     created_at: nowIso(), updated_at: nowIso(), completed_at: '', last_review: '', next_review: ''
   });
+}
+
+function actionBatch(user, payload, token) {
+  var requests = payload && payload.requests;
+  if (!Array.isArray(requests)) return errorResponse('Batch requests array required.', 'INVALID_BATCH');
+  var results = {};
+  for (var i = 0; i < requests.length; i++) {
+    var req = requests[i];
+    if (!req || !req.action) continue;
+    var res = handleRequest(req.action, req.payload || {}, token);
+    try {
+      var parsed = JSON.parse(res.getContent());
+      results[req.action] = parsed.data;
+    } catch (e) {
+      results[req.action] = null;
+    }
+  }
+  return successResponse(results);
 }

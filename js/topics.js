@@ -426,9 +426,39 @@ const Topics = (function () {
     modal.querySelector('#delete-topic-btn').addEventListener('click', () => {
       if (!confirm(I18n.t('topicDetail.confirmDeleteTopic'))) return;
       UI.closeModal();
-      UI.toast(I18n.t('toast.topicDeleted'), 'success');
-      Router.reload();
-      API.deleteTopic(id).catch(err => UI.toastError(err));
+
+      // PERF: Optimistic DOM removal (0ms)
+      const row = document.querySelector(`tr[data-id="${id}"]`);
+      if (row) row.style.display = 'none';
+
+      let undoClicked = false;
+      const isAr = I18n.getLang() === 'ar';
+
+      const timer = setTimeout(() => {
+        if (!undoClicked) {
+          API.deleteTopic(id).then(() => Router.reload()).catch(err => {
+            if (row) row.style.display = '';
+            UI.toastError(err);
+          });
+        }
+      }, 3000);
+
+      UI.toast(
+        `${I18n.t('toast.topicDeleted')} — <button id="undo-del-topic-${id}" style="background:none; border:none; color:var(--brass); text-decoration:underline; cursor:pointer; font-weight:700;">${isAr ? 'تراجع (Undo)' : 'Undo'}</button>`,
+        'info'
+      );
+
+      setTimeout(() => {
+        const undoBtn = document.getElementById(`undo-del-topic-${id}`);
+        if (undoBtn) {
+          undoBtn.addEventListener('click', () => {
+            undoClicked = true;
+            clearTimeout(timer);
+            if (row) row.style.display = '';
+            UI.toast(isAr ? 'تم إلغاء الحذف' : 'Deletion undone', 'success');
+          });
+        }
+      }, 50);
     });
 
     _bindStepper(modal, t, id);

@@ -1055,35 +1055,59 @@ const Notes = (function () {
 
     const deleteBtn = document.getElementById('confirm-delete-note-btn');
     deleteBtn.addEventListener('click', () => {
-      // ── OPTIMISTIC LOCAL UPDATE (0ms) ──────────────────────────────────
+      // PERF: Optimistic UI Deletion (0ms)
       const deletedIdx = _allNotesCache.findIndex(n => String(n.id) === String(note.id));
       if (deletedIdx !== -1) {
         _allNotesCache.splice(deletedIdx, 1);
       }
 
-      if (isAllNotesPage) {
-        const modFilter = document.querySelector('#all-notes-module-filter');
-        renderAllNotesGrouped(listWrap, searchInput ? searchInput.value : '', modFilter ? modFilter.value : '', badgeEl);
-      } else {
-        renderModuleNotesList(listWrap, searchInput ? searchInput.value : '', badgeEl);
-      }
-
-      UI.closeModal();
-      UI.toast(I18n.t('toast.noteDeleted'), 'success');
-
-      // ── BACKGROUND API CALL (non-blocking) ────────────────────────────
-      API.deleteNote(note.id).catch(err => {
-        if (deletedIdx !== -1) {
-          _allNotesCache.splice(deletedIdx, 0, note);
-        }
+      const refreshUI = () => {
         if (isAllNotesPage) {
           const modFilter = document.querySelector('#all-notes-module-filter');
           renderAllNotesGrouped(listWrap, searchInput ? searchInput.value : '', modFilter ? modFilter.value : '', badgeEl);
         } else {
           renderModuleNotesList(listWrap, searchInput ? searchInput.value : '', badgeEl);
         }
-        UI.toast(I18n.errorMessage(err), 'error');
-      });
+      };
+
+      refreshUI();
+      UI.closeModal();
+
+      // PERF: 3-Second Undo Bar before sending background delete API request
+      let undoClicked = false;
+      const isAr = I18n.getLang() === 'ar';
+      
+      const timer = setTimeout(() => {
+        if (!undoClicked) {
+          API.deleteNote(note.id).catch(err => {
+            if (deletedIdx !== -1) {
+              _allNotesCache.splice(deletedIdx, 0, note);
+              refreshUI();
+            }
+            UI.toast(I18n.errorMessage(err), 'error');
+          });
+        }
+      }, 3000);
+
+      UI.toast(
+        `${I18n.t('toast.noteDeleted')} — <button id="undo-del-note-${note.id}" style="background:none; border:none; color:var(--brass); text-decoration:underline; cursor:pointer; font-weight:700;">${isAr ? 'تراجع (Undo)' : 'Undo'}</button>`,
+        'info'
+      );
+
+      setTimeout(() => {
+        const undoBtn = document.getElementById(`undo-del-note-${note.id}`);
+        if (undoBtn) {
+          undoBtn.addEventListener('click', () => {
+            undoClicked = true;
+            clearTimeout(timer);
+            if (deletedIdx !== -1) {
+              _allNotesCache.splice(deletedIdx, 0, note);
+              refreshUI();
+            }
+            UI.toast(isAr ? 'تم إلغاء الحذف' : 'Deletion undone', 'success');
+          });
+        }
+      }, 50);
     });
   }
 

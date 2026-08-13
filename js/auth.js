@@ -1,16 +1,19 @@
 /**
- * js/auth.js
- * Ultra-fast Authentication & Session Management.
- * Features:
- *   - Instant Logout (0ms UI transition, background server notification)
- *   - Input-trigger Warmup (pre-heats Google Apps Script while user types credentials)
- *   - Instant Session Restore (0ms app boot using cached session data, background verification)
+ * js/auth.js - Instant Authentication & Non-blocking Session Management
+ *
+ * PERF FEATURES:
+ *  - 0ms First Paint: Shows login screen instantly without waiting for any API call.
+ *  - Non-blocking tryRestoreSession: Boots App shell in 0ms using cached user data while verifying in background.
+ *  - Reflow-free handleLogin: Uses a clean CSS spinner instead of repeating text changes every 2.5s.
+ *  - 0ms Logout: Instant local cleanup with navigator.sendBeacon background notification.
+ *  - Predictive Prefetch: Automatically triggers API.prefetchAll() immediately after successful login.
  */
 
 const Auth = (function () {
 
   const USER_LS_KEY = 'erp_tracker_user_v1';
 
+  // PERF: User Profile Cache
   function getCachedUser() {
     try {
       const raw = localStorage.getItem(USER_LS_KEY);
@@ -25,6 +28,7 @@ const Auth = (function () {
     } catch (e) {}
   }
 
+  // PERF: 0ms UI Transitions
   function showAuthScreen() {
     document.getElementById('auth-screen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
@@ -43,26 +47,17 @@ const Auth = (function () {
     document.getElementById('signup-form').classList.toggle('hidden', isLogin);
   }
 
+  // PERF: Reflow-free Login Handler
   async function handleLogin(e) {
     e.preventDefault();
     const errEl = document.getElementById('login-error');
     errEl.textContent = '';
     const btn = e.target.querySelector('button[type="submit"]');
-    const origText = btn.textContent;
+    const origHtml = btn.innerHTML;
     btn.disabled = true;
 
-    // Animated status indicator for cold-start resilience
-    const statusMsgs = [
-      I18n.t('auth.loginButton'),
-      '⏳ ' + (I18n.getLang() === 'ar' ? 'جاري الاتصال...' : 'Connecting...'),
-      '⏳ ' + (I18n.getLang() === 'ar' ? 'جاري التحقق...' : 'Authenticating...'),
-      '⏳ ' + (I18n.getLang() === 'ar' ? 'تحضير البيانات...' : 'Loading data...'),
-    ];
-    let msgIdx = 0;
-    const statusInterval = setInterval(() => {
-      msgIdx = (msgIdx + 1) % statusMsgs.length;
-      btn.textContent = statusMsgs[msgIdx];
-    }, 2500);
+    // PERF: Static spinner inside button — no layout thrashing or periodic text changes
+    btn.innerHTML = `<span class="spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-inline-end:6px;"></span> ${I18n.t('auth.loginButton')}`;
 
     try {
       const data = await API.login({
@@ -70,20 +65,23 @@ const Auth = (function () {
         password: document.getElementById('login-password').value,
         remember_me: document.getElementById('login-remember').checked
       });
-      clearInterval(statusInterval);
+
       API.setToken(data.token);
       State.currentUser = data.user;
       saveCachedUser(data.user);
 
       UI.toast(I18n.t('toast.loginSuccessful'), 'success');
       API.startKeepalive();
+
+      // PERF: Trigger predictive prefetch right after successful login
+      API.prefetchAll();
+
       await App.boot();
     } catch (err) {
-      clearInterval(statusInterval);
       errEl.textContent = I18n.errorMessage(err);
     } finally {
       btn.disabled = false;
-      btn.textContent = origText;
+      btn.innerHTML = origHtml;
     }
   }
 
@@ -114,27 +112,25 @@ const Auth = (function () {
   }
 
   /**
-   * Instant Logout (0ms):
-   * Immediately clears tokens, state, caches, and shows auth screen.
-   * Notifies the server asynchronously in the background.
+   * PERF: Instant Logout (0ms)
+   * Clears tokens, caches, state instantly in 0ms, and sends beacon background logout.
    */
   function logout() {
-    // 1. Background server notification (fire and forget)
-    API.logout().catch(() => {});
-
-    // 2. Instant 0ms local cleanup
+    API.logout(); // Sends beacon / background logout
     API.clearToken();
     API.cacheBustAll();
     API.stopKeepalive();
     if (typeof AutoSync !== 'undefined') AutoSync.stop();
     saveCachedUser(null);
-    try { localStorage.removeItem('erp_notes_cache_v2'); } catch(e) {}
+    try {
+      localStorage.removeItem('erp_notes_cache_v2');
+      sessionStorage.clear();
+    } catch(e) {}
 
     State.currentUser  = null;
     State.modulesCache = [];
     State.allCategories = [];
 
-    // 3. Immediately render auth screen
     showAuthScreen();
   }
 
@@ -144,9 +140,8 @@ const Auth = (function () {
   }
 
   /**
-   * Session Restore (0ms Instant Boot):
-   * If a token and cached user exist, boots the app shell in 0ms,
-   * then verifies the token asynchronously with the server in background.
+   * PERF: Non-blocking Session Restore (0ms App Boot)
+   * If token & cached user exist, boots App shell in 0ms, verifying in background.
    */
   async function tryRestoreSession() {
     const token = API.getToken();
@@ -155,11 +150,12 @@ const Auth = (function () {
     const cachedUser = getCachedUser();
 
     if (cachedUser) {
-      // 0ms instant boot using cached user credentials
+      // 0ms Instant Boot using cached user
       State.currentUser = cachedUser;
       API.startKeepalive();
+      API.prefetchAll();
 
-      // Silent background validation to keep user profile fresh
+      // Silent background validation — never blocks UI
       API.validateSession()
         .then(data => {
           State.currentUser = data.user;
@@ -174,7 +170,7 @@ const Auth = (function () {
       return true;
     }
 
-    // Fallback: no cached user profile — wait for network validation
+    // Fallback: network validation
     try {
       const data = await API.validateSession();
       State.currentUser = data.user;
@@ -182,6 +178,7 @@ const Auth = (function () {
       if (data.modules && data.modules.length) State.modulesCache = data.modules;
       if (data.categories && data.categories.length) State.allCategories = data.categories;
       API.startKeepalive();
+      API.prefetchAll();
       return true;
     } catch (err) {
       API.clearToken();
@@ -197,18 +194,6 @@ const Auth = (function () {
     document.getElementById('login-form').addEventListener('submit', handleLogin);
     document.getElementById('signup-form').addEventListener('submit', handleSignup);
     document.getElementById('logout-btn').addEventListener('click', logout);
-
-    // Warmup Trigger: Pre-heat Google Apps Script as soon as user interacts with login inputs
-    const loginForm = document.getElementById('login-form');
-    if (loginForm) {
-      const triggerWarmup = () => {
-        API.warmup();
-        loginForm.removeEventListener('focusin', triggerWarmup);
-        loginForm.removeEventListener('input', triggerWarmup);
-      };
-      loginForm.addEventListener('focusin', triggerWarmup);
-      loginForm.addEventListener('input', triggerWarmup);
-    }
   }
 
   return { init, showAuthScreen, showApp, tryRestoreSession, logout, onSessionExpired };

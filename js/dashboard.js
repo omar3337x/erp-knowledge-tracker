@@ -1,12 +1,17 @@
 /**
- * js/dashboard.js
- * Renders the main Dashboard with Stale-While-Revalidate instant load (0ms).
- * Features: KPI row, Pinned Items Widget (📌), Learning Goals (🎯), Module Cards, Review Summary.
+ * js/dashboard.js - High Performance Dashboard Renderer
+ *
+ * PERF FEATURES:
+ *  - Aggressive Stale-While-Revalidate (0ms instant render using cache, no spinner if cache exists)
+ *  - Skeleton UI Shimmers (Replaces raw spinner when first loading without cache)
+ *  - DOM Hash Diffing: Avoids layout thrashing if background fetch data matches current rendered state
+ *  - requestAnimationFrame scheduling for smooth 60fps gauge rendering
  */
 
 const Dashboard = (function () {
 
   let _prefetchDone = false;
+  let _lastRenderedHash = '';
   const DASHBOARD_LS_KEY = 'erp_dashboard_cache_v1';
 
   function getCachedDashboard() {
@@ -22,22 +27,36 @@ const Dashboard = (function () {
     } catch (e) {}
   }
 
+  function computeHash(data) {
+    if (!data) return '';
+    return JSON.stringify(data.kpis) + ':' + (data.topics ? data.topics.length : 0) + ':' + (data.modules ? data.modules.map(m=>m.id+m.progress).join(',') : '');
+  }
+
   async function render(container) {
     const cachedData = getCachedDashboard();
 
-    // ── 0ms Instant Render using cached dashboard if available ─────────
+    // PERF: 0ms Instant Render using cache if available — NEVER show spinner when cache exists
     if (cachedData && cachedData.kpis) {
       drawDashboard(container, cachedData);
     } else {
-      container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
+      // PERF: Layout-matching Skeleton Shimmers instead of generic spinner
+      container.innerHTML = `
+        ${UI.skeleton('kpi')}
+        <div style="margin-bottom:24px;">${UI.skeleton()}</div>
+        ${UI.skeleton('modules')}
+      `;
     }
 
-    // ── Network fetch in background / parallel ────────────────────────
+    // PERF: Background network fetch
     try {
       const freshData = await API.dashboard();
       saveCachedDashboard(freshData);
-      // Re-render only if data wasn't rendered yet or changed
-      drawDashboard(container, freshData);
+      
+      // PERF: Only re-render if data has changed (prevents DOM thrashing)
+      const freshHash = computeHash(freshData);
+      if (freshHash !== _lastRenderedHash || !cachedData) {
+        drawDashboard(container, freshData);
+      }
     } catch (err) {
       if (!cachedData) {
         container.innerHTML = UI.errorState(err);
@@ -46,19 +65,17 @@ const Dashboard = (function () {
   }
 
   function drawDashboard(container, data) {
+    _lastRenderedHash = computeHash(data);
     const k = data.kpis;
     const isAr = I18n.getLang() === 'ar';
 
-    // Topics come embedded in the dashboard response — zero extra network calls
     const allTopics = Array.isArray(data.topics) ? data.topics : [];
-
     const pinnedTopics = allTopics.filter(t => t.pinned === true || t.pinned === 'TRUE' || t.pinned === 'true' || t.pinned === 1);
     const goalsTopics  = allTopics.filter(t => t.target_date && t.status !== 'Mastered');
 
-    // Seed the in-memory API cache so subsequent pages (module, gaps, review) get topics instantly
     if (allTopics.length) API._dashboardTopics = allTopics;
 
-    container.innerHTML = `
+    const html = `
       <div class="grid grid-kpi" style="margin-bottom:24px;">
         ${kpiCard(I18n.t('dashboard.overallProgress'), k.overall_progress + '%', 'brass')}
         ${kpiCard(I18n.t('dashboard.totalTopics'), k.total_topics, '')}
@@ -140,25 +157,24 @@ const Dashboard = (function () {
       </div>
     `;
 
-    container.querySelectorAll('.module-card').forEach(card => {
-      card.addEventListener('click', () => Router.go('module', { id: card.dataset.moduleId }));
-    });
-    container.querySelectorAll('.dash-pinned-item, .dash-goal-item').forEach(el => {
-      el.addEventListener('click', () => Topics.openDetail(el.dataset.id));
-    });
+    // PERF: Scheduled 60fps DOM render
+    window.requestAnimationFrame(() => {
+      container.innerHTML = html;
 
-    const reviewBtn = container.querySelector('[data-route="review"]');
-    if (reviewBtn) reviewBtn.addEventListener('click', () => Router.go('review'));
+      container.querySelectorAll('.module-card').forEach(card => {
+        card.addEventListener('click', () => Router.go('module', { id: card.dataset.moduleId }));
+      });
+      container.querySelectorAll('.dash-pinned-item, .dash-goal-item').forEach(el => {
+        el.addEventListener('click', () => Topics.openDetail(el.dataset.id));
+      });
+
+      const reviewBtn = container.querySelector('[data-route="review"]');
+      if (reviewBtn) reviewBtn.addEventListener('click', () => Router.go('review'));
+    });
 
     if (!_prefetchDone) {
       _prefetchDone = true;
-      setTimeout(() => {
-        API.topics({}).catch(() => {});
-        setTimeout(() => {
-          API.notes({ module_id: '', search: '' }).catch(() => {});
-          API.reviews().catch(() => {});
-        }, 500);
-      }, 200);
+      API.prefetchAll();
     }
   }
 

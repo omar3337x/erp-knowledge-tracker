@@ -1,37 +1,32 @@
 /**
- * js/modules.js
- * Renders a single Module's dashboard: stats + filterable Topics table +
- * the Categories management section for that module.
+ * js/modules.js - High Performance Module Dashboard Renderer
  *
- * PERFORMANCE STRATEGY:
- *   We always call API.topics({}) — which fetches ALL topics for the user
- *   in one round-trip — then filter to the current module in memory.
- *   The dashboard pre-warms this cache key in the background right after
- *   boot, so by the time the user clicks any module the data is already
- *   ready and this function returns in < 1ms.
- *
- *   Modules and Categories are already in State from the one-time reference
- *   data load at boot, so no extra calls for those.
+ * PERF FEATURES:
+ *  - Skeleton UI Shimmers: Displays table skeletons during fetch
+ *  - Memory-based Filtering: Instant 0ms response on status/priority/category dropdown changes
+ *  - Fast DocumentFragment insertion for DOM updates
  */
 
 const Modules = (function () {
 
   async function render(container, moduleId) {
-    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
-
     const mod = State.modulesCache.find(m => m.id === moduleId);
     if (!mod) { container.innerHTML = UI.errorState({ code: 'MODULE_NOT_FOUND' }); return; }
 
+    // PERF: Layout Shimmer UI instead of spinner
+    container.innerHTML = `
+      <div style="margin-bottom:20px;">${UI.skeleton('kpi')}</div>
+      ${UI.skeleton('table')}
+    `;
+
     let allTopics;
     try {
-      // ONE cached call — gets all user topics. Filter to this module below.
       allTopics = await API.topics({});
     } catch (err) {
       container.innerHTML = UI.errorState(err);
       return;
     }
 
-    // Filter to just this module's topics (instant, in memory)
     const topics = allTopics.filter(t => t.module_id === moduleId);
     const stats   = computeStats(topics);
 
@@ -69,9 +64,7 @@ const Modules = (function () {
       </div>
 
       <div id="topics-table-wrap"></div>
-
       <div id="notes-section-wrap-module"></div>
-
       <div id="categories-section-wrap" style="margin-top:32px;"></div>
     `;
 
@@ -88,12 +81,13 @@ const Modules = (function () {
       Topics.renderTable(tableWrap, filtered, { emptyHint: I18n.t('empty.startAdding') });
     };
     draw();
+
+    // PERF: Instant 0ms memory filter change
     container.querySelectorAll('#filter-category,#filter-status,#filter-priority')
       .forEach(el => el.addEventListener('change', draw));
 
     container.querySelector('#add-gap-btn').addEventListener('click', () => {
       Topics.openAddModal(moduleId, () => {
-        // Bust topics cache so new topic appears, then re-render
         API.cacheBust('topics');
         Router.go('module', { id: moduleId });
       });
