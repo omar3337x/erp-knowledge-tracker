@@ -630,8 +630,6 @@ function actionLogin(payload) {
   if (!verifyPassword(password, match.password_hash)) return errorResponse('Invalid credentials.', 'INVALID_CREDENTIALS');
 
   var token = createSession(match.id, rememberMe);
-  updateRow(SHEET_NAMES.USERS, match.id, { last_login: nowIso() });
-  invalidateUserCache(match.id);
   match.last_login = nowIso();
 
   return successResponse({ token: token, user: publicUser(match) }, 'Login successful.');

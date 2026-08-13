@@ -120,8 +120,14 @@ const API = (function () {
   }
   function cacheBustAll() { _mem.clear(); lsBustAll(); }
 
-  /* ------------------------------------------------------------------ */
-  /* Warmup Gate — Ensures only ONE request pays the cold-start retry    */
+  const MAX_ATTEMPTS = 5;
+  // Delay schedule (ms): 1200ms on first retry (gives GAS cold-start time to complete), then 2000, 3000
+  function _retryDelay(attempt) {
+    if (attempt === 1) return 1200;
+    if (attempt === 2) return 2000;
+    return 3000;
+  }
+
   async function rawCall(action, payload, attempt) {
     attempt = attempt || 1;
 
