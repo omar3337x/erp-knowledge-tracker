@@ -155,7 +155,17 @@ const API = (function () {
   // PERF: Active Controllers for cancelable requests
   const activeControllers = new Map();
 
-  async function rawCall(action, payload, attempt, options) {
+  // PERF: Sequential Request Queueing to prevent parallel GAS fetch collisions (302 -> 404 echo errors)
+  let _requestQueue = Promise.resolve();
+
+  function rawCall(action, payload, attempt, options) {
+    const run = () => _executeRawCall(action, payload, attempt, options);
+    const p = _requestQueue.then(run, run);
+    _requestQueue = p.catch(() => {});
+    return p;
+  }
+
+  async function _executeRawCall(action, payload, attempt, options) {
     attempt = attempt || 1;
     options = options || {};
 
@@ -204,7 +214,7 @@ const API = (function () {
       if (networkErr.name === 'AbortError') throw networkErr; // Request intentionally canceled
       if (attempt < MAX_ATTEMPTS) {
         await _sleep(_retryDelay(attempt, false));
-        return rawCall(action, payload, attempt + 1, options);
+        return _executeRawCall(action, payload, attempt + 1, options);
       }
       const err = new Error('Network error contacting the API.');
       err.code = 'NETWORK_ERROR';
@@ -215,7 +225,7 @@ const API = (function () {
     if (res.status === 429) {
       if (attempt < MAX_ATTEMPTS) {
         await _sleep(_retryDelay(attempt, true));
-        return rawCall(action, payload, attempt + 1, options);
+        return _executeRawCall(action, payload, attempt + 1, options);
       }
       const err = new Error('Rate limit exceeded. Please wait a moment.');
       err.code = 'RATE_LIMIT';
@@ -226,7 +236,7 @@ const API = (function () {
     if (res.status === 404) {
       if (attempt < MAX_ATTEMPTS) {
         await _sleep(_retryDelay(attempt, false));
-        return rawCall(action, payload, attempt + 1, options);
+        return _executeRawCall(action, payload, attempt + 1, options);
       }
       const err = new Error('Service temporarily unavailable. Please try again.');
       err.code = 'SERVICE_UNAVAILABLE';
@@ -238,7 +248,7 @@ const API = (function () {
     catch (parseErr) {
       if (attempt < MAX_ATTEMPTS) {
         await _sleep(_retryDelay(attempt, false));
-        return rawCall(action, payload, attempt + 1, options);
+        return _executeRawCall(action, payload, attempt + 1, options);
       }
       const err = new Error('Unexpected response from the API.');
       err.code = 'SERVER_ERROR';
@@ -434,7 +444,22 @@ const API = (function () {
     toggleCategoryStatus: async (id) => { const r = await rawCall('toggleCategoryStatus', { id }); cacheBust('categories'); return r; },
 
     // Topics
-    topics  : (f, opts) => call('topics', f || {}, opts),
+    topics  : (f, opts) => {
+      f = f || {};
+      const allTopics = cacheGet('topics:{}', 'topics');
+      if (allTopics && Array.isArray(allTopics)) {
+        let filtered = allTopics;
+        if (f.module_id) filtered = filtered.filter(t => t.module_id === f.module_id);
+        if (f.category_id) filtered = filtered.filter(t => t.category_id === f.category_id);
+        if (f.status) filtered = filtered.filter(t => t.status === f.status);
+        if (f.search) {
+          const q = f.search.toLowerCase();
+          filtered = filtered.filter(t => (t.title_ar && t.title_ar.toLowerCase().includes(q)) || (t.title_en && t.title_en.toLowerCase().includes(q)));
+        }
+        return Promise.resolve(filtered);
+      }
+      return call('topics', f, opts);
+    },
     topic   : (id) => call('topic', { id }),
     createTopic: async (p) => { const r = await rawCall('createTopic', p); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
     updateTopic: async (p) => { const r = await rawCall('updateTopic', p); cacheBust('topics', 'topic', 'dashboard', 'analytics'); return r; },
@@ -448,17 +473,33 @@ const API = (function () {
     saveKnowledge: async (p) => { const r = await rawCall('saveKnowledge', p); cacheBust('knowledge', 'topic'); return r; },
 
     // Notes
-    notes : (opts) => call('notes', opts || {}).then(r => {
-      if (r && Array.isArray(r.notes)) { API._lastNotesMeta = { total: r.total, limit: r.limit, offset: r.offset }; return r.notes; }
-      return Array.isArray(r) ? r : [];
-    }),
+    notes : (opts) => {
+      opts = opts || {};
+      const cached = cacheGet('notes:{}', 'notes');
+      if (cached) {
+        let notesList = Array.isArray(cached.notes) ? cached.notes : (Array.isArray(cached) ? cached : []);
+        if (opts.module_id) notesList = notesList.filter(n => n.module_id === opts.module_id);
+        API._lastNotesMeta = { total: notesList.length, limit: opts.limit || 50, offset: opts.offset || 0 };
+        return Promise.resolve(notesList);
+      }
+      return call('notes', opts).then(r => {
+        if (r && Array.isArray(r.notes)) { API._lastNotesMeta = { total: r.total, limit: r.limit, offset: r.offset }; return r.notes; }
+        return Array.isArray(r) ? r : [];
+      });
+    },
     note      : (id) => call('note', { id }),
     createNote: async (p) => { const r = await rawCall('createNote', p); cacheBust('notes'); return r; },
     updateNote: async (p) => { const r = await rawCall('updateNote', p); cacheBust('notes', 'note'); return r; },
     deleteNote: async (id) => { const r = await rawCall('deleteNote', { id }); cacheBust('notes', 'note'); return r; },
 
     // Reviews
-    reviews  : (topicId) => call('reviews', topicId ? { topic_id: topicId } : {}),
+    reviews  : (topicId) => {
+      const cached = cacheGet('reviews:{}', 'reviews');
+      if (cached && Array.isArray(cached) && topicId) {
+        return Promise.resolve(cached.filter(r => r.topic_id === topicId));
+      }
+      return call('reviews', topicId ? { topic_id: topicId } : {});
+    },
     addReview: async (p) => { const r = await rawCall('addReview', p); cacheBust('reviews', 'topic', 'dashboard'); return r; },
     markReviewed: async (id, p) => { const r = await rawCall('markReviewed', Object.assign({ id }, p || {})); cacheBust('reviews', 'topic', 'dashboard'); return r; },
 
