@@ -169,18 +169,36 @@ const Profile = (function () {
   }
 
   async function renderAdmin(container) {
-    container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
-    let data;
-    let aiSettings = { endpoint: 'https://router.bynara.id/v1', model: 'gemini-3.6-medium', masked_key: '••••••••••••••••', daily_count: 5, enabled: true };
-    try {
-      [data, aiSettings] = await Promise.all([
-        API.adminUsers(),
-        API.getAISettings().catch(() => aiSettings)
-      ]);
-    } catch (err) {
-      container.innerHTML = UI.errorState(err);
-      return;
+    let aiSettingsDefault = { endpoint: 'https://router.bynara.id/v1', model: 'gemini-3.6-medium', masked_key: '••••••••••••••••', daily_count: 5, enabled: true };
+    let dataDefault = { total_users: 1, active_users: 1, new_users: 0, users: [] };
+
+    // PERF: Try cache first (0ms instant render)
+    let cachedData = (typeof API !== 'undefined' && API.cacheGet) ? API.cacheGet('adminUsers:{}', 'adminUsers') : null;
+    let cachedAi = (typeof API !== 'undefined' && API.cacheGet) ? API.cacheGet('getAISettings:{}', 'getAISettings') : null;
+
+    if (!cachedData || !cachedAi) {
+      container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
     }
+
+    let data = cachedData || dataDefault;
+    let aiSettings = cachedAi || aiSettingsDefault;
+
+    // PERF: Single batch call instead of parallel Promise.all to prevent 404 concurrency limits on GAS
+    try {
+      const batchRes = await API.batch([
+        { action: 'adminUsers', payload: {} },
+        { action: 'getAISettings', payload: {} }
+      ]);
+      if (batchRes && batchRes.adminUsers) data = batchRes.adminUsers;
+      if (batchRes && batchRes.getAISettings) aiSettings = batchRes.getAISettings;
+    } catch (err) {
+      if (!cachedData) {
+        // Fallback: try individual sequential calls
+        try { data = await API.adminUsers(); } catch (e) {}
+        try { aiSettings = await API.getAISettings(); } catch (e) {}
+      }
+    }
+
 
     container.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">

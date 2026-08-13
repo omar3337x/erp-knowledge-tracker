@@ -333,7 +333,7 @@ const Modules = (function () {
     const modLower = nameEn + ' ' + nameAr + ' ' + idLower;
 
     // 1. Inventory (المخزون)
-    if (modLower.includes('inventory') || modLower.includes('mod-1') || modLower.includes('مخزون')) {
+    if (modLower.includes('inventory') || modLower.includes('مخزون') || /\bmod-1\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,
@@ -363,7 +363,7 @@ const Modules = (function () {
     }
 
     // 2. Accounting (الحسابات)
-    if (modLower.includes('account') || modLower.includes('mod-2') || modLower.includes('حسابات')) {
+    if (modLower.includes('account') || modLower.includes('حسابات') || /\bmod-2\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,
@@ -385,7 +385,7 @@ const Modules = (function () {
     }
 
     // 3. HR (الموارد البشرية)
-    if (modLower.includes('hr') || modLower.includes('mod-6') || modLower.includes('human') || modLower.includes('بشرية') || modLower.includes('موارد')) {
+    if (modLower.includes('hr') || modLower.includes('human') || modLower.includes('بشرية') || modLower.includes('موارد') || /\bmod-6\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,
@@ -415,7 +415,7 @@ const Modules = (function () {
     }
 
     // 4. Maintenance (الصيانة)
-    if (modLower.includes('maint') || modLower.includes('mod-3') || modLower.includes('صيانة')) {
+    if (modLower.includes('maint') || modLower.includes('صيانة') || /\bmod-3\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,
@@ -437,7 +437,7 @@ const Modules = (function () {
     }
 
     // 5. Assets (الأصول)
-    if (modLower.includes('asset') || modLower.includes('mod-4') || modLower.includes('أصول')) {
+    if (modLower.includes('asset') || modLower.includes('أصول') || /\bmod-4\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,
@@ -459,7 +459,7 @@ const Modules = (function () {
     }
 
     // 6. Transportation (النقليات)
-    if (modLower.includes('trans') || modLower.includes('fleet') || modLower.includes('mod-5') || modLower.includes('نقليات') || modLower.includes('مركبات')) {
+    if (modLower.includes('trans') || modLower.includes('fleet') || modLower.includes('نقليات') || modLower.includes('مركبات') || /\bmod-5\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,
@@ -481,7 +481,7 @@ const Modules = (function () {
     }
 
     // 7. Real Estate (العقارات)
-    if (modLower.includes('real') || modLower.includes('estate') || modLower.includes('mod-7') || modLower.includes('عقارات') || modLower.includes('عقار')) {
+    if (modLower.includes('real') || modLower.includes('estate') || modLower.includes('عقارات') || modLower.includes('عقار') || /\bmod-7\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,
@@ -503,7 +503,7 @@ const Modules = (function () {
     }
 
     // 8. Contracting (المقاولات)
-    if (modLower.includes('contract') || modLower.includes('mod-8') || modLower.includes('مقاولات') || modLower.includes('مشروع')) {
+    if (modLower.includes('contract') || modLower.includes('مقاولات') || modLower.includes('مشروع') || /\bmod-8\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,
@@ -525,7 +525,7 @@ const Modules = (function () {
     }
 
     // 9. Fuel Stations (الوقود)
-    if (modLower.includes('fuel') || modLower.includes('mod-9') || modLower.includes('وقود') || modLower.includes('محطة')) {
+    if (modLower.includes('fuel') || modLower.includes('وقود') || modLower.includes('محطة') || /\bmod-9\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,
@@ -547,7 +547,7 @@ const Modules = (function () {
     }
 
     // 10. Law Firm (المحاماة)
-    if (modLower.includes('law') || modLower.includes('legal') || modLower.includes('mod-10') || modLower.includes('محاماة') || modLower.includes('قانون')) {
+    if (modLower.includes('law') || modLower.includes('legal') || modLower.includes('محاماة') || modLower.includes('قانون') || /\bmod-10\b/i.test(modLower)) {
       return [
         {
           id: 'AI-' + moduleId + '-1', module_id: moduleId,

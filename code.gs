@@ -2019,7 +2019,7 @@ function getFallbackInsights(moduleId, lang) {
   var modLower = (String(moduleId || '') + ' ' + modNameEn + ' ' + modNameAr).toLowerCase();
 
   // 1. Inventory (المخزون)
-  if (modLower.indexOf('inventory') !== -1 || modLower.indexOf('mod-1') !== -1 || modLower.indexOf('مخزون') !== -1) {
+  if (modLower.indexOf('inventory') !== -1 || modLower.indexOf('مخزون') !== -1 || /\bmod-1\b/i.test(modLower)) {
     return [
       {
         title: isAr ? 'الربط التلقائي بين تقييم المخزون والقيود المحاسبية' : 'Automated Inventory Valuation & Journal Entries',
@@ -2046,7 +2046,7 @@ function getFallbackInsights(moduleId, lang) {
   }
 
   // 2. Accounting (الحسابات)
-  if (modLower.indexOf('account') !== -1 || modLower.indexOf('mod-2') !== -1 || modLower.indexOf('حسابات') !== -1) {
+  if (modLower.indexOf('account') !== -1 || modLower.indexOf('حسابات') !== -1 || /\bmod-2\b/i.test(modLower)) {
     return [
       {
         title: isAr ? 'إقفال الفترات المالية وتثبيت القيود (Period Lock)' : 'Period Lock & Journal Entry Controls',
@@ -2066,7 +2066,7 @@ function getFallbackInsights(moduleId, lang) {
   }
 
   // 3. HR (الموارد البشرية)
-  if (modLower.indexOf('hr') !== -1 || modLower.indexOf('mod-6') !== -1 || modLower.indexOf('human') !== -1 || modLower.indexOf('بشرية') !== -1 || modLower.indexOf('موارد') !== -1) {
+  if (modLower.indexOf('hr') !== -1 || modLower.indexOf('human') !== -1 || modLower.indexOf('بشرية') !== -1 || modLower.indexOf('موارد') !== -1 || /\bmod-6\b/i.test(modLower)) {
     return [
       {
         title: isAr ? 'حساب مكافأة نهاية الخدمة التلقائي (EOS Calculation)' : 'Automated End-of-Service (EOS) & Gratuity Rules',
@@ -2093,7 +2093,7 @@ function getFallbackInsights(moduleId, lang) {
   }
 
   // 4. Maintenance (الصيانة)
-  if (modLower.indexOf('maint') !== -1 || modLower.indexOf('mod-3') !== -1 || modLower.indexOf('صيانة') !== -1) {
+  if (modLower.indexOf('maint') !== -1 || modLower.indexOf('صيانة') !== -1 || /\bmod-3\b/i.test(modLower)) {
     return [
       {
         title: isAr ? 'جدولة الصيانة الوقائية بالعدادات (Preventive Maintenance)' : 'Meter & Meter-Hour Triggered Maintenance',
@@ -2113,7 +2113,7 @@ function getFallbackInsights(moduleId, lang) {
   }
 
   // 5. Assets (الأصول)
-  if (modLower.indexOf('asset') !== -1 || modLower.indexOf('mod-4') !== -1 || modLower.indexOf('أصول') !== -1) {
+  if (modLower.indexOf('asset') !== -1 || modLower.indexOf('أصول') !== -1 || /\bmod-4\b/i.test(modLower)) {
     return [
       {
         title: isAr ? 'إهلاك الأصول الآلي شهرياً (Automated Asset Depreciation)' : 'Automated Monthly Depreciation Posting',
@@ -2133,7 +2133,7 @@ function getFallbackInsights(moduleId, lang) {
   }
 
   // 6. Transportation (النقليات)
-  if (modLower.indexOf('trans') !== -1 || modLower.indexOf('fleet') !== -1 || modLower.indexOf('mod-5') !== -1 || modLower.indexOf('نقليات') !== -1 || modLower.indexOf('مركبات') !== -1) {
+  if (modLower.indexOf('trans') !== -1 || modLower.indexOf('fleet') !== -1 || modLower.indexOf('نقليات') !== -1 || modLower.indexOf('مركبات') !== -1 || /\bmod-5\b/i.test(modLower)) {
     return [
       {
         title: isAr ? 'مراقبة معدل استهلاك الوقود لكل 100 كم (Fuel Consumption Ratio)' : 'Vehicle Fuel Efficiency & Theft Detection Ratio',
@@ -2153,7 +2153,7 @@ function getFallbackInsights(moduleId, lang) {
   }
 
   // 7. Real Estate (العقارات)
-  if (modLower.indexOf('real') !== -1 || modLower.indexOf('estate') !== -1 || modLower.indexOf('mod-7') !== -1 || modLower.indexOf('عقارات') !== -1 || modLower.indexOf('عقار') !== -1) {
+  if (modLower.indexOf('real') !== -1 || modLower.indexOf('estate') !== -1 || modLower.indexOf('عقارات') !== -1 || modLower.indexOf('عقار') !== -1 || /\bmod-7\b/i.test(modLower)) {
     return [
       {
         title: isAr ? 'توزيع الإيراد المؤجل للإيجارات (Deferred Rent Revenue)' : 'Accrual Accounting on Deferred Rental Revenue',
@@ -2173,7 +2173,7 @@ function getFallbackInsights(moduleId, lang) {
   }
 
   // 8. Contracting (المقاولات)
-  if (modLower.indexOf('contract') !== -1 || modLower.indexOf('mod-8') !== -1 || modLower.indexOf('مقاولات') !== -1 || modLower.indexOf('مشروع') !== -1) {
+  if (modLower.indexOf('contract') !== -1 || modLower.indexOf('مقاولات') !== -1 || modLower.indexOf('مشروع') !== -1 || /\bmod-8\b/i.test(modLower)) {
     return [
       {
         title: isAr ? 'شهادات إنجاز الأعمال والمحتجزات (IPC & Retention Accounting)' : 'Interim Payment Certificate (IPC) & Retention Accounting',
@@ -2193,7 +2193,7 @@ function getFallbackInsights(moduleId, lang) {
   }
 
   // 9. Fuel Stations (الوقود)
-  if (modLower.indexOf('fuel') !== -1 || modLower.indexOf('mod-9') !== -1 || modLower.indexOf('وقود') !== -1 || modLower.indexOf('محطة') !== -1) {
+  if (modLower.indexOf('fuel') !== -1 || modLower.indexOf('وقود') !== -1 || modLower.indexOf('محطة') !== -1 || /\bmod-9\b/i.test(modLower)) {
     return [
       {
         title: isAr ? 'تسوية قراءات العدادات ومبيعات الورديات (Shift Nozzle Reconciliation)' : 'Shift Meter Reading & Cash Collection Reconciliation',
@@ -2213,7 +2213,8 @@ function getFallbackInsights(moduleId, lang) {
   }
 
   // 10. Law Firm (المحاماة)
-  if (modLower.indexOf('law') !== -1 || modLower.indexOf('legal') !== -1 || modLower.indexOf('mod-10') !== -1 || modLower.indexOf('محاماة') !== -1 || modLower.indexOf('قانون') !== -1) {
+  if (modLower.indexOf('law') !== -1 || modLower.indexOf('legal') !== -1 || modLower.indexOf('محاماة') !== -1 || modLower.indexOf('قانون') !== -1 || /\bmod-10\b/i.test(modLower)) {
+
     return [
       {
         title: isAr ? 'متابعة مواعيد الجلسات القضائية والتنبيه الآلي (Court Session Deadlines)' : 'Court Session & Hearing Calendar Auto-Sync',

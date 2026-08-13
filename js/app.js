@@ -248,10 +248,13 @@ async function loadReferenceData() {
   } catch (e) { /* corrupt cache — fall through */ }
 
   try {
-    const [modules, categories] = await Promise.all([
-      API.modules().catch(() => null),
-      API.categories().catch(() => null)
-    ]);
+    const batchRes = await API.batch([
+      { action: 'modules', payload: {} },
+      { action: 'categories', payload: {} }
+    ]).catch(() => ({}));
+    const modules = batchRes.modules;
+    const categories = batchRes.categories;
+
     if (Array.isArray(modules) && modules.length > 0) {
       State.modulesCache = modules;
     } else if (!Array.isArray(State.modulesCache) || !State.modulesCache.length) {
@@ -265,6 +268,7 @@ async function loadReferenceData() {
       modules: State.modulesCache,
       categories: State.allCategories || []
     }));
+
   } catch (e) {
     if (!Array.isArray(State.modulesCache) || !State.modulesCache.length) {
       State.modulesCache = DEFAULT_MODULES;
