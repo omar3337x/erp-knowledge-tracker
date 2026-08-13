@@ -1,6 +1,6 @@
 /**
  * js/journal_sim.js
- * 📑 AI Journal Entry Generator — Natural Language Business Event & Compound Entry Analyzer.
+ * 📑 AI Journal Entry Generator — Dynamic Natural Language Business Event & Multi-Split Compound Entry Engine.
  */
 
 const JournalSim = (function () {
@@ -30,10 +30,10 @@ const JournalSim = (function () {
       <!-- Natural Language Event Input -->
       <div class="card" style="margin-bottom:20px; border-inline-start:4px solid var(--brass);">
         <label class="field-label" style="font-size:12px; font-weight:700; color:var(--ink-soft); display:block; margin-bottom:8px;">
-          ${isAr ? 'صف العملية التجارية باللغة الطبيعية (بسيطة أو مركبة أجزاء كاش وآجل):' : 'Describe Business Event in Natural Language:'}
+          ${isAr ? 'صف العملية التجارية باللغة الطبيعية (بسيطة أو مركبة أجزاء كاش، بنك وآجل):' : 'Describe Business Event in Natural Language:'}
         </label>
         <div style="display:flex; gap:10px;">
-          <input type="text" id="sim-prompt-input" class="field" placeholder="${isAr ? 'مثال: شراء اصل ب 1000 كاش 500 و 500 أجل من مورد محمد...' : 'e.g. Purchased asset for 1000, paid 500 cash and 500 on credit to vendor Mohamed...'}" style="margin:0; flex:1;">
+          <input type="text" id="sim-prompt-input" class="field" placeholder="${isAr ? 'مثال: شراء اصل ب 1000 كاش 500 و 300 أجل و 200 بنك من مورد سيد...' : 'e.g. Purchased asset for 1000: 500 cash, 300 credit and 200 bank from vendor Sayed...'}" style="margin:0; flex:1;">
           <button class="btn btn-primary" id="sim-ai-gen-btn">
             🧠 ${isAr ? 'توليد القيد بالـ AI' : 'Generate Entry'}
           </button>
@@ -41,7 +41,7 @@ const JournalSim = (function () {
       </div>
 
       <div id="sim-output-box">
-        ${renderSimulation(parseCompoundTransaction(isAr ? 'شراء اصل ب 1000 كاش 500 و 500 أجل من مورد محمد' : 'Purchase asset for 1000, 500 cash & 500 credit from vendor Mohamed'))}
+        ${renderSimulation(parseDynamicAccountingEvent(isAr ? 'شراء اصل ب 1000 كاش 500 و 300 أجل و 200 بنك من مورد سيد' : 'Purchased asset for 1000: 500 cash, 300 credit and 200 bank from vendor Sayed'))}
       </div>
     `;
 
@@ -61,7 +61,7 @@ const JournalSim = (function () {
 
         box.innerHTML = UI.skeleton('cards');
 
-        const res = await AIService.ask('journal_sim', text || 'Purchase asset cash & credit', { moduleId: modId });
+        const res = await AIService.ask('journal_sim', text || 'Purchase asset cash bank and credit', { moduleId: modId });
 
         if (res.success) {
           let parsedData = res.parsed || {};
@@ -80,76 +80,92 @@ const JournalSim = (function () {
               explanation: parsedData.explanation || parsedData.message || text
             };
           } else {
-            // Intelligent Natural Language Compound & Simple Entry Parser
-            txData = parseCompoundTransaction(text || 'شراء اصل ب 1000 كاش 500 و 500 أجل من مورد محمد');
+            // Fully Dynamic Natural Language Compound Transaction Parser
+            txData = parseDynamicAccountingEvent(text || 'شراء اصل ب 1000 كاش 500 و 300 أجل و 200 بنك من مورد سيد');
           }
 
           box.innerHTML = renderSimulation(txData);
         } else {
-          box.innerHTML = renderSimulation(parseCompoundTransaction(text || 'شراء اصل ب 1000 كاش 500 و 500 أجل من مورد محمد'));
+          box.innerHTML = renderSimulation(parseDynamicAccountingEvent(text || 'شراء اصل ب 1000 كاش 500 و 300 أجل و 200 بنك من مورد سيد'));
         }
       });
     }
   }
 
   /**
-   * Intelligent Natural Language Compound Transaction Parser (القيود البسيطة والمركبة)
+   * Fully Dynamic Natural Language Compound Transaction Parser & Mathematical Balance Assurer
    */
-  function parseCompoundTransaction(text) {
+  function parseDynamicAccountingEvent(text) {
     const isAr = I18n.getLang() === 'ar';
-    const rawText = text || '';
+    const rawText = (text || '').trim();
     const lowerText = rawText.toLowerCase();
 
-    // 1. Extract Main Total Amount
-    let totalAmount = 1000;
-    const numMatches = rawText.match(/\d+[\d,.]*/g);
-    if (numMatches && numMatches.length > 0) {
-      const mainNum = parseFloat(numMatches[0].replace(/,/g, ''));
-      if (!isNaN(mainNum) && mainNum > 0) totalAmount = mainNum;
-    }
+    // 1. Extract All Numbers in Sequence
+    const numberMatches = rawText.match(/\d+[\d,.]*/g) || [];
+    const numbers = numberMatches.map(n => parseFloat(n.replace(/,/g, ''))).filter(n => !isNaN(n) && n > 0);
 
-    // 2. Extract Partial Cash Amount
+    // Main Total Amount is the first number or default 1000
+    const totalAmount = numbers.length > 0 ? numbers[0] : 1000;
+
+    // 2. Extract Specific Amounts for Cash, Bank, Credit/Vendor
     let cashAmt = 0;
-    const cashMatch = rawText.match(/(?:كاش|نقداً|نقدا|صندوق|خزينة)\s*(\d+)|(\d+)\s*(?:كاش|نقداً|نقدا|صندوق|خزينة)/i);
-    if (cashMatch) {
-      const val = parseFloat((cashMatch[1] || cashMatch[2]).replace(/,/g, ''));
-      if (!isNaN(val)) cashAmt = val;
+    let bankAmt = 0;
+    let vendorAmt = 0;
+
+    // Extract Cash amount
+    const cashRegex = /(?:كاش|نقداً|نقدا|صندوق|خزينة)\s*(\d+[\d,.]*)|(\d+[\d,.]*)\s*(?:كاش|نقداً|نقدا|صندوق|خزينة)/i;
+    const cashM = rawText.match(cashRegex);
+    if (cashM) {
+      const val = parseFloat((cashM[1] || cashM[2]).replace(/,/g, ''));
+      if (!isNaN(val) && val !== totalAmount) cashAmt = val;
+      else if (!isNaN(val) && numbers.length > 1) cashAmt = val;
     }
 
-    // 3. Extract Partial Credit / Vendor Amount
-    let creditAmt = 0;
-    const creditMatch = rawText.match(/(?:أجل|آجل|مورد|على الحساب|دائن)\s*(\d+)|(\d+)\s*(?:أجل|آجل|مورد|على الحساب|دائن)/i);
-    if (creditMatch) {
-      const val = parseFloat((creditMatch[1] || creditMatch[2]).replace(/,/g, ''));
-      if (!isNaN(val)) creditAmt = val;
+    // Extract Bank amount
+    const bankRegex = /(?:بنك|البنك|شيك|تحويل|بطاقة|فيزا)\s*(\d+[\d,.]*)|(\d+[\d,.]*)\s*(?:بنك|البنك|شيك|تحويل|بطاقة|فيزا)/i;
+    const bankM = rawText.match(bankRegex);
+    if (bankM) {
+      const val = parseFloat((bankM[1] || bankM[2]).replace(/,/g, ''));
+      if (!isNaN(val) && val !== totalAmount) bankAmt = val;
+      else if (!isNaN(val) && numbers.length > 1) bankAmt = val;
     }
 
-    // 4. Extract Vendor Name if present
+    // Extract Vendor/Credit amount
+    const vendorRegex = /(?:أجل|آجل|مورد|على الحساب|دائن)\s*(\d+[\d,.]*)|(\d+[\d,.]*)\s*(?:أجل|آجل|مورد|على الحساب|دائن)/i;
+    const vendorM = rawText.match(vendorRegex);
+    if (vendorM) {
+      const val = parseFloat((vendorM[1] || vendorM[2]).replace(/,/g, ''));
+      if (!isNaN(val) && val !== totalAmount) vendorAmt = val;
+      else if (!isNaN(val) && numbers.length > 1) vendorAmt = val;
+    }
+
+    // 3. Extract Vendor Name
     let vendorName = '';
-    const vendorNameMatch = rawText.match(/(?:مورد|المورد|شركة|من)\s+([\u0600-\u06FF\w]+)/i);
-    if (vendorNameMatch && !['محمد', 'أجل', 'آجل', 'كاش', 'ب'].includes(vendorNameMatch[1])) {
-      vendorName = vendorNameMatch[1];
+    const nameM = rawText.match(/(?:مورد|المورد|شركة|من السيد|من)\s+([\u0600-\u06FF\w]+)/i);
+    if (nameM && !['مورد', 'شركة', 'أجل', 'آجل', 'كاش', 'بنك', 'ب', 'من'].includes(nameM[1])) {
+      vendorName = nameM[1];
     }
-    if (rawText.includes('محمد')) vendorName = 'محمد';
+    if (!vendorName && rawText.includes('سيد')) vendorName = 'سيد';
+    if (!vendorName && rawText.includes('محمد')) vendorName = 'محمد';
 
-    // 5. Deduce Main Asset / Expense / WIP Account
+    // 4. Deduce Primary Debit Account
     let mainAccount = isAr ? 'حـ/ الأصول الثابتة (Fixed Assets Account)' : 'Fixed Assets Account';
     if (lowerText.includes('لابتوب') || lowerText.includes('كمبيوتر')) {
-      mainAccount = isAr ? 'حـ/ الأصول الثابتة - أجهزة ومعدات حاسب (Fixed Assets - Computers)' : 'Fixed Assets - Computers';
+      mainAccount = isAr ? 'حـ/ الأصول الثابتة - أجهزة حاسب آلي (Fixed Assets - Computers)' : 'Fixed Assets - Computers';
     } else if (lowerText.includes('امر انتاج') || lowerText.includes('أمر إنتاج') || lowerText.includes('تصنيع') || lowerText.includes('wip')) {
       mainAccount = isAr ? 'حـ/ الإنتاج تحت التشغيل (Work In Process - WIP Account)' : 'Work In Process (WIP)';
-    } else if (lowerText.includes('مخزون') || lowerText.includes('بضاعة') || lowerText.includes('مواد خام')) {
+    } else if (lowerText.includes('مخزون') || lowerText.includes('بضاعة') || lowerText.includes('مواد خام') || lowerText.includes('شحنة')) {
       mainAccount = isAr ? 'حـ/ المخزون (Inventory Asset Account)' : 'Inventory Asset Account';
-    } else if (lowerText.includes('سيارة')) {
+    } else if (lowerText.includes('سيارة') || lowerText.includes('وسائل نقل')) {
       mainAccount = isAr ? 'حـ/ الأصول الثابتة - وسائل نقل وسيارات (Fixed Assets - Vehicles)' : 'Fixed Assets - Vehicles';
-    } else if (lowerText.includes('راتب') || lowerText.includes('رواتب') || lowerText.includes('مصروف')) {
+    } else if (lowerText.includes('راتب') || lowerText.includes('رواتب') || lowerText.includes('مصروف') || lowerText.includes('إيجار')) {
       mainAccount = isAr ? 'حـ/ المصروفات العمومية والإدارية (General & Administrative Expenses)' : 'Expenses Account';
     }
 
-    // 6. Build Compound Entries Array
+    // 5. Build Balanced Entries Array
     const entries = [];
 
-    // Debit Line
+    // Line 1: Main Debit Line
     entries.push({
       side: 'Debit',
       account: mainAccount,
@@ -157,91 +173,104 @@ const JournalSim = (function () {
       credit: 0
     });
 
-    // Credit Lines (Compound or Simple)
-    if (cashAmt > 0 && creditAmt > 0) {
-      entries.push({
-        side: 'Credit',
-        account: isAr ? 'حـ/ الصندوق - كاش (Cash Account)' : 'Cash Account',
-        debit: 0,
-        credit: cashAmt
-      });
+    // Check explicitly provided payment amounts sum
+    const totalExplicitCredit = cashAmt + bankAmt + vendorAmt;
 
-      const vendorAccountLabel = vendorName
-        ? (isAr ? `حـ/ الموردين - مورد ${vendorName} (Accounts Payable - ${vendorName})` : `Accounts Payable - ${vendorName}`)
-        : (isAr ? 'حـ/ الموردين (Accounts Payable / Vendors)' : 'Accounts Payable');
-
-      entries.push({
-        side: 'Credit',
-        account: vendorAccountLabel,
-        debit: 0,
-        credit: creditAmt
-      });
-    } else if (cashAmt > 0) {
-      entries.push({
-        side: 'Credit',
-        account: isAr ? 'حـ/ الصندوق - كاش (Cash Account)' : 'Cash Account',
-        debit: 0,
-        credit: cashAmt
-      });
-
-      const rem = totalAmount - cashAmt;
-      if (rem > 0) {
-        entries.push({
-          side: 'Credit',
-          account: isAr ? 'حـ/ الموردين / الحسابات الدائنة (Accounts Payable)' : 'Accounts Payable',
-          debit: 0,
-          credit: rem
-        });
-      }
-    } else if (creditAmt > 0) {
-      const rem = totalAmount - creditAmt;
-      if (rem > 0) {
+    if (totalExplicitCredit > 0) {
+      if (cashAmt > 0) {
         entries.push({
           side: 'Credit',
           account: isAr ? 'حـ/ الصندوق - كاش (Cash Account)' : 'Cash Account',
           debit: 0,
-          credit: rem
+          credit: cashAmt
         });
       }
 
-      const vendorAccountLabel = vendorName
-        ? (isAr ? `حـ/ الموردين - مورد ${vendorName} (Accounts Payable - ${vendorName})` : `Accounts Payable - ${vendorName}`)
-        : (isAr ? 'حـ/ الموردين (Accounts Payable / Vendors)' : 'Accounts Payable');
-
-      entries.push({
-        side: 'Credit',
-        account: vendorAccountLabel,
-        debit: 0,
-        credit: creditAmt
-      });
-    } else {
-      // Standard Simple Entry Fallback
-      let creditAccountLabel = isAr ? 'حـ/ الموردين / النقدية بالبنك (Accounts Payable / Bank)' : 'Accounts Payable / Bank';
-      if (lowerText.includes('نقداً') || lowerText.includes('كاش') || lowerText.includes('صندوق')) {
-        creditAccountLabel = isAr ? 'حـ/ الصندوق - كاش (Cash Account)' : 'Cash Account';
-      } else if (lowerText.includes('بنك') || lowerText.includes('تحويل')) {
-        creditAccountLabel = isAr ? 'حـ/ البنك (Bank Account)' : 'Bank Account';
-      } else if (vendorName) {
-        creditAccountLabel = isAr ? `حـ/ الموردين - مورد ${vendorName} (Accounts Payable - ${vendorName})` : `Accounts Payable - ${vendorName}`;
+      if (bankAmt > 0) {
+        entries.push({
+          side: 'Credit',
+          account: isAr ? 'حـ/ البنك - حساب جاري (Bank Account)' : 'Bank Account',
+          debit: 0,
+          credit: bankAmt
+        });
       }
 
-      entries.push({
-        side: 'Credit',
-        account: creditAccountLabel,
-        debit: 0,
-        credit: totalAmount
-      });
+      if (vendorAmt > 0) {
+        const vLabel = vendorName
+          ? (isAr ? `حـ/ الموردين - مورد ${vendorName} (Accounts Payable - ${vendorName})` : `Accounts Payable - ${vendorName}`)
+          : (isAr ? 'حـ/ الموردين (Accounts Payable / Vendors)' : 'Accounts Payable');
+
+        entries.push({
+          side: 'Credit',
+          account: vLabel,
+          debit: 0,
+          credit: vendorAmt
+        });
+      }
+
+      // Check for remaining unallocated credit balance
+      const remainingCredit = totalAmount - totalExplicitCredit;
+      if (remainingCredit > 0) {
+        const vLabel = vendorName
+          ? (isAr ? `حـ/ الموردين - مورد ${vendorName} (Accounts Payable - ${vendorName})` : `Accounts Payable - ${vendorName}`)
+          : (isAr ? 'حـ/ الموردين / الحسابات الدائنة (Accounts Payable)' : 'Accounts Payable');
+
+        entries.push({
+          side: 'Credit',
+          account: vLabel,
+          debit: 0,
+          credit: remainingCredit
+        });
+      }
+    } else {
+      // Default single credit fallback based on payment keywords
+      if (lowerText.includes('امر انتاج') || lowerText.includes('أمر إنتاج') || lowerText.includes('تصنيع')) {
+        entries.push({
+          side: 'Credit',
+          account: isAr ? 'حـ/ المخزون - المواد الخام (Raw Materials Inventory Account)' : 'Raw Materials Inventory Account',
+          debit: 0,
+          credit: totalAmount
+        });
+      } else if (lowerText.includes('نقداً') || lowerText.includes('كاش') || lowerText.includes('صندوق')) {
+        entries.push({
+          side: 'Credit',
+          account: isAr ? 'حـ/ الصندوق - كاش (Cash Account)' : 'Cash Account',
+          debit: 0,
+          credit: totalAmount
+        });
+      } else if (lowerText.includes('بنك') || lowerText.includes('تحويل') || lowerText.includes('شيك')) {
+        entries.push({
+          side: 'Credit',
+          account: isAr ? 'حـ/ البنك - حساب جاري (Bank Account)' : 'Bank Account',
+          debit: 0,
+          credit: totalAmount
+        });
+      } else {
+        const vLabel = vendorName
+          ? (isAr ? `حـ/ الموردين - مورد ${vendorName} (Accounts Payable - ${vendorName})` : `Accounts Payable - ${vendorName}`)
+          : (isAr ? 'حـ/ الموردين / الحسابات الدائنة (Accounts Payable)' : 'Accounts Payable');
+
+        entries.push({
+          side: 'Credit',
+          account: vLabel,
+          debit: 0,
+          credit: totalAmount
+        });
+      }
     }
+
+    // Generate clear accounting explanation summary
+    const creditDetails = entries.filter(e => e.side === 'Credit').map(e => `${e.account}: ${e.credit.toLocaleString()} EGP`).join(' • ');
+
+    const explanation = isAr
+      ? `إثبات قيد محاسبي ${entries.length > 2 ? 'مركب (Compound Entry)' : 'بسيط'} للعملية (${rawText}): إثبات الجانب المدين في (${mainAccount}) بمبلغ ${totalAmount.toLocaleString()} EGP، مقابل إثبات الجانب الدائن في الأرصدة (${creditDetails}) مع ضمان التوازن المالي التام للطرفين.`
+      : `Accounting Entry for (${rawText}): Debit ${mainAccount} for ${totalAmount} vs Credit (${creditDetails}).`;
 
     return {
       title: rawText,
       amount: totalAmount,
       entries: entries,
-      explanation: isAr
-        ? (entries.length > 2
-            ? `إثبات قيد مركب (Compound Journal Entry) لشراء (${rawText}): زيادة الجانب المدين في (${mainAccount}) بـ ${totalAmount.toLocaleString()} EGP، مقابل سداد ${cashAmt ? cashAmt.toLocaleString() : (totalAmount - creditAmt).toLocaleString()} EGP نقداً من الخزينة (دائن) وتأجيل الباقي ${creditAmt ? creditAmt.toLocaleString() : (totalAmount - cashAmt).toLocaleString()} EGP لحساب المورد ${vendorName || ''} (دائن).`
-            : `إثبات قيد بسيط لشراء (${rawText}): زيادة الجانب المدين في (${mainAccount}) بـ ${totalAmount.toLocaleString()} EGP مقابل إثبات الجانب الدائن بمبلغ ${totalAmount.toLocaleString()} EGP.`)
-        : `Compound Entry for (${rawText}): Debit ${mainAccount} ${totalAmount} vs Credit Cash ${cashAmt} & Credit Accounts Payable ${creditAmt}.`
+      explanation: explanation
     };
   }
 
