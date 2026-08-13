@@ -94,8 +94,25 @@ const Dashboard = (function () {
         <button class="btn btn-sm btn-primary" data-route="review">${I18n.t('dashboard.goToReview')}</button>
       </div>` : ''}
 
-      <!-- 📌 PINNED & 🎯 GOALS WIDGETS ROW -->
-      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-bottom:28px;">
+      <!-- 🔥 STREAK, 📌 PINNED & 🎯 GOALS WIDGETS ROW -->
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px; margin-bottom:28px;">
+
+        <!-- 🔥 Study Streak Widget -->
+        <div class="card streak-widget-card" id="streak-widget-container">
+          <div class="streak-header">
+            <h3 style="font-size:16px; font-weight:700; margin:0; display:flex; align-items:center; gap:6px;">
+              🔥 ${I18n.t('dashboard.studyStreak')}
+            </h3>
+            <span class="badge" style="background:var(--rust-soft); color:var(--rust); font-weight:700;" id="streak-badge-current">0d</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:13px;">
+            <span>${I18n.t('dashboard.currentStreak')}: <strong id="streak-val-current" class="mono">0</strong></span>
+            <span>🏆 ${I18n.t('dashboard.longestStreak')}: <strong id="streak-val-longest" class="mono">0</strong></span>
+          </div>
+          <div class="streak-7days" id="streak-7days-circles">
+            ${Array(7).fill(0).map((_, i) => `<div class="streak-day-circle">—</div>`).join('')}
+          </div>
+        </div>
 
         <!-- 📌 Pinned Items Widget -->
         <div class="card" style="padding:18px;">
@@ -170,6 +187,26 @@ const Dashboard = (function () {
 
       const reviewBtn = container.querySelector('[data-route="review"]');
       if (reviewBtn) reviewBtn.addEventListener('click', () => Router.go('review'));
+
+      // PERF: Populate 🔥 Streak Widget data asynchronously
+      API.getStreak().then(streakData => {
+        if (!streakData) return;
+        const curEl = container.querySelector('#streak-val-current');
+        const longEl = container.querySelector('#streak-val-longest');
+        const badgeEl = container.querySelector('#streak-badge-current');
+        const circlesEl = container.querySelector('#streak-7days-circles');
+
+        if (curEl) curEl.textContent = streakData.current_streak || 0;
+        if (longEl) longEl.textContent = streakData.longest_streak || 0;
+        if (badgeEl) badgeEl.textContent = (streakData.current_streak || 0) + 'd';
+
+        if (circlesEl && Array.isArray(streakData.last_7_days)) {
+          circlesEl.innerHTML = streakData.last_7_days.map(d => {
+            const dayName = new Date(d.date).toLocaleDateString(I18n.getLang() === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'narrow' });
+            return `<div class="streak-day-circle ${d.active ? 'active' : ''}" title="${d.date}">${dayName}</div>`;
+          }).join('');
+        }
+      }).catch(() => {});
     });
 
     if (!_prefetchDone) {

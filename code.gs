@@ -46,7 +46,9 @@ var SHEET_NAMES = {
   TOPICS: 'Topics',
   KNOWLEDGE: 'Knowledge',
   REVIEWS: 'Reviews',
-  NOTES: 'Notes'
+  NOTES: 'Notes',
+  STREAKS: 'Streaks',
+  EMAIL_LOGS: 'EmailLogs'
 };
 
 var SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 7;           // 7 days default
@@ -56,7 +58,7 @@ var STATUS_VALUES = ['Not Started', 'Learning', 'Understood', 'Practiced', 'Mast
 var PRIORITY_VALUES = ['Low', 'Medium', 'High', 'Critical'];
 var LANGUAGE_VALUES = ['en', 'ar'];
 
-var SCHEMA_VERSION_TARGET = '4';
+var SCHEMA_VERSION_TARGET = '5';
 
 // Actions that mutate data. Only these acquire the script lock — read
 // actions run without locking so parallel requests from the same page
@@ -213,36 +215,40 @@ function handleRequest(action, payload, token) {
       // Topics
       case 'topics':            return jsonResponse(withAuth(token, function(user){ return actionGetTopics(user, payload); }));
       case 'topic':              return jsonResponse(withAuth(token, function(user){ return actionGetTopic(user, payload); }));
-      case 'createTopic':        return jsonResponse(withAuth(token, function(user){ return actionCreateTopic(user, payload); }));
-      case 'updateTopic':        return jsonResponse(withAuth(token, function(user){ return actionUpdateTopic(user, payload); }));
+      case 'createTopic':        return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionCreateTopic(user, payload); }));
+      case 'updateTopic':        return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionUpdateTopic(user, payload); }));
       case 'deleteTopic':        return jsonResponse(withAuth(token, function(user){ return actionDeleteTopic(user, payload); }));
-      case 'updateStatus':       return jsonResponse(withAuth(token, function(user){ return actionUpdateStatus(user, payload); }));
-      case 'updateStatusBulk':   return jsonResponse(withAuth(token, function(user){ return actionUpdateStatusBulk(user, payload); }));
-      case 'updateProgress':     return jsonResponse(withAuth(token, function(user){ return actionUpdateProgress(user, payload); }));
+      case 'updateStatus':       return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionUpdateStatus(user, payload); }));
+      case 'updateStatusBulk':   return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionUpdateStatusBulk(user, payload); }));
+      case 'updateProgress':     return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionUpdateProgress(user, payload); }));
 
       // Knowledge
       case 'knowledge':          return jsonResponse(withAuth(token, function(user){ return actionGetKnowledge(user, payload); }));
-      case 'saveKnowledge':      return jsonResponse(withAuth(token, function(user){ return actionSaveKnowledge(user, payload); }));
-      case 'updateKnowledge':    return jsonResponse(withAuth(token, function(user){ return actionSaveKnowledge(user, payload); }));
+      case 'saveKnowledge':      return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionSaveKnowledge(user, payload); }));
+      case 'updateKnowledge':    return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionSaveKnowledge(user, payload); }));
 
       // Reviews
       case 'reviews':             return jsonResponse(withAuth(token, function(user){ return actionGetReviews(user, payload); }));
-      case 'addReview':           return jsonResponse(withAuth(token, function(user){ return actionAddReview(user, payload); }));
-      case 'markReviewed':        return jsonResponse(withAuth(token, function(user){ return actionMarkReviewed(user, payload); }));
+      case 'addReview':           return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionAddReview(user, payload); }));
+      case 'markReviewed':        return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionMarkReviewed(user, payload); }));
 
       // Notes — paginated
       case 'notes':               return jsonResponse(withAuth(token, function(user){ return actionGetNotes(user, payload); }));
       case 'note':                return jsonResponse(withAuth(token, function(user){ return actionGetNote(user, payload); }));
-      case 'createNote':          return jsonResponse(withAuth(token, function(user){ return actionCreateNote(user, payload); }));
-      case 'updateNote':          return jsonResponse(withAuth(token, function(user){ return actionUpdateNote(user, payload); }));
+      case 'createNote':          return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionCreateNote(user, payload); }));
+      case 'updateNote':          return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionUpdateNote(user, payload); }));
       case 'deleteNote':          return jsonResponse(withAuth(token, function(user){ return actionDeleteNote(user, payload); }));
 
-      // Dashboard / Analytics — each is ONE read of Topics + ONE (cached) read of Modules
+      // Dashboard / Analytics / Streaks
       case 'dashboard':            return jsonResponse(withAuth(token, function(user){ return actionDashboard(user); }));
       case 'analytics':            return jsonResponse(withAuth(token, function(user){ return actionAnalytics(user); }));
+      case 'getStreak':            return jsonResponse(withAuth(token, function(user){ return actionGetStreak(user); }));
 
-      // Admin
+      // Admin & Backup
       case 'adminUsers':           return jsonResponse(withAuth(token, function(user){ return actionAdminUsers(user); }));
+      case 'sendTestDigest':       return jsonResponse(withAuth(token, function(user){ return actionSendTestDigest(user); }));
+      case 'exportMyData':         return jsonResponse(withAuth(token, function(user){ return actionExportMyData(user); }));
+      case 'importMyData':         return jsonResponse(withAuth(token, function(user){ return actionImportMyData(user, payload); }));
 
       // Setup
       case 'seed':                  return jsonResponse(actionSeed());
@@ -1316,14 +1322,16 @@ function removeKeepaliveTrigger() {
 function createSheetsIfMissing() {
   var spreadsheet = ss();
   var schemas = {
-    Users: ['id', 'full_name', 'username', 'email', 'password_hash', 'role', 'active', 'language', 'created_at', 'last_login'],
+    Users: ['id', 'full_name', 'username', 'email', 'password_hash', 'role', 'active', 'language', 'created_at', 'last_login', 'digest_enabled'],
     Sessions: ['session_id', 'user_id', 'created_at', 'expires_at', 'active', 'last_activity'],
     Modules: ['id', 'name_ar', 'name_en', 'description', 'active'],
     Categories: ['id', 'module_id', 'name_ar', 'name_en', 'description', 'active', 'created_at', 'updated_at'],
     Topics: ['id', 'user_id', 'module_id', 'category_id', 'topic', 'description', 'priority', 'status', 'progress', 'created_at', 'updated_at', 'completed_at', 'last_review', 'next_review', 'tags', 'pinned', 'target_date'],
     Knowledge: ['id', 'user_id', 'topic_id', 'what_i_know', 'what_i_dont_know', 'what_i_need_to_learn', 'business_understanding', 'erp_understanding', 'practical_experience', 'notes', 'updated_at'],
     Reviews: ['id', 'user_id', 'topic_id', 'review_date', 'understanding', 'notes'],
-    Notes: ['id', 'user_id', 'module_id', 'title', 'section_name', 'content', 'created_at', 'updated_at', 'tags', 'pinned', 'image_url']
+    Notes: ['id', 'user_id', 'module_id', 'title', 'section_name', 'content', 'created_at', 'updated_at', 'tags', 'pinned', 'image_url'],
+    Streaks: ['user_id', 'date', 'activity_count', 'streak_count'],
+    EmailLogs: ['user_id', 'sent_at', 'status', 'error_message']
   };
   Object.keys(schemas).forEach(function(name) {
     var sheet = spreadsheet.getSheetByName(name);
@@ -1372,7 +1380,7 @@ function ensureSchema() {
   if (props.getProperty('SCHEMA_VERSION') === SCHEMA_VERSION_TARGET) return;
 
   createSheetsIfMissing();
-  migrateAddMissingColumns(SHEET_NAMES.USERS, ['language'], { language: 'en' });
+  migrateAddMissingColumns(SHEET_NAMES.USERS, ['language', 'digest_enabled'], { language: 'en', digest_enabled: true });
   migrateAddMissingColumns(SHEET_NAMES.CATEGORIES, ['description', 'created_at', 'updated_at'], { description: '', created_at: '', updated_at: '' });
   migrateAddMissingColumns(SHEET_NAMES.NOTES, ['tags', 'pinned', 'image_url'], { tags: '', pinned: false, image_url: '' });
   migrateAddMissingColumns(SHEET_NAMES.TOPICS, ['tags', 'pinned', 'target_date'], { tags: '', pinned: false, target_date: '' });
@@ -1461,4 +1469,288 @@ function actionBatch(user, payload, token) {
     }
   }
   return successResponse(results);
+}
+
+// ---------------------------------------------------------------------------
+// FEATURE 1: STREAK COUNTER ENGINE
+// ---------------------------------------------------------------------------
+
+function recordActivity(userId) {
+  if (!userId) return;
+  try {
+    var todayStr = new Date().toISOString().slice(0, 10);
+    var streaks = readAllRows(SHEET_NAMES.STREAKS).filter(function(s) { return s.user_id === userId; });
+    var todayRow = null;
+    for (var i = 0; i < streaks.length; i++) {
+      if (streaks[i].date === todayStr) { todayRow = streaks[i]; break; }
+    }
+
+    if (todayRow) {
+      updateRowByObj(SHEET_NAMES.STREAKS, todayRow, { activity_count: (Number(todayRow.activity_count) || 0) + 1 });
+    } else {
+      var dateSet = {};
+      streaks.forEach(function(s) { if (s.date) dateSet[s.date] = true; });
+      dateSet[todayStr] = true;
+
+      var cur = new Date();
+      var streakCount = 0;
+      while (true) {
+        var dStr = cur.toISOString().slice(0, 10);
+        if (dateSet[dStr]) {
+          streakCount++;
+          cur.setDate(cur.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+
+      appendRow(SHEET_NAMES.STREAKS, {
+        user_id: userId,
+        date: todayStr,
+        activity_count: 1,
+        streak_count: streakCount
+      });
+    }
+    cacheRemove('streak:' + userId);
+  } catch(e) {
+    Logger.log('recordActivity error: ' + e.message);
+  }
+}
+
+function actionGetStreak(user) {
+  var key = 'streak:' + user.id;
+  var cached = cacheGet(key);
+  if (cached) return successResponse(cached);
+
+  var rows = readAllRows(SHEET_NAMES.STREAKS).filter(function(s) { return s.user_id === user.id; });
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var dateMap = {};
+  var maxStreak = 0;
+  var currentStreak = 0;
+
+  rows.forEach(function(s) {
+    if (s.date) dateMap[s.date] = s;
+    var sc = Number(s.streak_count) || 0;
+    if (sc > maxStreak) maxStreak = sc;
+  });
+
+  var cur = new Date();
+  while (true) {
+    var dStr = cur.toISOString().slice(0, 10);
+    if (dateMap[dStr]) {
+      currentStreak++;
+      cur.setDate(cur.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  var last7 = [];
+  for (var d = 6; d >= 0; d--) {
+    var dt = new Date();
+    dt.setDate(dt.getDate() - d);
+    var dStr = dt.toISOString().slice(0, 10);
+    last7.push({ date: dStr, active: !!dateMap[dStr] });
+  }
+
+  var result = {
+    current_streak: currentStreak,
+    longest_streak: Math.max(maxStreak, currentStreak),
+    last_7_days: last7
+  };
+
+  cachePut(key, result, 3600);
+  return successResponse(result);
+}
+
+// ---------------------------------------------------------------------------
+// FEATURE 4: WEEKLY EMAIL DIGEST
+// ---------------------------------------------------------------------------
+
+function actionSendTestDigest(user) {
+  if (user.role !== 'Admin') return errorResponse('Admin access required.', 'ADMIN_REQUIRED');
+  sendWeeklyDigestForUser(user);
+  return successResponse({ sent: true }, 'Test digest sent successfully.');
+}
+
+function sendWeeklyDigest() {
+  var users = getUsersRows().filter(function(u) {
+    return (u.active === true || u.active === 'TRUE') && u.digest_enabled !== false && u.digest_enabled !== 'FALSE';
+  });
+  users.forEach(function(user) {
+    try {
+      sendWeeklyDigestForUser(user);
+    } catch(err) {
+      appendRow(SHEET_NAMES.EMAIL_LOGS, {
+        user_id: user.id,
+        sent_at: nowIso(),
+        status: 'error',
+        error_message: err.message
+      });
+    }
+  });
+}
+
+function sendWeeklyDigestForUser(user) {
+  var topics = getTopicsByUser(user.id);
+  var masteredThisWeek = topics.filter(function(t) {
+    if (t.status !== 'Mastered' || !t.completed_at) return false;
+    var d = new Date(t.completed_at);
+    return (new Date() - d) <= (7 * 24 * 60 * 60 * 1000);
+  }).length;
+
+  var reviews = readAllRows(SHEET_NAMES.REVIEWS).filter(function(r) {
+    return r.user_id === user.id && (new Date() - new Date(r.review_date)) <= (7 * 24 * 60 * 60 * 1000);
+  }).length;
+
+  var dueNextWeek = topics.filter(function(t) {
+    if (!t.next_review) return false;
+    var nr = new Date(t.next_review);
+    var now = new Date();
+    var next7 = new Date(); next7.setDate(next7.getDate() + 7);
+    return nr >= now && nr <= next7;
+  }).length;
+
+  var streakData = actionGetStreak(user).data;
+  var overallProgress = averageProgress(topics);
+  var isAr = user.language === 'ar';
+
+  var subject = isAr ? '📊 الملخص الأسبوعي لتعلّم ERP - ' + user.full_name : '📊 Your Weekly ERP Learning Digest - ' + user.full_name;
+
+  var htmlBody = isAr ?
+    '<div dir="rtl" style="font-family:sans-serif; color:#333; line-height:1.6; max-width:600px; margin:0 auto; padding:20px; border:1px solid #e0e0e0; border-radius:8px;">' +
+      '<h2 style="color:#b5772e;">📊 الملخص الأسبوعي لتقدم التعلّم</h2>' +
+      '<p>أهلاً <strong>' + user.full_name + '</strong>، إليك ملخص نشاطك في تعلّم موديولات الـ ERP خلال الأسبوع الماضي:</p>' +
+      '<ul>' +
+        '<li>🔥 <strong>سلسلة التعلّم الحالية:</strong> ' + streakData.current_streak + ' يوم متواصل</li>' +
+        '<li>📈 <strong>التقدم الإجمالي:</strong> ' + overallProgress + '%</li>' +
+        '<li>✅ <strong>مواضيع تم إتقانها هذا الأسبوع:</strong> ' + masteredThisWeek + '</li>' +
+        '<li>🔄 <strong>مراجعات تمت هذا الأسبوع:</strong> ' + reviews + '</li>' +
+        '<li>📅 <strong>مواضيع مستحقة للمراجعة الأسبوع القادم:</strong> ' + dueNextWeek + '</li>' +
+      '</ul>' +
+      '<p style="margin-top:20px;"><a href="' + (CONFIG_CLIENT_URL || '#') + '" style="background:#b5772e; color:#fff; padding:10px 18px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block;">افتح المنصة وواصل التعلّم</a></p>' +
+    '</div>' :
+    '<div style="font-family:sans-serif; color:#333; line-height:1.6; max-width:600px; margin:0 auto; padding:20px; border:1px solid #e0e0e0; border-radius:8px;">' +
+      '<h2 style="color:#b5772e;">📊 Your Weekly ERP Learning Digest</h2>' +
+      '<p>Hi <strong>' + user.full_name + '</strong>, here is your learning activity summary for the past week:</p>' +
+      '<ul>' +
+        '<li>🔥 <strong>Current Study Streak:</strong> ' + streakData.current_streak + ' days</li>' +
+        '<li>📈 <strong>Overall Progress:</strong> ' + overallProgress + '%</li>' +
+        '<li>✅ <strong>Topics Mastered This Week:</strong> ' + masteredThisWeek + '</li>' +
+        '<li>🔄 <strong>Reviews Completed This Week:</strong> ' + reviews + '</li>' +
+        '<li>📅 <strong>Topics Due for Review Next Week:</strong> ' + dueNextWeek + '</li>' +
+      '</ul>' +
+      '<p style="margin-top:20px;"><a href="' + (CONFIG_CLIENT_URL || '#') + '" style="background:#b5772e; color:#fff; padding:10px 18px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block;">Open Tracker &amp; Keep Learning</a></p>' +
+    '</div>';
+
+  MailApp.sendEmail({
+    to: user.email,
+    subject: subject,
+    htmlBody: htmlBody
+  });
+
+  appendRow(SHEET_NAMES.EMAIL_LOGS, {
+    user_id: user.id,
+    sent_at: nowIso(),
+    status: 'success',
+    error_message: ''
+  });
+}
+
+function setupWeeklyDigestTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'sendWeeklyDigest') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('sendWeeklyDigest')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.MONDAY)
+    .atHour(9)
+    .create();
+}
+
+// ---------------------------------------------------------------------------
+// FEATURE 5: DATA EXPORT & IMPORT (JSON BACKUP)
+// ---------------------------------------------------------------------------
+
+function actionExportMyData(user) {
+  var topics = getTopicsByUser(user.id).map(stripRow);
+  var topicIds = {};
+  topics.forEach(function(t) { topicIds[t.id] = true; });
+
+  var knowledge = readAllRows(SHEET_NAMES.KNOWLEDGE)
+    .filter(function(k) { return k.user_id === user.id || topicIds[k.topic_id]; })
+    .map(stripRow);
+
+  var reviews = readAllRows(SHEET_NAMES.REVIEWS)
+    .filter(function(r) { return r.user_id === user.id || topicIds[r.topic_id]; })
+    .map(stripRow);
+
+  var notes = readAllRows(SHEET_NAMES.NOTES)
+    .filter(function(n) { return n.user_id === user.id; })
+    .map(stripRow);
+
+  var streaks = readAllRows(SHEET_NAMES.STREAKS)
+    .filter(function(s) { return s.user_id === user.id; })
+    .map(stripRow);
+
+  return successResponse({
+    user: publicUser(user),
+    topics: topics,
+    knowledge: knowledge,
+    reviews: reviews,
+    notes: notes,
+    streaks: streaks,
+    exported_at: nowIso()
+  });
+}
+
+function actionImportMyData(user, payload) {
+  if (!payload || typeof payload !== 'object') return errorResponse('Invalid backup payload.', 'INVALID_PAYLOAD');
+
+  deleteRowsByUser(SHEET_NAMES.TOPICS, user.id);
+  deleteRowsByUser(SHEET_NAMES.KNOWLEDGE, user.id);
+  deleteRowsByUser(SHEET_NAMES.REVIEWS, user.id);
+  deleteRowsByUser(SHEET_NAMES.NOTES, user.id);
+  deleteRowsByUser(SHEET_NAMES.STREAKS, user.id);
+
+  var topics = Array.isArray(payload.topics) ? payload.topics : [];
+  var knowledge = Array.isArray(payload.knowledge) ? payload.knowledge : [];
+  var reviews = Array.isArray(payload.reviews) ? payload.reviews : [];
+  var notes = Array.isArray(payload.notes) ? payload.notes : [];
+  var streaks = Array.isArray(payload.streaks) ? payload.streaks : [];
+
+  topics.forEach(function(t) { t.user_id = user.id; });
+  knowledge.forEach(function(k) { k.user_id = user.id; });
+  reviews.forEach(function(r) { r.user_id = user.id; });
+  notes.forEach(function(n) { n.user_id = user.id; });
+  streaks.forEach(function(s) { s.user_id = user.id; });
+
+  appendRowsBatch(SHEET_NAMES.TOPICS, topics);
+  appendRowsBatch(SHEET_NAMES.KNOWLEDGE, knowledge);
+  appendRowsBatch(SHEET_NAMES.REVIEWS, reviews);
+  appendRowsBatch(SHEET_NAMES.NOTES, notes);
+  appendRowsBatch(SHEET_NAMES.STREAKS, streaks);
+
+  invalidateTopicsCache();
+  invalidateCategoriesCache();
+
+  return successResponse({
+    imported_topics: topics.length,
+    imported_knowledge: knowledge.length,
+    imported_reviews: reviews.length,
+    imported_notes: notes.length,
+    imported_streaks: streaks.length
+  }, 'Backup imported successfully.');
+}
+
+function deleteRowsByUser(sheetName, userId) {
+  var sheet = sheetOf(sheetName);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  var rows = readAllRows(sheetName);
+  for (var i = rows.length - 1; i >= 0; i--) {
+    if (rows[i].user_id === userId) {
+      sheet.deleteRow(rows[i].__row);
+    }
+  }
 }

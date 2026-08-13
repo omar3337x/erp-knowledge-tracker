@@ -535,6 +535,8 @@ const Notes = (function () {
     const pinBadge = n.pinned ? `<span class="pinned-badge">📌 ${I18n.t('common.pinned')}</span>` : '';
     const imgThumb = n.image_url ? `<div style="margin-top:10px; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--line);"><img src="${n.image_url}" style="width:100%; max-height:140px; object-fit:cover; display:block;"></div>` : '';
 
+    const safeContent = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(n.content) : escapeHtml(n.content);
+
     return `
       <div class="note-card ${n.pinned ? 'is-pinned' : ''}" data-id="${n.id}" style="${n.pinned ? 'border-color:var(--gold); background:rgba(212,175,55,0.03);' : ''}">
         <div class="note-card-header" style="flex-wrap:wrap; gap:6px;">
@@ -548,7 +550,7 @@ const Notes = (function () {
             <span class="note-section-badge">${sectionBadge}</span>
           </div>
         </div>
-        <div class="note-card-content">${escapeHtml(n.content)}</div>
+        <div class="note-card-content ql-editor" style="padding:0;">${safeContent}</div>
         ${imgThumb}
         ${tagsHtml ? `<div style="margin-top:10px; display:flex; gap:4px; flex-wrap:wrap;">${tagsHtml}</div>` : ''}
         <div class="note-card-footer">
@@ -652,7 +654,7 @@ const Notes = (function () {
         </div>
         <div class="field">
           <label class="required">${I18n.t('notes.content')}</label>
-          <textarea name="content" rows="5" required placeholder="${I18n.t('notes.contentPlaceholder')}"></textarea>
+          <div id="add-note-quill-container" style="background:var(--paper); min-height:140px;"></div>
         </div>
         <div class="field">
           <label>${I18n.t('common.attachImage')}</label>
@@ -677,6 +679,24 @@ const Notes = (function () {
     `;
 
     const modalEl = UI.openModal(html);
+
+    // Initialize Quill Rich Text Editor
+    let quillAdd = null;
+    if (typeof Quill !== 'undefined' && modalEl.querySelector('#add-note-quill-container')) {
+      quillAdd = new Quill(modalEl.querySelector('#add-note-quill-container'), {
+        theme: 'snow',
+        placeholder: I18n.t('notes.contentPlaceholder'),
+        modules: {
+          toolbar: [
+            [{ header: [2, false] }],
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['link', 'code-block'],
+            ['clean']
+          ]
+        }
+      });
+    }
 
     // Setup image paste & upload
     const dropzone = modalEl.querySelector('#img-dropzone');
@@ -737,7 +757,7 @@ const Notes = (function () {
       const targetModuleId = form.elements['module_id'].value;
       const title = form.elements['title'].value.trim();
       const sectionName = form.elements['section_name'].value.trim();
-      const content = form.elements['content'].value.trim();
+      const content = quillAdd ? quillAdd.root.innerHTML.trim() : '';
       const tagsRaw = form.elements['tags'].value.trim();
       const isPinned = modalEl.querySelector('#add-note-pinned').checked;
       const parsedTags = tagsRaw ? tagsRaw.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean) : [];
@@ -843,7 +863,7 @@ const Notes = (function () {
         </div>
         <div class="field">
           <label class="required">${I18n.t('notes.content')}</label>
-          <textarea name="content" rows="5" required placeholder="${I18n.t('notes.contentPlaceholder')}">${escapeHtml(note.content)}</textarea>
+          <div id="edit-note-quill-container" style="background:var(--paper); min-height:140px;"></div>
         </div>
         <div class="field">
           <label>${I18n.t('common.attachImage')}</label>
@@ -868,6 +888,27 @@ const Notes = (function () {
     `;
 
     const modalEl = UI.openModal(html);
+
+    // Initialize Quill Rich Text Editor
+    let quillEdit = null;
+    if (typeof Quill !== 'undefined' && modalEl.querySelector('#edit-note-quill-container')) {
+      quillEdit = new Quill(modalEl.querySelector('#edit-note-quill-container'), {
+        theme: 'snow',
+        placeholder: I18n.t('notes.contentPlaceholder'),
+        modules: {
+          toolbar: [
+            [{ header: [2, false] }],
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['link', 'code-block'],
+            ['clean']
+          ]
+        }
+      });
+      if (note && note.content) {
+        quillEdit.root.innerHTML = note.content;
+      }
+    }
 
     const dropzone = modalEl.querySelector('#img-dropzone');
     const fileInput = modalEl.querySelector('#img-file-input');
@@ -927,7 +968,7 @@ const Notes = (function () {
       const targetModuleId = form.elements['module_id'].value;
       const title = form.elements['title'].value.trim();
       const sectionName = form.elements['section_name'].value.trim();
-      const content = form.elements['content'].value.trim();
+      const content = quillEdit ? quillEdit.root.innerHTML.trim() : (note.content || '');
       const tagsRaw = form.elements['tags'].value.trim();
       const isPinned = modalEl.querySelector('#edit-note-pinned').checked;
       const parsedTags = tagsRaw ? tagsRaw.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean) : [];
@@ -1004,7 +1045,7 @@ const Notes = (function () {
     const modName = modObj ? I18n.localizedName(modObj) : note.module_id;
     const tagsHtml = (note.tags || []).map(t => `<span class="tag-badge">#${escapeHtml(t)}</span>`).join(' ');
     const pinBadge = note.pinned ? `<span class="pinned-badge">📌 ${I18n.t('common.pinned')}</span>` : '';
-    const imgHtml = note.image_url ? `<div style="margin-top:16px; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--line);"><img src="${note.image_url}" style="width:100%; max-height:400px; object-fit:contain; background:var(--paper); display:block;"></div>` : '';
+    const safeContent = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(note.content) : escapeHtml(note.content);
 
     const html = `
       <div class="modal-head">
@@ -1021,7 +1062,7 @@ const Notes = (function () {
           <span class="mono" style="font-size:12px; color:var(--ink-soft);">${UI.fmtDate(note.created_at)}</span>
         </div>
         <h3 style="font-size:18px; font-weight:700; margin:0 0 12px; color:var(--ink);">${escapeHtml(note.title)}</h3>
-        <div class="note-detail-content" style="white-space:pre-wrap;">${escapeHtml(note.content)}</div>
+        <div class="note-detail-content ql-editor" style="padding:0;">${safeContent}</div>
         ${imgHtml}
         ${tagsHtml ? `<div style="margin-top:16px; display:flex; gap:6px; flex-wrap:wrap;">${tagsHtml}</div>` : ''}
         <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">

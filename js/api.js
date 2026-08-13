@@ -247,7 +247,7 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   const READ_ACTIONS = new Set([
     'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
-    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping', 'batch'
+    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping', 'batch', 'getStreak'
   ]);
 
   async function call(action, payload, options) {
@@ -447,7 +447,13 @@ const API = (function () {
     dashboard : (opts) => call('dashboard', {}, opts),
     analytics : (opts) => call('analytics', {}, Object.assign({ priority: 'LOW' }, opts || {})),
 
-    // Admin
-    adminUsers: () => call('adminUsers', {}),
+    // Streaks
+    getStreak : () => call('getStreak', {}),
+
+    // Admin & Backup
+    adminUsers    : () => call('adminUsers', {}),
+    sendTestDigest: () => rawCall('sendTestDigest', {}),
+    exportMyData  : () => rawCall('exportMyData', {}),
+    importMyData  : async (p) => { const r = await rawCall('importMyData', p); cacheBustAll(); return r; },
   };
 })();

@@ -45,7 +45,26 @@ const I18N_DICT = {
       notStarted: 'Not Started', learning: 'Learning', understood: 'Understood', practiced: 'Practiced',
       mastered: 'Mastered', knowledgeGaps: 'Knowledge Gaps', toReview: 'To Review',
       overdueAndDue: '{{overdue}} overdue · {{due}} due today for review.',
-      goToReview: 'Go to Review Center', modulesHeading: 'Modules'
+      goToReview: 'Go to Review Center', modulesHeading: 'Modules',
+      currentStreak: 'Current Streak', longestStreak: 'Longest Streak', studyStreak: 'Study Streak'
+    },
+
+    shortcuts: {
+      title: 'Keyboard Shortcuts', search: 'Focus Search', addTopic: 'Add New Topic',
+      closeModal: 'Close Modal', dashboard: 'Go to Dashboard', modules: 'Go to Modules',
+      review: 'Go to Review Center', analytics: 'Go to Analytics', notes: 'Go to All Notes',
+      cheatSheet: 'Show Keyboard Shortcuts', toastHint: 'Press / to search, N to add topic, ? for shortcuts'
+    },
+
+    digest: {
+      receiveWeeklyDigest: 'Receive weekly progress digest emails', sendTestDigest: 'Send Test Digest Email',
+      testDigestSent: 'Test digest email sent successfully!'
+    },
+
+    backup: {
+      title: 'Data Backup & Recovery', exportData: 'Export My Data (JSON)', importData: 'Import Backup (JSON)',
+      importConfirm: 'Are you sure? Importing a backup will replace your current Topics, Knowledge, Reviews, Notes, and Streaks data.',
+      importSuccess: 'Backup imported successfully!', importError: 'Failed to import backup. Please verify the JSON file format.'
     },
 
     module: {
@@ -211,7 +230,26 @@ const I18N_DICT = {
       notStarted: 'لم يبدأ', learning: 'قيد التعلّم', understood: 'مفهوم', practiced: 'تم التطبيق',
       mastered: 'مُتقَن', knowledgeGaps: 'فجوات المعرفة', toReview: 'للمراجعة',
       overdueAndDue: '{{overdue}} متأخر · {{due}} مستحق اليوم للمراجعة.',
-      goToReview: 'الذهاب لمركز المراجعة', modulesHeading: 'الموديولات'
+      goToReview: 'الذهاب لمركز المراجعة', modulesHeading: 'الموديولات',
+      currentStreak: 'سلسلة الأيام الحالية', longestStreak: 'أطول سلسلة متواصلة', studyStreak: 'سلسلة التعلّم المتواصل'
+    },
+
+    shortcuts: {
+      title: 'اختصارات لوحة المفاتيح', search: 'التركيز على شريط البحث', addTopic: 'إضافة موضوع جديد',
+      closeModal: 'إغلاق النافذة المنبثقة', dashboard: 'الانتقال للوحة التحكم', modules: 'الانتقال للموديولات',
+      review: 'الانتقال لمركز المراجعة', analytics: 'الانتقال للتحليلات', notes: 'الانتقال لجميع الملاحظات',
+      cheatSheet: 'عرض قائمة اختصارات الكيبورد', toastHint: 'اضغط / للبحث، N لإضافة موضوع، ? لمشاهدة الاختصارات'
+    },
+
+    digest: {
+      receiveWeeklyDigest: 'استلام التقرير الأسبوعي الملخص عبر البريد الإلكتروني', sendTestDigest: 'إرسال بريد تجريبي ملخص',
+      testDigestSent: 'تم إرسال بريد الملخص الأسبوعي التجريبي بنجاح!'
+    },
+
+    backup: {
+      title: 'نسخ البيانات احتياطياً واستعادتها', exportData: 'تصدير بياناتي بالكامل (JSON)', importData: 'استعادة نسخة احتياطية (JSON)',
+      importConfirm: 'هل أنت تأكد؟ استعادة نسخة احتياطية ستقوم باستبدال كافة البيانات الحالية للمواضيع، المعرفة، المراجعات، الملاحظات، والسلاسل.',
+      importSuccess: 'تمت استعادة النسخة الاحتياطية بنجاح!', importError: 'فشلت عملية استعادة النسخة الاحتياطية. يرجى التأكد من صحة ملف JSON.'
     },
 
     module: {

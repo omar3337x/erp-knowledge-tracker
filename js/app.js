@@ -506,6 +506,107 @@ const App = (function () {
     API.prefetchAll();
   }
 
+// ---------------------------------------------------------------------------
+// Keyboard Shortcuts Engine
+// ---------------------------------------------------------------------------
+const KeyboardShortcuts = (function () {
+  let gKeyPressed = false;
+  let gKeyTimer = null;
+
+  function isEditing(e) {
+    const active = document.activeElement;
+    if (!active) return false;
+    const tag = active.tagName.toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || active.isContentEditable || active.classList.contains('ql-editor');
+  }
+
+  function showCheatSheet() {
+    const html = `
+      <div class="modal-head">
+        <h3>⌨️ ${I18n.t('shortcuts.title')}</h3>
+        <button class="btn btn-icon btn-ghost" data-close>&times;</button>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="shortcut-row"><span>${I18n.t('shortcuts.search')}</span><span class="shortcut-key">/ or Ctrl+K</span></div>
+        <div class="shortcut-row"><span>${I18n.t('shortcuts.addTopic')}</span><span class="shortcut-key">N</span></div>
+        <div class="shortcut-row"><span>${I18n.t('shortcuts.closeModal')}</span><span class="shortcut-key">Esc</span></div>
+        <div class="shortcut-row"><span>${I18n.t('shortcuts.dashboard')}</span><span class="shortcut-key">G then D</span></div>
+        <div class="shortcut-row"><span>${I18n.t('shortcuts.modules')}</span><span class="shortcut-key">G then M</span></div>
+        <div class="shortcut-row"><span>${I18n.t('shortcuts.review')}</span><span class="shortcut-key">G then R</span></div>
+        <div class="shortcut-row"><span>${I18n.t('shortcuts.analytics')}</span><span class="shortcut-key">G then A</span></div>
+        <div class="shortcut-row"><span>${I18n.t('shortcuts.notes')}</span><span class="shortcut-key">G then N</span></div>
+        <div class="shortcut-row"><span>${I18n.t('shortcuts.cheatSheet')}</span><span class="shortcut-key">?</span></div>
+      </div>
+      <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end;">
+        <button class="btn btn-secondary" data-close>${I18n.t('common.close')}</button>
+      </div>
+    `;
+    UI.openModal(html);
+  }
+
+  function init() {
+    window.addEventListener('keydown', (e) => {
+      // Esc closes open modal regardless of target
+      if (e.key === 'Escape') {
+        UI.closeModal();
+        return;
+      }
+
+      // Search focus: / or Ctrl+K
+      if ((e.key === '/' && !isEditing(e)) || (e.ctrlKey && e.key.toLowerCase() === 'k')) {
+        e.preventDefault();
+        const searchInput = document.getElementById('global-search');
+        if (searchInput) searchInput.focus();
+        return;
+      }
+
+      if (isEditing(e)) return; // Ignore single key shortcuts if user is typing
+
+      const key = e.key.toLowerCase();
+
+      // ? -> Show cheat sheet
+      if (e.key === '?') {
+        e.preventDefault();
+        showCheatSheet();
+        return;
+      }
+
+      // N -> Quick Add Topic modal
+      if (key === 'n' && !gKeyPressed) {
+        e.preventDefault();
+        const defaultModuleId = State.modulesCache.length ? State.modulesCache[0].id : null;
+        Topics.openAddModal(defaultModuleId, () => Router.reload());
+        return;
+      }
+
+      // Sequence navigation G -> D/M/R/A/N
+      if (key === 'g') {
+        gKeyPressed = true;
+        clearTimeout(gKeyTimer);
+        gKeyTimer = setTimeout(() => { gKeyPressed = false; }, 1000);
+        return;
+      }
+
+      if (gKeyPressed) {
+        gKeyPressed = false;
+        clearTimeout(gKeyTimer);
+
+        if (key === 'd') { e.preventDefault(); Router.go('dashboard'); }
+        else if (key === 'm') {
+          e.preventDefault();
+          const firstModId = State.modulesCache.length ? State.modulesCache[0].id : 'MOD-1';
+          Router.go('module', { id: firstModId });
+        }
+        else if (key === 'r') { e.preventDefault(); Router.go('review'); }
+        else if (key === 'a') { e.preventDefault(); Router.go('analytics'); }
+        else if (key === 'n') { e.preventDefault(); Router.go('notes'); }
+      }
+    });
+  }
+
+  return { init, showCheatSheet };
+})();
+
   async function init() {
     I18n.init();
     UI.applyStaticTranslations();
@@ -521,6 +622,7 @@ const App = (function () {
     Auth.init();
     bindStaticNav();
     bindLanguageSwitch();
+    KeyboardShortcuts.init();
     Router.init();
 
     const restored = await Auth.tryRestoreSession();
