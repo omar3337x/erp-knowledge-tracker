@@ -390,17 +390,12 @@ const App = (function () {
       });
     }
 
-    // Auto-sync when user returns from editing Google Sheets in another tab
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && API.getToken()) {
-        invalidateReferenceCache();
-        API.cacheBustAll();
-        loadReferenceData().then(() => {
-          buildSidebarModules();
-          Router.reload();
-        }).catch(() => {});
-      }
-    });
+    const autoSyncBadge = document.getElementById('autosync-badge');
+    if (autoSyncBadge) {
+      autoSyncBadge.addEventListener('click', () => {
+        if (typeof AutoSync !== 'undefined') AutoSync.syncNow();
+      });
+    }
 
     document.getElementById('quick-add-btn').addEventListener('click', () => {
       const defaultModuleId = State.modulesCache.length ? State.modulesCache[0].id : null;
@@ -429,6 +424,9 @@ const App = (function () {
 
     const h = Router.decodeHash();
     Router.render(h.route, h.params);
+
+    // Start background auto-sync engine (90-second periodic sync, tab-focus sync)
+    if (typeof AutoSync !== 'undefined') AutoSync.start();
 
     // Ensure full reference data is loaded in background if not already cached
     loadReferenceData().then(() => {

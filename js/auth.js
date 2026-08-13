@@ -126,6 +126,7 @@ const Auth = (function () {
     API.clearToken();
     API.cacheBustAll();
     API.stopKeepalive();
+    if (typeof AutoSync !== 'undefined') AutoSync.stop();
     saveCachedUser(null);
     try { localStorage.removeItem('erp_notes_cache_v2'); } catch(e) {}
 
