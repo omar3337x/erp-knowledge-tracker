@@ -261,16 +261,6 @@ const Modules = (function () {
       }).catch(() => {});
     }
 
-    // PERF: Delay getModuleInsights by 2s to avoid competing with topics/notes fetch
-    setTimeout(() => {
-      API.getModuleInsights(moduleId).then(res => {
-        if (res && Array.isArray(res.insights) && res.insights.length > 0) {
-          currentInsights = res.insights;
-          renderInsightsList();
-        }
-      }).catch(() => {});
-    }, 2000);
-
     if (refreshBtn) {
       refreshBtn.addEventListener('click', async () => {
         if (!confirm(I18n.t('ai.refreshConfirmBody'))) return;

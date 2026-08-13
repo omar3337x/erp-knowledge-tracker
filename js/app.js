@@ -297,7 +297,7 @@ const Router = (function () {
     }
     const map = {
       dashboard: 'dashboard.title', notes: 'nav.allNotes', favorites: 'nav.favorites', 'ai-insights': 'nav.aiInsights', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
-      analytics: 'analytics.title', profile: 'nav.myProfile', admin: 'admin.title'
+      analytics: 'analytics.title', 'system-test': 'nav.systemTest', profile: 'nav.myProfile', admin: 'admin.title'
     };
     return map[route] ? I18n.t(map[route]) : I18n.t('common.notFound');
   }
@@ -362,6 +362,7 @@ const Router = (function () {
     }
     if (route === 'review') return Reviews.renderCenter(content);
     if (route === 'analytics') return Analytics.render(content);
+    if (route === 'system-test') return SystemTest.render(content);
     if (route === 'profile') return Profile.render(content);
     if (route === 'admin') return Profile.renderAdmin(content);
     if (route === 'search') {

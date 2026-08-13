@@ -517,7 +517,14 @@ const API = (function () {
     importMyData  : async (p) => { const r = await rawCall('importMyData', p); cacheBustAll(); return r; },
 
     // AI Daily Insights
-    getModuleInsights    : (moduleId) => call('getModuleInsights', { module_id: moduleId }),
+    getModuleInsights: (moduleId) => {
+      const cached = cacheGet('getModuleInsights:{"module_id":"' + moduleId + '"}', 'getModuleInsights');
+      if (cached) return Promise.resolve(cached);
+      if (typeof Modules !== 'undefined' && Modules.getFallbackInsightsLocal) {
+        return Promise.resolve({ insights: Modules.getFallbackInsightsLocal(moduleId) });
+      }
+      return call('getModuleInsights', { module_id: moduleId });
+    },
     refreshModuleInsights: async (moduleId) => { const r = await rawCall('refreshModuleInsights', { module_id: moduleId }); cacheBust('getModuleInsights'); return r; },
     testAIConnection     : () => rawCall('testAIConnection', {}),
     getAISettings        : () => call('getAISettings', {}),
