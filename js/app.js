@@ -545,8 +545,15 @@ const App = (function () {
             categories: State.allCategories || []
           }));
         } catch (e) {}
+
+        // PERF: Seamlessly refresh current view (Dashboard/Module) with fresh batch data
+        const cur = Router.getRoute();
+        if (cur && cur.route === 'dashboard') {
+          Dashboard.render(document.getElementById('content'));
+        }
       }
     }).catch(() => {});
+
 
     // 5s failsafe: load reference data only if batch failed to populate modules
     setTimeout(() => {

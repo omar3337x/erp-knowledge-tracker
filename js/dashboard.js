@@ -73,6 +73,24 @@ const Dashboard = (function () {
     const mastered = topicsCached.filter(t => t.status === 'Mastered').length;
     const progress = total ? Math.round(((mastered + practiced * 0.8 + understood * 0.5 + learning * 0.2) / total) * 100) : 0;
 
+    const mappedModules = modules.map(m => {
+      const modTopics = topicsCached.filter(t => String(t.module_id || '').toLowerCase() === String(m.id || '').toLowerCase());
+      const mTotal = modTopics.length;
+      const mNotStarted = modTopics.filter(t => t.status === 'Not Started').length;
+      const mLearning = modTopics.filter(t => t.status === 'Learning').length;
+      const mMastered = modTopics.filter(t => t.status === 'Mastered').length;
+      const mPracticed = modTopics.filter(t => t.status === 'Practiced').length;
+      const mUnderstood = modTopics.filter(t => t.status === 'Understood').length;
+      const mProg = mTotal ? Math.round(((mMastered + mPracticed * 0.8 + mUnderstood * 0.5 + mLearning * 0.2) / mTotal) * 100) : (m.progress || 0);
+
+      return Object.assign({}, m, {
+        progress: mProg,
+        total: mTotal,
+        not_started: mNotStarted,
+        learning: mLearning
+      });
+    });
+
     return {
       kpis: {
         overall_progress: progress,
@@ -85,11 +103,12 @@ const Dashboard = (function () {
         knowledge_gaps: notStarted + learning,
         topics_to_review: topicsCached.filter(t => t.next_review_date && new Date(t.next_review_date) <= new Date()).length
       },
-      modules: modules.map(m => Object.assign({}, m, { progress: m.progress || 0 })),
+      modules: mappedModules,
       topics: topicsCached,
       review_summary: { due_today: 0, overdue: 0 }
     };
   }
+
 
 
   function drawDashboard(container, data) {
@@ -242,10 +261,6 @@ const Dashboard = (function () {
       }).catch(() => {});
     });
 
-    if (!_prefetchDone) {
-      _prefetchDone = true;
-      API.prefetchAll();
-    }
   }
 
   function kpiCard(label, value, tone) {
