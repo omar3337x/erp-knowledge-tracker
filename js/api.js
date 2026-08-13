@@ -170,14 +170,15 @@ const API = (function () {
       activeControllers.set(options.route, controller);
     }
 
-    // PERF: Send all requests as POST with text/plain content type.
-    // This avoids Google Apps Script's 302 -> macros/echo 404 redirect entirely,
-    // avoids CORS preflight OPTIONS delays, and removes URL query string length limits.
-    const fetchUrl = CONFIG.API_URL;
+    // PERF: Include action and token in URL query string + POST body.
+    // Dual parameter passing guarantees compatibility with both new and old GAS deployments,
+    // eliminates 302 -> macros/echo 404 redirects, and prevents Missing action parameter errors.
+    const qs = new URLSearchParams({ action: action || '', token: token || '' }).toString();
+    const fetchUrl = CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + qs;
     const fetchOpts = {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, payload: payload || {}, token }),
+      body: JSON.stringify({ action: action || '', payload: payload || {}, token: token || '' }),
       signal: controller.signal
     };
 
