@@ -1997,7 +1997,19 @@ function generateModuleInsights(user, moduleId, lang, dateKey) {
 
 function getFallbackInsights(moduleId, lang) {
   var isAr = lang === 'ar';
-  var modLower = String(moduleId || '').toLowerCase();
+  var modNameEn = '';
+  var modNameAr = '';
+
+  try {
+    var modules = readAllRows(SHEET_NAMES.MODULES);
+    var foundMod = modules.find(function(m) { return String(m.id) === String(moduleId); });
+    if (foundMod) {
+      modNameEn = foundMod.name_en || '';
+      modNameAr = foundMod.name_ar || '';
+    }
+  } catch (e) {}
+
+  var modLower = (String(moduleId || '') + ' ' + modNameEn + ' ' + modNameAr).toLowerCase();
 
   // 1. Inventory (المخزون)
   if (modLower.indexOf('inventory') !== -1 || modLower.indexOf('mod-1') !== -1 || modLower.indexOf('مخزون') !== -1) {

@@ -272,7 +272,8 @@ const Modules = (function () {
 
   function getFallbackInsightsLocal(moduleId) {
     const isAr = I18n.getLang() === 'ar';
-    const modObj = (State.modulesCache || []).find(m => String(m.id) === String(moduleId));
+    const modulesList = (State.modulesCache && State.modulesCache.length) ? State.modulesCache : (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
+    const modObj = modulesList.find(m => String(m.id) === String(moduleId));
     const modName = modObj ? I18n.localizedName(modObj) : (isAr ? 'الموديول الحالي' : 'Current Module');
     const modLower = (String(moduleId || '') + ' ' + String(modObj ? modObj.name_en : '') + ' ' + String(modObj ? modObj.name_ar : '')).toLowerCase();
 
