@@ -20,11 +20,27 @@ const Modules = (function () {
     `;
 
     let allTopics;
-    try {
-      allTopics = await API.topics({});
-    } catch (err) {
-      container.innerHTML = UI.errorState(err);
-      return;
+    // PERF: Read from prefetchAll batch cache (topics:{}) — 0ms if batch already done
+    const cachedTopics = API.cacheGet('topics:{}', 'topics');
+    if (cachedTopics && Array.isArray(cachedTopics)) {
+      allTopics = cachedTopics;
+    } else {
+      // Batch still in-flight: poll up to 3s in 300ms increments, then fallback to direct call
+      let waited = 0;
+      while (waited < 3000) {
+        await new Promise(r => setTimeout(r, 300));
+        waited += 300;
+        const poll = API.cacheGet('topics:{}', 'topics');
+        if (poll && Array.isArray(poll)) { allTopics = poll; break; }
+      }
+      if (!allTopics) {
+        try {
+          allTopics = await API.topics({});
+        } catch (err) {
+          container.innerHTML = UI.errorState(err);
+          return;
+        }
+      }
     }
 
     const topics = allTopics.filter(t => t.module_id === moduleId);
@@ -228,20 +244,30 @@ const Modules = (function () {
     // 0ms Instant First Paint!
     renderInsightsList();
 
-    // Background Async Fetch & Sync
-    API.getFavorites().then(favs => {
-      if (favs && Array.isArray(favs)) {
-        State.setFavorites(favs);
-        renderInsightsList();
-      }
-    }).catch(() => {});
+    // PERF: Read favorites from prefetchAll batch cache (no extra GAS request)
+    const cachedFavs = API.cacheGet('getFavorites:{}', 'getFavorites');
+    if (cachedFavs && Array.isArray(cachedFavs)) {
+      State.setFavorites(cachedFavs);
+      renderInsightsList();
+    } else {
+      // Fallback: fetch only if not in cache yet
+      API.getFavorites().then(favs => {
+        if (favs && Array.isArray(favs)) {
+          State.setFavorites(favs);
+          renderInsightsList();
+        }
+      }).catch(() => {});
+    }
 
-    API.getModuleInsights(moduleId).then(res => {
-      if (res && Array.isArray(res.insights) && res.insights.length > 0) {
-        currentInsights = res.insights;
-        renderInsightsList();
-      }
-    }).catch(() => {});
+    // PERF: Delay getModuleInsights by 2s to avoid competing with topics/notes fetch
+    setTimeout(() => {
+      API.getModuleInsights(moduleId).then(res => {
+        if (res && Array.isArray(res.insights) && res.insights.length > 0) {
+          currentInsights = res.insights;
+          renderInsightsList();
+        }
+      }).catch(() => {});
+    }, 2000);
 
     if (refreshBtn) {
       refreshBtn.addEventListener('click', async () => {

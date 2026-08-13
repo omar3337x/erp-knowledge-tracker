@@ -150,27 +150,28 @@ const Auth = (function () {
     const cachedUser = getCachedUser();
 
     if (cachedUser) {
-      // 0ms Instant Boot using cached user
+      // 0ms Instant Boot using cached user — prefetchAll fired by App.boot()
       State.currentUser = cachedUser;
       API.startKeepalive();
-      API.prefetchAll();
 
-      // Silent background validation — never blocks UI
-      API.validateSession()
-        .then(data => {
-          State.currentUser = data.user;
-          saveCachedUser(data.user);
-          if (data.modules && data.modules.length) State.modulesCache = data.modules;
-          if (data.categories && data.categories.length) State.allCategories = data.categories;
-        })
-        .catch(err => {
-          if (err && err.code === 'SESSION_EXPIRED') onSessionExpired();
-        });
+      // Silent background validation — delayed 4s to avoid competing with boot batch
+      setTimeout(() => {
+        API.validateSession()
+          .then(data => {
+            State.currentUser = data.user;
+            saveCachedUser(data.user);
+            if (data.modules && data.modules.length) State.modulesCache = data.modules;
+            if (data.categories && data.categories.length) State.allCategories = data.categories;
+          })
+          .catch(err => {
+            if (err && err.code === 'SESSION_EXPIRED') onSessionExpired();
+          });
+      }, 4000);
 
       return true;
     }
 
-    // Fallback: network validation
+    // Fallback: network validation (no cached user — must verify before showing app)
     try {
       const data = await API.validateSession();
       State.currentUser = data.user;
@@ -178,7 +179,6 @@ const Auth = (function () {
       if (data.modules && data.modules.length) State.modulesCache = data.modules;
       if (data.categories && data.categories.length) State.allCategories = data.categories;
       API.startKeepalive();
-      API.prefetchAll();
       return true;
     } catch (err) {
       API.clearToken();

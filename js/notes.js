@@ -275,8 +275,24 @@ const Notes = (function () {
     }
 
     try {
-      const raw = await API.notes({ module_id: selectedModuleId || '', search: searchQuery || '' });
-      const freshNotes = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
+      // PERF: Try batch cache first (stored as notes:{}) — filter locally, no extra GAS request
+      const batchCached = API.cacheGet('notes:{}', 'notes');
+      let freshNotes;
+      if (batchCached && Array.isArray(batchCached) && batchCached.length > 0 && !forceNetwork) {
+        // Use batch cache — filter by module/search locally
+        let filtered = batchCached;
+        if (selectedModuleId) filtered = filtered.filter(n => String(n.module_id || '') === String(selectedModuleId));
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          filtered = filtered.filter(n => String(n.title || '').toLowerCase().includes(q) || String(n.content || '').toLowerCase().includes(q));
+        }
+        freshNotes = filtered.map(normalizeNote).filter(Boolean);
+        // Still fetch in background after 3s to refresh
+        setTimeout(() => { API.notes({ module_id: selectedModuleId || '', search: '' }).catch(() => {}); }, 3000);
+      } else {
+        const raw = await API.notes({ module_id: selectedModuleId || '', search: searchQuery || '' });
+        freshNotes = (Array.isArray(raw) ? raw : []).map(normalizeNote).filter(Boolean);
+      }
 
       // Only re-render if data actually changed (avoid flicker)
       const changed = freshNotes.length !== _allNotesCache.length ||

@@ -188,7 +188,8 @@ const API = (function () {
     const useGet = fetchUrl.length < 2000;
     const fetchOpts = {
       method: useGet ? 'GET' : 'POST',
-      signal: controller.signal
+      signal: controller.signal,
+      credentials: 'omit'  // Suppress "Tracking Prevention blocked storage" browser warnings
     };
 
     if (!useGet) {
@@ -336,17 +337,21 @@ const API = (function () {
     if (_warmupTimer) { clearInterval(_warmupTimer); _warmupTimer = null; }
   }
 
-  // PERF: Predictive Prefetch (Parallel background batch loading after login)
+  // PERF: Predictive Prefetch — ONE batch call after login (dashboard + topics + notes + reviews + modules + categories + favorites)
+  let _prefetchInProgress = false;
   function prefetchAll() {
-    if (!getToken()) return;
-    setTimeout(() => {
-      batch([
-        { action: 'dashboard', payload: {} },
-        { action: 'topics', payload: {} },
-        { action: 'notes', payload: {} },
-        { action: 'reviews', payload: {} }
-      ]).catch(() => {});
-    }, 300);
+    if (!getToken() || _prefetchInProgress) return Promise.resolve();
+    _prefetchInProgress = true;
+    const p = batch([
+      { action: 'dashboard',   payload: {} },
+      { action: 'topics',      payload: {} },
+      { action: 'notes',       payload: {} },
+      { action: 'reviews',     payload: {} },
+      { action: 'modules',     payload: {} },
+      { action: 'categories',  payload: {} },
+      { action: 'getFavorites', payload: {} }
+    ]).catch(() => {}).finally(() => { _prefetchInProgress = false; });
+    return p;
   }
 
   /* ------------------------------------------------------------------ */

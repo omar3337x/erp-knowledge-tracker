@@ -498,9 +498,9 @@ const App = (function () {
   /**
    * PERF: Non-blocking App Boot Sequence
    * 1. Renders App Shell & Sidebar instantly in 0ms using available/default modules.
-   * 2. Renders active route instantly with cached data.
-   * 3. Triggers predictive background prefetch.
-   * 4. Refreshes reference data silently in background.
+   * 2. Fires ONE batch prefetch (dashboard+topics+notes+reviews+modules+categories).
+   * 3. Renders active route — Dashboard reads from cache populated by the batch.
+   * 4. loadReferenceData only as 5s failsafe if batch failed.
    */
   async function boot() {
     Auth.showApp();
@@ -508,24 +508,48 @@ const App = (function () {
       I18n.setLang(State.currentUser.language);
     }
 
-    // 0ms instant sidebar render
+    // 0ms instant sidebar render using default/cached modules
     buildSidebarModules();
     if (State.currentUser && State.currentUser.role === 'Admin') {
       document.getElementById('nav-admin').classList.remove('hidden');
     }
 
+    // PERF: Fire ONE batch prefetch immediately — modules+categories+dashboard+topics+notes+reviews
+    // in a single GAS request. Bind event listeners first, then await so skeleton renders right away.
     const h = Router.decodeHash();
-    Router.render(h.route, h.params);
+    Router.render(h.route, h.params); // Instant skeleton paint
 
-    // Start background auto-sync engine
+    // Bind nav immediately
     if (typeof AutoSync !== 'undefined') AutoSync.start();
 
-    // Trigger background reference data load non-blockingly
+    // Background: fire single prefetch batch, then update State + re-render if needed
+    API.prefetchAll().then(batchResult => {
+      if (batchResult && typeof batchResult === 'object') {
+        // Populate modules cache from batch result
+        if (Array.isArray(batchResult.modules) && batchResult.modules.length > 0) {
+          State.modulesCache = batchResult.modules;
+          buildSidebarModules();
+        }
+        if (Array.isArray(batchResult.categories)) {
+          State.allCategories = batchResult.categories;
+        }
+        // Save to reference cache so next boot is instant
+        try {
+          localStorage.setItem('erp_tracker_ref_cache_v1', JSON.stringify({
+            savedAt: Date.now(),
+            modules: State.modulesCache,
+            categories: State.allCategories || []
+          }));
+        } catch (e) {}
+      }
+    }).catch(() => {});
+
+    // 5s failsafe: load reference data only if batch failed to populate modules
     setTimeout(() => {
-      loadReferenceData().then(() => {
-        buildSidebarModules();
-      }).catch(() => {});
-    }, 1200);
+      if (!Array.isArray(State.modulesCache) || State.modulesCache.length === 0) {
+        loadReferenceData().then(() => buildSidebarModules()).catch(() => {});
+      }
+    }, 5000);
   }
 
 // ---------------------------------------------------------------------------

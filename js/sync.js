@@ -79,17 +79,17 @@ const AutoSync = (function () {
     updateBadge('online');
     _syncTimer = setInterval(performSync, SYNC_INTERVAL_MS);
 
-    // Auto-sync when user switches back to this tab
+    // Auto-sync when user switches back to this tab — delayed 5s to avoid competing with page load
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && API.getToken()) {
-        performSync();
+        setTimeout(performSync, 5000);
       }
     });
 
     // Auto-sync when internet reconnects
     window.addEventListener('online', () => {
       updateBadge('online');
-      performSync();
+      setTimeout(performSync, 3000); // Delay 3s to let page settle
     });
 
     window.addEventListener('offline', () => {

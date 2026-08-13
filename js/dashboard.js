@@ -15,6 +15,10 @@ const Dashboard = (function () {
   const DASHBOARD_LS_KEY = 'erp_dashboard_cache_v1';
 
   function getCachedDashboard() {
+    // First check shared API cache (populated by prefetchAll batch)
+    const apiCached = (typeof API !== 'undefined' && API.cacheGet) ? API.cacheGet('dashboard:{}', 'dashboard') : null;
+    if (apiCached && apiCached.kpis) return apiCached;
+    // Fallback: own localStorage snapshot
     try {
       const raw = localStorage.getItem(DASHBOARD_LS_KEY);
       return raw ? JSON.parse(raw) : null;
@@ -47,7 +51,24 @@ const Dashboard = (function () {
       `;
     }
 
-    // PERF: Background network fetch
+    // PERF: Wait briefly for prefetchAll batch to populate cache before firing own request.
+    // prefetchAll fires a batch(dashboard+topics+...) — if we give it a head start,
+    // API.dashboard() will return from cache (0ms) instead of firing a duplicate GAS call.
+    if (!cachedData) {
+      // No cache at all: wait up to 3s for the prefetch batch, checking every 300ms
+      let waited = 0;
+      while (waited < 3000) {
+        await new Promise(r => setTimeout(r, 300));
+        waited += 300;
+        const earlyData = getCachedDashboard();
+        if (earlyData && earlyData.kpis) {
+          drawDashboard(container, earlyData);
+          return; // Batch populated cache — no extra request needed
+        }
+      }
+    }
+
+    // Background network fetch (reads from cache if prefetchAll batch already completed)
     try {
       const freshData = await API.dashboard();
       saveCachedDashboard(freshData);
