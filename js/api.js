@@ -121,23 +121,30 @@ const API = (function () {
   function cacheBustAll() { _mem.clear(); lsBustAll(); }
 
   /* ------------------------------------------------------------------ */
-  /* Raw HTTP call with exponential-backoff retry loop                  */
+  /* Warmup Gate — Ensures only ONE request pays the cold-start retry    */
+  /* penalty (404s). Other concurrent requests wait for warmup to finish.*/
   /* ------------------------------------------------------------------ */
-  /* rawCall — always GET (≤7500 chars) or fire-and-forget no-cors POST  */
-  /* for oversized payloads (base64 images). Avoids CORS 302/echo/404.  */
-  /* ------------------------------------------------------------------ */
-  const MAX_ATTEMPTS = 8;
-  // Delay schedule (ms): 300, 600, 1200, 2400, 3000, 3000, 3000
-  function _retryDelay(attempt) { return Math.min(300 * Math.pow(2, attempt - 1), 3000); }
+  let _warmupPromise = null;
+  let _isWarmedUp = false;
 
-  const WRITE_ACTIONS = new Set([
-    'signup','login','logout','updateProfile','changePassword',
-    'createCategory','updateCategory','deleteCategory','toggleCategoryStatus',
-    'createTopic','updateTopic','deleteTopic','updateStatus','updateStatusBulk','updateProgress',
-    'saveKnowledge','updateKnowledge',
-    'createNote','updateNote','deleteNote',
-    'addReview','markReviewed','seed'
-  ]);
+  function ensureWarmedUp() {
+    if (_isWarmedUp) return Promise.resolve();
+    if (_warmupPromise) return _warmupPromise;
+
+    _warmupPromise = rawCall('ping', {}, 1)
+      .then(() => {
+        _isWarmedUp = true;
+      })
+      .catch(() => {
+        // Even if ping fails or is ignored, clear gate so requests proceed
+        _isWarmedUp = true;
+      })
+      .finally(() => {
+        _warmupPromise = null;
+      });
+
+    return _warmupPromise;
+  }
 
   async function rawCall(action, payload, attempt) {
     attempt = attempt || 1;
@@ -146,6 +153,11 @@ const API = (function () {
       const err = new Error('API_URL is not configured.');
       err.code = 'NOT_CONFIGURED';
       throw err;
+    }
+
+    // Wait for warmup gate unless this IS the ping action or attempt > 1
+    if (action !== 'ping' && !_isWarmedUp && attempt === 1) {
+      await ensureWarmedUp();
     }
 
     const token = getToken();
@@ -222,6 +234,8 @@ const API = (function () {
       if (err.code === 'SESSION_EXPIRED') { clearToken(); Auth.onSessionExpired(); }
       throw err;
     }
+
+    _isWarmedUp = true; // Mark as warmed up on any successful API call
     return json.data;
   }
 
@@ -262,7 +276,7 @@ const API = (function () {
   /* ------------------------------------------------------------------ */
   function warmup() {
     if (!CONFIG.API_URL || CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL') return;
-    call('ping', {}).catch(() => {});
+    ensureWarmedUp().catch(() => {});
   }
 
   /* ------------------------------------------------------------------ */
