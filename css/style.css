@@ -968,3 +968,113 @@ tbody tr:has(.topic-select-cb:checked) {
   font-weight: 700;
   box-shadow: 0 0 8px rgba(181, 119, 46, 0.25);
 }
+
+/* --------------------------------------------------------------------------- */
+/* ✨ AI DAILY INSIGHTS & ⭐ FAVORITES                                          */
+/* --------------------------------------------------------------------------- */
+
+.ai-insights-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-insights-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ai-insights-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.ai-insight-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+}
+
+.ai-insight-card:last-child {
+  margin-bottom: 0;
+}
+
+.ai-insight-card:hover {
+  border-color: var(--brass);
+  box-shadow: var(--shadow-md);
+}
+
+.ai-insight-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ai-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ai-type-tip          { background: var(--teal-soft); color: var(--teal); }
+.ai-type-trick        { background: var(--brass-soft); color: var(--brass); }
+.ai-type-business     { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.ai-type-mistake      { background: var(--rust-soft); color: var(--rust); }
+.ai-type-warning      { background: var(--rust-soft); color: var(--rust); }
+.ai-type-practice     { background: var(--gold-soft); color: #b5772e; }
+.ai-type-accounting   { background: rgba(147, 51, 234, 0.12); color: #7e22ce; }
+.ai-type-default      { background: var(--paper-hover); color: var(--ink); }
+
+.btn-fav-toggle {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.btn-fav-toggle:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.btn-fav-toggle.is-fav {
+  background: var(--gold-soft);
+  border-color: var(--gold);
+  color: #b5772e;
+  font-weight: 700;
+}

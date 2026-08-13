@@ -27,10 +27,47 @@ const I18N_DICT = {
 
     nav: {
       dashboard: 'Dashboard', modules: 'Modules', learning: 'Learning',
-      allNotes: 'All Notes',
+      allNotes: 'All Notes', favorites: 'Favorites',
       knowledgeGaps: 'Knowledge Gaps', reviewCenter: 'Review Center', analytics: 'Analytics',
       account: 'Account', myProfile: 'My Profile', administration: 'Administration', logout: 'Logout',
       searchPlaceholder: 'Search topics across all modules...', quickAdd: '+ Quick Add'
+    },
+
+    ai: {
+      sectionTitle: 'AI Daily Insights',
+      refreshBtn: 'Refresh Insights',
+      refreshConfirmTitle: 'Generate New Insights?',
+      refreshConfirmBody: 'Generate new insights for this module? This may use another AI request.',
+      example: 'Practical Example',
+      whyItMatters: 'Why It Matters',
+      favoriteAdd: 'Favorite',
+      favoriteRemove: 'Remove Favorite',
+      loadingSkeleton: 'AI is generating daily ERP insights...',
+      error: 'Unable to load AI insights right now.'
+    },
+
+    favorites: {
+      title: 'Bookmarked AI Insights',
+      subtitle: 'Your saved tips, tricks, best practices, and ERP insights across all modules.',
+      searchPlaceholder: 'Search favorites by title, content, or type...',
+      allTypes: 'All Types',
+      noFavorites: 'No favorites saved yet.',
+      noFavoritesHint: 'Click ⭐ Favorite on any AI Insight in any module to save it here for quick access.',
+      removedToast: 'Removed from favorites'
+    },
+
+    aiSettings: {
+      title: 'AI Configuration & Model Settings',
+      enableAI: 'Enable AI Insights',
+      apiEndpoint: 'API Endpoint (OpenAI Compatible)',
+      model: 'AI Model',
+      apiKey: 'API Key (Script Property)',
+      apiKeyHint: 'Stored securely in Google Apps Script properties — never exposed in code.',
+      dailyCount: 'Daily Insights Count',
+      testConnection: 'Test AI Connection',
+      connectionSuccess: 'AI connection successful!',
+      connectionTesting: 'Testing AI connection...',
+      saveSuccess: 'AI settings updated successfully!'
     },
 
     auth: {
@@ -212,10 +249,47 @@ const I18N_DICT = {
 
     nav: {
       dashboard: 'لوحة التحكم', modules: 'الموديولات', learning: 'التعلّم',
-      allNotes: 'جميع الملاحظات',
+      allNotes: 'جميع الملاحظات', favorites: 'المفضلة',
       knowledgeGaps: 'فجوات المعرفة', reviewCenter: 'مركز المراجعة', analytics: 'التحليلات',
       myProfile: 'ملفي الشخصي', administration: 'الإدارة', account: 'الحساب', logout: 'تسجيل الخروج',
       searchPlaceholder: 'ابحث عن أي موضوع في كل الموديولات...', quickAdd: '+ إضافة سريعة'
+    },
+
+    ai: {
+      sectionTitle: '✨ نصائح ورؤى الذكاء الاصطناعي اليومية (AI Daily Insights)',
+      refreshBtn: 'توليد insights جديدة',
+      refreshConfirmTitle: 'توليد نصائح ورؤى جديدة؟',
+      refreshConfirmBody: 'هل تريد إنشاء Insights جديدة لهذا الموديول؟ قد يتم استهلاك طلب جديد من خدمة الذكاء الاصطناعي.',
+      example: '💡 مثال عملي',
+      whyItMatters: '🎯 لماذا هذه المعلومة مهمة؟',
+      favoriteAdd: 'إضافة للمفضلة',
+      favoriteRemove: 'إزالة من المفضلة',
+      loadingSkeleton: 'جاري توليد رؤى ونصائح ERP الذكية لهذا الموديول...',
+      error: 'تعذر تحميل رؤى الذكاء الاصطناعي حالياً.'
+    },
+
+    favorites: {
+      title: '⭐ المفضلة (AI Insights)',
+      subtitle: 'جميع النصائح والأفكار والممارسات الأفضل التي قمت بحفظها عبر الموديولات المختلفة.',
+      searchPlaceholder: 'ابحث في المفضلة حسب العنوان، المحتوى، أو النوع...',
+      allTypes: 'جميع الأنواع',
+      noFavorites: 'لا توجد عناصر محفوظة في المفضلة بعد.',
+      noFavoritesHint: 'انقر على زر ⭐ إضافة للمفضلة في أي كارد AI Insight داخل الموديولات ليتم حفظه هنا للرجوع إليه في أي وقت.',
+      removedToast: 'تمت إزالة العنصر من المفضلة'
+    },
+
+    aiSettings: {
+      title: 'إعدادات الذكاء الاصطناعي (AI Settings)',
+      enableAI: 'تفعيل ميزة الذكاء الاصطناعي (AI Insights)',
+      apiEndpoint: 'عنوان الـ API Endpoint (OpenAI-Compatible)',
+      model: 'نموذج الذكاء الاصطناعي (AI Model)',
+      apiKey: 'مفتاح الـ API Key (Script Property)',
+      apiKeyHint: 'يتم حفظ المفتاح بأمان تام داخل Google Apps Script Properties ولا يظهر في الكود إطلاقاً.',
+      dailyCount: 'عدد الـ Insights اليومية لكل موديول',
+      testConnection: 'اختبار الاتصال بالـ AI',
+      connectionSuccess: 'تم الاتصال بالذكاء الاصطناعي بنجاح!',
+      connectionTesting: 'جاري اختبار الاتصال بالذكاء الاصطناعي...',
+      saveSuccess: 'تم حفظ إعدادات الذكاء الاصطناعي بنجاح!'
     },
 
     auth: {

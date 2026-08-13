@@ -272,7 +272,7 @@ const Router = (function () {
       return mod ? I18n.localizedName(mod) : I18n.t('nav.modules');
     }
     const map = {
-      dashboard: 'dashboard.title', notes: 'nav.allNotes', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
+      dashboard: 'dashboard.title', notes: 'nav.allNotes', favorites: 'nav.favorites', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
       analytics: 'analytics.title', profile: 'nav.myProfile', admin: 'admin.title'
     };
     return map[route] ? I18n.t(map[route]) : I18n.t('common.notFound');
@@ -322,6 +322,7 @@ const Router = (function () {
 
     if (route === 'dashboard') return Dashboard.render(content);
     if (route === 'notes') return Notes.renderAllNotesPage(content);
+    if (route === 'favorites') return Favorites.render(content);
     if (route === 'module') return Modules.render(content, params.id);
     if (route === 'gaps') {
       content.innerHTML = UI.skeleton('table');

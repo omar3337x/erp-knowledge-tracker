@@ -139,7 +139,8 @@ const API = (function () {
   const MAX_ATTEMPTS = 5;
   const READ_ACTIONS = new Set([
     'validateSession', 'currentUser', 'modules', 'categories', 'topics', 'topic',
-    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping', 'batch', 'getStreak'
+    'knowledge', 'reviews', 'dashboard', 'analytics', 'adminUsers', 'notes', 'note', 'ping', 'batch', 'getStreak',
+    'getModuleInsights', 'getAISettings', 'getFavorites'
   ]);
 
   function _retryDelay(attempt, is429) {
@@ -462,5 +463,17 @@ const API = (function () {
     sendTestDigest: () => rawCall('sendTestDigest', {}),
     exportMyData  : () => rawCall('exportMyData', {}),
     importMyData  : async (p) => { const r = await rawCall('importMyData', p); cacheBustAll(); return r; },
+
+    // AI Daily Insights
+    getModuleInsights    : (moduleId) => call('getModuleInsights', { module_id: moduleId }),
+    refreshModuleInsights: async (moduleId) => { const r = await rawCall('refreshModuleInsights', { module_id: moduleId }); cacheBust('getModuleInsights'); return r; },
+    testAIConnection     : () => rawCall('testAIConnection', {}),
+    getAISettings        : () => call('getAISettings', {}),
+    updateAISettings     : async (p) => { const r = await rawCall('updateAISettings', p); cacheBust('getAISettings'); return r; },
+
+    // AI Favorites
+    getFavorites  : () => call('getFavorites', {}),
+    addFavorite   : async (p) => { const r = await rawCall('addFavorite', p); cacheBust('getFavorites'); return r; },
+    removeFavorite: async (p) => { const r = await rawCall('removeFavorite', p); cacheBust('getFavorites'); return r; },
   };
 })();

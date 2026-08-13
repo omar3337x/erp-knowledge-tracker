@@ -48,7 +48,9 @@ var SHEET_NAMES = {
   REVIEWS: 'Reviews',
   NOTES: 'Notes',
   STREAKS: 'Streaks',
-  EMAIL_LOGS: 'EmailLogs'
+  EMAIL_LOGS: 'EmailLogs',
+  AI_INSIGHTS: 'AI_Insights',
+  AI_FAVORITES: 'AI_Favorites'
 };
 
 var SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 7;           // 7 days default
@@ -58,7 +60,7 @@ var STATUS_VALUES = ['Not Started', 'Learning', 'Understood', 'Practiced', 'Mast
 var PRIORITY_VALUES = ['Low', 'Medium', 'High', 'Critical'];
 var LANGUAGE_VALUES = ['en', 'ar'];
 
-var SCHEMA_VERSION_TARGET = '5';
+var SCHEMA_VERSION_TARGET = '6';
 
 // Actions that mutate data. Only these acquire the script lock — read
 // actions run without locking so parallel requests from the same page
@@ -71,6 +73,7 @@ var WRITE_ACTIONS = {
   addReview: 1, markReviewed: 1,
   createCategory: 1, updateCategory: 1, deleteCategory: 1, toggleCategoryStatus: 1,
   createNote: 1, updateNote: 1, deleteNote: 1,
+  refreshModuleInsights: 1, updateAISettings: 1, addFavorite: 1, removeFavorite: 1,
   seed: 1
 };
 
@@ -249,6 +252,16 @@ function handleRequest(action, payload, token) {
       case 'sendTestDigest':       return jsonResponse(withAuth(token, function(user){ return actionSendTestDigest(user); }));
       case 'exportMyData':         return jsonResponse(withAuth(token, function(user){ return actionExportMyData(user); }));
       case 'importMyData':         return jsonResponse(withAuth(token, function(user){ return actionImportMyData(user, payload); }));
+
+      // AI Daily Insights & Favorites
+      case 'getModuleInsights':    return jsonResponse(withAuth(token, function(user){ return actionGetModuleInsights(user, payload); }));
+      case 'refreshModuleInsights':return jsonResponse(withAuth(token, function(user){ return actionRefreshModuleInsights(user, payload); }));
+      case 'testAIConnection':     return jsonResponse(withAuth(token, function(user){ return actionTestAIConnection(user); }));
+      case 'getAISettings':        return jsonResponse(withAuth(token, function(user){ return actionGetAISettings(user); }));
+      case 'updateAISettings':     return jsonResponse(withAuth(token, function(user){ return actionUpdateAISettings(user, payload); }));
+      case 'getFavorites':         return jsonResponse(withAuth(token, function(user){ return actionGetFavorites(user); }));
+      case 'addFavorite':          return jsonResponse(withAuth(token, function(user){ return actionAddFavorite(user, payload); }));
+      case 'removeFavorite':       return jsonResponse(withAuth(token, function(user){ return actionRemoveFavorite(user, payload); }));
 
       // Setup
       case 'seed':                  return jsonResponse(actionSeed());
@@ -1331,7 +1344,9 @@ function createSheetsIfMissing() {
     Reviews: ['id', 'user_id', 'topic_id', 'review_date', 'understanding', 'notes'],
     Notes: ['id', 'user_id', 'module_id', 'title', 'section_name', 'content', 'created_at', 'updated_at', 'tags', 'pinned', 'image_url'],
     Streaks: ['user_id', 'date', 'activity_count', 'streak_count'],
-    EmailLogs: ['user_id', 'sent_at', 'status', 'error_message']
+    EmailLogs: ['user_id', 'sent_at', 'status', 'error_message'],
+    AI_Insights: ['id', 'user_id', 'module_id', 'title', 'type', 'content', 'example', 'why_it_matters', 'generated_at', 'date_key', 'model', 'language'],
+    AI_Favorites: ['id', 'user_id', 'insight_id', 'module_id', 'title', 'type', 'content', 'example', 'why_it_matters', 'created_at']
   };
   Object.keys(schemas).forEach(function(name) {
     var sheet = spreadsheet.getSheetByName(name);
@@ -1759,4 +1774,255 @@ function deleteRowsByUser(sheetName, userId) {
       sheet.deleteRow(rows[i].__row);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// AI DAILY INSIGHTS & FAVORITES SERVICE
+// ---------------------------------------------------------------------------
+
+function getAISetting(key, defaultValue) {
+  var props = PropertiesService.getScriptProperties();
+  var val = props.getProperty(key);
+  return (val !== null && val !== undefined && val !== '') ? val : defaultValue;
+}
+
+function callAI(messages) {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = props.getProperty('AI_API_KEY') || 'YOUR_SECRET_KEY';
+  var endpoint = props.getProperty('AI_API_ENDPOINT') || 'https://router.bynara.id/v1';
+  var model = props.getProperty('AI_MODEL') || 'gemini-3.6-medium';
+  var temperature = Number(props.getProperty('AI_TEMPERATURE')) || 0.7;
+  var maxTokens = Number(props.getProperty('AI_MAX_TOKENS')) || 1500;
+
+  var url = endpoint.replace(/\/+$/, '') + '/chat/completions';
+
+  var payload = {
+    model: model,
+    messages: messages,
+    temperature: temperature,
+    max_tokens: maxTokens
+  };
+
+  var options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'Authorization': 'Bearer ' + apiKey
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  var response = UrlFetchApp.fetch(url, options);
+  var code = response.getResponseCode();
+  var text = response.getContentText();
+
+  if (code < 200 || code >= 300) {
+    throw new Error('AI Service error (HTTP ' + code + '): ' + text.substring(0, 200));
+  }
+
+  var data = JSON.parse(text);
+  if (data.choices && data.choices[0] && data.choices[0].message) {
+    return data.choices[0].message.content;
+  }
+  throw new Error('Invalid AI response payload.');
+}
+
+function actionTestAIConnection(user) {
+  var prompt = [
+    { role: 'system', content: 'You are an ERP business analyst.' },
+    { role: 'user', content: 'Say "OK" in JSON format: {"status": "ok"}' }
+  ];
+  var raw = callAI(prompt);
+  return successResponse({ status: 'ok', raw: raw }, 'AI connection successful.');
+}
+
+function actionGetAISettings(user) {
+  if (user.role !== 'Admin') return errorResponse('Admin access required.', 'ADMIN_REQUIRED');
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = props.getProperty('AI_API_KEY') || '';
+  var masked = apiKey ? (apiKey.substring(0, 6) + '************') : '••••••••••••••••';
+  return successResponse({
+    endpoint: props.getProperty('AI_API_ENDPOINT') || 'https://router.bynara.id/v1',
+    model: props.getProperty('AI_MODEL') || 'gemini-3.6-medium',
+    masked_key: masked,
+    daily_count: Number(props.getProperty('AI_DAILY_COUNT')) || 5,
+    enabled: props.getProperty('AI_ENABLED') !== 'false'
+  });
+}
+
+function actionUpdateAISettings(user, payload) {
+  if (user.role !== 'Admin') return errorResponse('Admin access required.', 'ADMIN_REQUIRED');
+  var props = PropertiesService.getScriptProperties();
+
+  if (payload.api_endpoint) props.setProperty('AI_API_ENDPOINT', String(payload.api_endpoint).trim());
+  if (payload.model) props.setProperty('AI_MODEL', String(payload.model).trim());
+  if (payload.api_key && String(payload.api_key).trim()) {
+    props.setProperty('AI_API_KEY', String(payload.api_key).trim());
+  }
+  if (payload.daily_count) props.setProperty('AI_DAILY_COUNT', String(payload.daily_count));
+  props.setProperty('AI_ENABLED', payload.enabled !== false ? 'true' : 'false');
+
+  return successResponse(null, 'AI Settings updated successfully.');
+}
+
+function actionGetModuleInsights(user, payload) {
+  var moduleId = payload.module_id;
+  if (!moduleId) return errorResponse('Module ID is required.', 'MODULE_REQUIRED');
+
+  var dateKey = todayIsoDate();
+  var lang = user.language || payload.language || 'ar';
+
+  var rows = readAllRows(SHEET_NAMES.AI_INSIGHTS);
+  var saved = rows.filter(function(r) {
+    return String(r.user_id) === String(user.id) &&
+           String(r.module_id) === String(moduleId) &&
+           String(r.date_key) === dateKey &&
+           String(r.language || 'ar') === lang;
+  }).map(stripRow);
+
+  if (saved.length > 0) {
+    return successResponse({ insights: saved });
+  }
+
+  return generateModuleInsights(user, moduleId, lang, dateKey);
+}
+
+function actionRefreshModuleInsights(user, payload) {
+  var moduleId = payload.module_id;
+  if (!moduleId) return errorResponse('Module ID is required.', 'MODULE_REQUIRED');
+  var dateKey = todayIsoDate();
+  var lang = user.language || payload.language || 'ar';
+  return generateModuleInsights(user, moduleId, lang, dateKey);
+}
+
+function generateModuleInsights(user, moduleId, lang, dateKey) {
+  var topics = getTopicsByUser(user.id).filter(function(t) { return t.module_id === moduleId; });
+  var gaps = topics.filter(function(t) { return t.status !== 'Mastered' && t.status !== 'Practiced'; });
+
+  var topicNames = topics.map(function(t) { return t.topic; }).join(', ');
+  var gapNames = gaps.map(function(t) { return t.topic; }).join(', ');
+
+  var pastRows = readAllRows(SHEET_NAMES.AI_INSIGHTS).filter(function(r) {
+    return String(r.user_id) === String(user.id) && String(r.module_id) === String(moduleId);
+  });
+  var pastTitles = pastRows.map(function(r) { return r.title; }).slice(-10).join('; ');
+
+  var count = Number(getAISetting('AI_DAILY_COUNT', '5')) || 5;
+  var model = getAISetting('AI_MODEL', 'gemini-3.6-medium');
+
+  var isAr = lang === 'ar';
+  var systemPrompt = isAr
+    ? 'أنت محلل أعمال واستشاري أنظمة ERP متخصص وخبير في العمليات اللوجستية والمالية والإدارية. قم بتوليد نصائح ورؤى عملية، مختصرة، دقيقة وحقيقية 100% بدون أي ابتكار لقوانين أو نسب غير صحيحة.'
+    : 'You are an expert ERP Business Analyst and Functional Consultant. Generate practical, concise, highly accurate ERP insights without fabricating rules or tax rates.';
+
+  var userPrompt = 'Module: ' + moduleId + '\n' +
+    'User Topics: ' + (topicNames || 'None yet') + '\n' +
+    'Knowledge Gaps: ' + (gapNames || 'None') + '\n' +
+    'Previously Generated Insights to avoid repeating: ' + (pastTitles || 'None') + '\n\n' +
+    'Generate exactly ' + count + ' unique ERP insights for this module in ' + (isAr ? 'Arabic' : 'English') + '.\n' +
+    'Types must be chosen from: Tip, Trick, Business Insight, Common Mistake, Best Practice, Warning, Accounting Impact, Process Insight.\n\n' +
+    'Return ONLY a valid JSON array of objects with the exact key structure:\n' +
+    '[\n' +
+    '  {\n' +
+    '    "title": "short title",\n' +
+    '    "type": "Tip",\n' +
+    '    "content": "detailed explanation",\n' +
+    '    "example": "practical example",\n' +
+    '    "why_it_matters": "why this is important"\n' +
+    '  }\n' +
+    ']';
+
+  var messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt }
+  ];
+
+  var rawAiRes = callAI(messages);
+
+  var cleanJson = rawAiRes.replace(/```json/gi, '').replace(/```/g, '').trim();
+  var parsedList = [];
+  try {
+    parsedList = JSON.parse(cleanJson);
+  } catch (e) {
+    var match = cleanJson.match(/\[[\s\S]*\]/);
+    if (match) parsedList = JSON.parse(match[0]);
+  }
+
+  if (!Array.isArray(parsedList) || !parsedList.length) {
+    throw new Error('AI failed to output valid insights list.');
+  }
+
+  var nowStr = nowIso();
+  var newRows = parsedList.map(function(item) {
+    var id = 'AI-' + makeId(8);
+    var rowObj = {
+      id: id,
+      user_id: user.id,
+      module_id: moduleId,
+      title: item.title || 'ERP Insight',
+      type: item.type || 'Tip',
+      content: item.content || '',
+      example: item.example || '',
+      why_it_matters: item.why_it_matters || '',
+      generated_at: nowStr,
+      date_key: dateKey,
+      model: model,
+      language: lang
+    };
+    appendRow(SHEET_NAMES.AI_INSIGHTS, rowObj);
+    return rowObj;
+  });
+
+  return successResponse({ insights: newRows });
+}
+
+function actionGetFavorites(user) {
+  var rows = readAllRows(SHEET_NAMES.AI_FAVORITES).filter(function(r) { return String(r.user_id) === String(user.id); });
+  return successResponse(rows.map(stripRow));
+}
+
+function actionAddFavorite(user, payload) {
+  var insightId = payload.insight_id;
+  if (!insightId) return errorResponse('Insight ID is required.', 'INSIGHT_REQUIRED');
+
+  var existing = readAllRows(SHEET_NAMES.AI_FAVORITES).find(function(r) {
+    return String(r.user_id) === String(user.id) && String(r.insight_id) === String(insightId);
+  });
+
+  if (existing) {
+    return successResponse(stripRow(existing), 'Already in favorites.');
+  }
+
+  var favObj = {
+    id: 'FAV-' + makeId(8),
+    user_id: user.id,
+    insight_id: insightId,
+    module_id: payload.module_id || '',
+    title: payload.title || '',
+    type: payload.type || 'Tip',
+    content: payload.content || '',
+    example: payload.example || '',
+    why_it_matters: payload.why_it_matters || '',
+    created_at: nowIso()
+  };
+
+  appendRow(SHEET_NAMES.AI_FAVORITES, favObj);
+  return successResponse(favObj, 'Saved to favorites.');
+}
+
+function actionRemoveFavorite(user, payload) {
+  var insightId = payload.insight_id;
+  var favId = payload.id;
+
+  var existing = readAllRows(SHEET_NAMES.AI_FAVORITES).find(function(r) {
+    return String(r.user_id) === String(user.id) &&
+           (String(r.id) === String(favId) || String(r.insight_id) === String(insightId));
+  });
+
+  if (existing) {
+    deleteRowByObj(SHEET_NAMES.AI_FAVORITES, existing);
+  }
+
+  return successResponse(null, 'Removed from favorites.');
 }

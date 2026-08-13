@@ -171,23 +171,68 @@ const Profile = (function () {
   async function renderAdmin(container) {
     container.innerHTML = `<div class="loading-row"><span class="spinner"></span> ${I18n.t('common.loading')}</div>`;
     let data;
+    let aiSettings = { endpoint: 'https://router.bynara.id/v1', model: 'gemini-3.6-medium', masked_key: '••••••••••••••••', daily_count: 5, enabled: true };
     try {
-      data = await API.adminUsers();
+      [data, aiSettings] = await Promise.all([
+        API.adminUsers(),
+        API.getAISettings().catch(() => aiSettings)
+      ]);
     } catch (err) {
       container.innerHTML = UI.errorState(err);
       return;
     }
+
     container.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
         <h2 style="margin:0;">${I18n.t('admin.title')}</h2>
         <button class="btn btn-secondary btn-sm" id="send-test-digest-btn">📧 ${I18n.t('digest.sendTestDigest')}</button>
       </div>
 
-      <div class="grid grid-kpi" style="margin-bottom:20px;">
+      <div class="grid grid-kpi" style="margin-bottom:24px;">
         <div class="card kpi-card"><div class="kpi-label">${I18n.t('admin.totalUsers')}</div><div class="kpi-value">${data.total_users}</div></div>
         <div class="card kpi-card"><div class="kpi-label">${I18n.t('admin.activeUsers')}</div><div class="kpi-value teal">${data.active_users}</div></div>
         <div class="card kpi-card"><div class="kpi-label">${I18n.t('admin.newUsers')}</div><div class="kpi-value brass">${data.new_users}</div></div>
       </div>
+
+      <!-- AI Settings Section -->
+      <div class="card" style="margin-bottom:24px;">
+        <h3 style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">✨ ${I18n.t('aiSettings.title')}</h3>
+        <form id="ai-settings-form">
+          <div class="grid" style="grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field">
+              <label>${I18n.t('aiSettings.apiEndpoint')}</label>
+              <input name="api_endpoint" value="${Topics.escapeHtml(aiSettings.endpoint || 'https://router.bynara.id/v1')}" required>
+            </div>
+            <div class="field">
+              <label>${I18n.t('aiSettings.model')}</label>
+              <input name="model" value="${Topics.escapeHtml(aiSettings.model || 'gemini-3.6-medium')}" required>
+            </div>
+          </div>
+
+          <div class="grid" style="grid-template-columns:1fr 1fr; gap:14px; margin-top:10px;">
+            <div class="field">
+              <label>${I18n.t('aiSettings.apiKey')}</label>
+              <input name="api_key" type="password" placeholder="${aiSettings.masked_key || 'Leave blank to keep unchanged'}" autocomplete="off">
+              <small class="field-hint">${I18n.t('aiSettings.apiKeyHint')}</small>
+            </div>
+            <div class="field">
+              <label>${I18n.t('aiSettings.dailyCount')}</label>
+              <input name="daily_count" type="number" min="1" max="10" value="${aiSettings.daily_count || 5}" required>
+            </div>
+          </div>
+
+          <div class="field checkbox-row" style="margin-top:12px; margin-bottom:16px;">
+            <input type="checkbox" id="ai-enabled-cb" name="enabled" ${aiSettings.enabled !== false ? 'checked' : ''}>
+            <label for="ai-enabled-cb" style="margin:0;">✨ ${I18n.t('aiSettings.enableAI')}</label>
+          </div>
+
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <button type="submit" class="btn btn-primary">${I18n.t('profile.saveChanges')}</button>
+            <button type="button" class="btn btn-secondary" id="btn-test-ai-conn">🔌 ${I18n.t('aiSettings.testConnection')}</button>
+          </div>
+        </form>
+      </div>
+
       <div class="table-wrap">
         <table>
           <thead><tr><th>${I18n.t('admin.name')}</th><th>${I18n.t('admin.username')}</th><th>${I18n.t('admin.role')}</th><th>${I18n.t('admin.progress')}</th><th>${I18n.t('admin.topics')}</th><th>${I18n.t('admin.lastLogin')}</th></tr></thead>
@@ -217,6 +262,36 @@ const Profile = (function () {
           UI.toast(I18n.t('digest.testDigestSent'), 'success');
         } catch (err) { UI.toastError(err); }
         finally { testDigestBtn.disabled = false; }
+      });
+    }
+
+    const aiForm = container.querySelector('#ai-settings-form');
+    if (aiForm) {
+      aiForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(aiForm);
+        const payload = Object.fromEntries(fd.entries());
+        payload.enabled = container.querySelector('#ai-enabled-cb').checked;
+        const btn = aiForm.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+          await API.updateAISettings(payload);
+          UI.toast(I18n.t('aiSettings.saveSuccess'), 'success');
+        } catch (err) { UI.toastError(err); }
+        finally { btn.disabled = false; }
+      });
+    }
+
+    const testAiBtn = container.querySelector('#btn-test-ai-conn');
+    if (testAiBtn) {
+      testAiBtn.addEventListener('click', async () => {
+        testAiBtn.disabled = true;
+        UI.toast(I18n.t('aiSettings.connectionTesting'), 'info');
+        try {
+          await API.testAIConnection();
+          UI.toast(I18n.t('aiSettings.connectionSuccess'), 'success');
+        } catch (err) { UI.toastError(err); }
+        finally { testAiBtn.disabled = false; }
       });
     }
   }

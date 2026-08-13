@@ -63,10 +63,15 @@ const Modules = (function () {
         <button class="btn btn-primary" id="add-gap-btn">${I18n.t('module.addKnowledgeGap')}</button>
       </div>
 
+      <div id="ai-insights-section-wrap" style="margin-top:24px; margin-bottom:28px;"></div>
       <div id="topics-table-wrap"></div>
       <div id="notes-section-wrap-module"></div>
       <div id="categories-section-wrap" style="margin-top:32px;"></div>
     `;
+
+    // ---- AI Insights Section (Asynchronous 0ms load) ----
+    const aiWrap = container.querySelector('#ai-insights-section-wrap');
+    loadAIInsightsSection(aiWrap, moduleId);
 
     // ---- topics table ----
     const tableWrap = container.querySelector('#topics-table-wrap');
@@ -107,6 +112,148 @@ const Modules = (function () {
       if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
       draw();
     };
+
+    Categories.renderSection(catWrap, moduleId, onCategoryChange);
+  }
+
+  async function loadAIInsightsSection(wrapEl, moduleId) {
+    if (!wrapEl) return;
+
+    wrapEl.innerHTML = `
+      <div class="ai-insights-section">
+        <div class="ai-insights-header">
+          <h3 class="ai-insights-title">✨ ${I18n.t('ai.sectionTitle')}</h3>
+          <button class="btn btn-secondary btn-sm" id="btn-refresh-ai-insights">🔄 ${I18n.t('ai.refreshBtn')}</button>
+        </div>
+        <div id="ai-insights-cards-container">
+          <div style="padding:16px;">${UI.skeleton('card')}</div>
+        </div>
+      </div>
+    `;
+
+    const cardsContainer = wrapEl.querySelector('#ai-insights-cards-container');
+    const refreshBtn = wrapEl.querySelector('#btn-refresh-ai-insights');
+
+    let currentInsights = [];
+    let favoritesMap = {};
+
+    const renderInsightsList = () => {
+      if (!currentInsights || !currentInsights.length) {
+        cardsContainer.innerHTML = `<p style="font-size:13px; color:var(--ink-soft); margin:0;">${I18n.t('ai.error')}</p>`;
+        return;
+      }
+
+      cardsContainer.innerHTML = currentInsights.map(insight => {
+        const isFav = !!favoritesMap[insight.id];
+        const badgeClass = getBadgeClass(insight.type);
+
+        return `
+          <div class="ai-insight-card" data-id="${insight.id}">
+            <div class="ai-insight-head">
+              <span class="ai-type-badge ${badgeClass}">${Topics.escapeHtml(insight.type || 'INSIGHT')}</span>
+              <button class="btn-fav-toggle ${isFav ? 'is-fav' : ''}" data-action="toggle-fav" data-id="${insight.id}">
+                ${isFav ? '★ ' + I18n.t('ai.favoriteRemove') : '☆ ' + I18n.t('ai.favoriteAdd')}
+              </button>
+            </div>
+            <h4 style="font-size:15px; font-weight:700; margin:0 0 8px; color:var(--ink);">${Topics.escapeHtml(insight.title)}</h4>
+            <div style="font-size:13.5px; color:var(--ink); line-height:1.5; margin-bottom:10px; white-space:pre-wrap;">${Topics.escapeHtml(insight.content)}</div>
+            ${insight.example ? `
+              <div style="background:var(--paper-raised); border-radius:var(--radius-sm); padding:8px 12px; margin-bottom:8px; font-size:12.5px;">
+                <strong>${I18n.t('ai.example')}:</strong> ${Topics.escapeHtml(insight.example)}
+              </div>
+            ` : ''}
+            ${insight.why_it_matters ? `
+              <div style="font-size:12.5px; color:var(--ink-soft);">
+                <strong>${I18n.t('ai.whyItMatters')}:</strong> ${Topics.escapeHtml(insight.why_it_matters)}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+
+      cardsContainer.querySelectorAll('[data-action="toggle-fav"]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const insightId = btn.dataset.id;
+          const targetInsight = currentInsights.find(i => String(i.id) === String(insightId));
+          if (!targetInsight) return;
+
+          const wasFav = !!favoritesMap[insightId];
+          favoritesMap[insightId] = !wasFav;
+          btn.classList.toggle('is-fav', !wasFav);
+          btn.innerHTML = !wasFav ? '★ ' + I18n.t('ai.favoriteRemove') : '☆ ' + I18n.t('ai.favoriteAdd');
+
+          try {
+            if (wasFav) {
+              await API.removeFavorite({ insight_id: insightId });
+            } else {
+              await API.addFavorite({
+                insight_id: insightId,
+                module_id: moduleId,
+                title: targetInsight.title,
+                type: targetInsight.type,
+                content: targetInsight.content,
+                example: targetInsight.example || '',
+                why_it_matters: targetInsight.why_it_matters || ''
+              });
+            }
+          } catch (err) {
+            favoritesMap[insightId] = wasFav;
+            btn.classList.toggle('is-fav', wasFav);
+            btn.innerHTML = wasFav ? '★ ' + I18n.t('ai.favoriteRemove') : '☆ ' + I18n.t('ai.favoriteAdd');
+            UI.toastError(err);
+          }
+        });
+      });
+    };
+
+    try {
+      const [res, favs] = await Promise.all([
+        API.getModuleInsights(moduleId).catch(() => null),
+        API.getFavorites().catch(() => [])
+      ]);
+
+      if (favs && Array.isArray(favs)) {
+        favs.forEach(f => { favoritesMap[f.insight_id] = true; });
+      }
+
+      currentInsights = (res && Array.isArray(res.insights)) ? res.insights : [];
+      renderInsightsList();
+    } catch (err) {
+      cardsContainer.innerHTML = `<p style="font-size:13px; color:var(--ink-soft); margin:0;">${I18n.t('ai.error')}</p>`;
+    }
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', async () => {
+        if (!confirm(I18n.t('ai.refreshConfirmBody'))) return;
+        refreshBtn.disabled = true;
+        cardsContainer.innerHTML = `<div style="padding:16px;">${UI.skeleton('card')}</div>`;
+        try {
+          const freshRes = await API.refreshModuleInsights(moduleId);
+          currentInsights = (freshRes && Array.isArray(freshRes.insights)) ? freshRes.insights : [];
+          renderInsightsList();
+          UI.toast(I18n.getLang() === 'ar' ? 'تمت إضافة الـ Insights الجديدة بنجاح' : 'New AI Insights generated', 'success');
+        } catch (err) {
+          renderInsightsList();
+          UI.toastError(err);
+        } finally {
+          refreshBtn.disabled = false;
+        }
+      });
+    }
+  }
+
+  function getBadgeClass(type) {
+    const t = String(type || '').toLowerCase();
+    if (t.includes('tip')) return 'ai-type-tip';
+    if (t.includes('trick')) return 'ai-type-trick';
+    if (t.includes('business') || t.includes('process')) return 'ai-type-business';
+    if (t.includes('mistake') || t.includes('error')) return 'ai-type-mistake';
+    if (t.includes('warn')) return 'ai-type-warning';
+    if (t.includes('practice') || t.includes('best')) return 'ai-type-practice';
+    if (t.includes('account') || t.includes('tax')) return 'ai-type-accounting';
+    return 'ai-type-default';
+  }
 
     Categories.renderSection(catWrap, moduleId, topics, onCategoryChange);
   }
