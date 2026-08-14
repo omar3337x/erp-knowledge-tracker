@@ -551,5 +551,25 @@ const API = (function () {
     getFavorites  : () => call('getFavorites', {}),
     addFavorite   : async (p) => { const r = await rawCall('addFavorite', p); cacheBust('getFavorites'); return r; },
     removeFavorite: async (p) => { const r = await rawCall('removeFavorite', p); cacheBust('getFavorites'); return r; },
+
+    // AI Daily ERP Challenge & Question Bank
+    getDailyChallenge: (moduleId, mode, language) => {
+      const lang = language || (window.I18n ? I18n.getLang() : 'en');
+      return call('getDailyChallenge', { module_id: moduleId, mode: mode || 'Practice', language: lang });
+    },
+    submitQuestionAttempt: async (p) => {
+      const r = await rawCall('submitQuestionAttempt', p);
+      cacheBust('topics', 'dashboard', 'reviews', 'getTopicDrill', 'getChallengeHistory');
+      return r;
+    },
+    getQuestionBank: (params) => call('getQuestionBank', params || {}),
+    getChallengeHistory: () => call('getChallengeHistory', {}),
+    getTopicDrill: (topicId) => call('getTopicDrill', { topic_id: topicId }),
+    reportQuestion: async (p) => { return await rawCall('reportQuestion', p); },
+    adminUpdateQuestion: async (p) => {
+      const r = await rawCall('adminUpdateQuestion', p);
+      cacheBust('getQuestionBank');
+      return r;
+    }
   };
 })();

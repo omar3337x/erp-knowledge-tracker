@@ -778,6 +778,38 @@ const SystemTest = (function () {
           return { status: 'PASS', expected: 'Profile and Admin renderers ready', actual: 'Profile page functional' };
         }
       },
+      {
+        id: 'page_daily_challenge_health',
+        domain: 'PAGES',
+        name_en: 'AI Daily ERP Challenge Engine Component Health',
+        name_ar: 'صحة مكونات ومحرك التحدي اليومي (AI Daily Challenge)',
+        severity: 'CRITICAL',
+        dependencies: [],
+        description_en: 'Verifies DailyChallenge.render and question runner components.',
+        description_ar: 'فحص جاهزية محرك تشغيل أسئلة التحدي اليومي ونظام التلميحات الذكي.',
+        run: async (ctx) => {
+          if (typeof DailyChallenge === 'undefined' || typeof DailyChallenge.render !== 'function') {
+            return { status: 'FAIL', expected: 'DailyChallenge.render defined', actual: 'DailyChallenge module missing', rootCause: 'js/daily_challenge.js missing.' };
+          }
+          return { status: 'PASS', expected: 'Daily Challenge engine ready', actual: 'DailyChallenge module loaded and functional' };
+        }
+      },
+      {
+        id: 'page_question_bank_health',
+        domain: 'PAGES',
+        name_en: 'ERP Question Bank Explorer Component Health',
+        name_ar: 'صحة ومكونات مستودع بنك الأسئلة (Question Bank)',
+        severity: 'HIGH',
+        dependencies: [],
+        description_en: 'Verifies QuestionBank.render and catalog filtering engine.',
+        description_ar: 'فحص جاهزية صفحة بنك الأسئلة وفلاتر البحث ومؤشرات النجاح.',
+        run: async (ctx) => {
+          if (typeof QuestionBank === 'undefined' || typeof QuestionBank.render !== 'function') {
+            return { status: 'FAIL', expected: 'QuestionBank.render defined', actual: 'QuestionBank module missing', rootCause: 'js/question_bank.js missing.' };
+          }
+          return { status: 'PASS', expected: 'Question Bank explorer ready', actual: 'QuestionBank module loaded and functional' };
+        }
+      },
 
       // ─── DOMAIN: ERP MODULES MATRIX (🧩) ────────────────────────────────
       {

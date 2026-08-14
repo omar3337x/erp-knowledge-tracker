@@ -27,6 +27,8 @@ const I18N_DICT = {
 
     nav: {
       dashboard: 'Dashboard', modules: 'Modules', learning: 'Learning',
+      dailyChallenge: '🧠 Daily ERP Challenge', questionBank: '📚 Question Bank',
+      topicDrill: '🎯 Topic Drill', challengeHistory: '📅 Challenge History',
       allNotes: 'All Notes', favorites: 'Favorites', aiInsights: 'AI Daily Insights',
       knowledgeGaps: 'Knowledge Gaps', reviewCenter: 'Review Center', analytics: 'Analytics', systemTest: '🧪 System Test',
       account: 'Account', myProfile: 'My Profile', administration: 'Administration', logout: 'Logout',
@@ -250,6 +252,8 @@ const I18N_DICT = {
 
     nav: {
       dashboard: 'لوحة التحكم', modules: 'الموديولات', learning: 'التعلّم',
+      dailyChallenge: '🧠 التحدي اليومي', questionBank: '📚 بنك الأسئلة',
+      topicDrill: '🎯 تدريب الموضوع', challengeHistory: '📅 سجل التحديات',
       allNotes: 'جميع الملاحظات', favorites: 'المفضلة', aiInsights: 'رؤى الذكاء الاصطناعي',
       knowledgeGaps: 'فجوات المعرفة', reviewCenter: 'مركز المراجعة', analytics: 'التحليلات', systemTest: '🧪 الاختبار والتشخيص',
       myProfile: 'ملفي الشخصي', administration: 'الإدارة', account: 'الحساب', logout: 'تسجيل الخروج',

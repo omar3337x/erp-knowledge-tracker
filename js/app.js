@@ -298,9 +298,10 @@ const Router = (function () {
     const map = {
       dashboard: 'dashboard.title', notes: 'nav.allNotes', favorites: 'nav.favorites', 'ai-insights': 'nav.aiInsights', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
       analytics: 'analytics.title', 'system-test': 'nav.systemTest',
-      profile: 'nav.myProfile', admin: 'admin.title'
+      profile: 'nav.myProfile', admin: 'admin.title',
+      'daily-challenge': 'nav.dailyChallenge', 'question-bank': 'nav.questionBank', 'topic-drill': 'nav.topicDrill', 'challenge-history': 'nav.challengeHistory'
     };
-    return map[route] ? I18n.t(map[route]) : I18n.t('common.notFound');
+    return map[route] ? (I18n.t(map[route]) || route) : I18n.t('common.notFound');
   }
 
   function encodeHash(route, params) {
@@ -346,6 +347,59 @@ const Router = (function () {
     titleEl.textContent = titleFor(route, params);
 
     if (route === 'dashboard') return Dashboard.render(content);
+    if (route === 'daily-challenge') return DailyChallenge.render(content);
+    if (route === 'question-bank') return QuestionBank.render(content);
+    if (route === 'topic-drill') return TopicDrill.render(content);
+    if (route === 'challenge-history') {
+      content.innerHTML = UI.skeleton('table');
+      try {
+        const historyList = await API.getChallengeHistory();
+        const isAr = I18n.getLang() === 'ar';
+        content.innerHTML = `
+          <div class="card" style="padding: 20px; max-width: 900px; margin: 0 auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h2 style="font-size: 18px; font-weight: 700; color: var(--ink); margin: 0;">📅 ${isAr ? 'سجل التحديات اليومية' : 'Daily Challenge History'}</h2>
+              <button class="btn btn-primary btn-sm" onclick="Router.go('daily-challenge')">🧠 ${isAr ? 'بدء تحدي اليوم' : 'Start Today Challenge'}</button>
+            </div>
+            ${(!historyList || historyList.length === 0) ? `
+              <p style="color: var(--ink-soft); text-align: center; padding: 30px;">${isAr ? 'لا يوجد سجل تحديات سابقة بعد.' : 'No challenge history recorded yet.'}</p>
+            ` : `
+              <div class="table-container">
+                <table class="table" style="width: 100%;">
+                  <thead>
+                    <tr>
+                      <th>${isAr ? 'التاريخ' : 'Date'}</th>
+                      <th>${isAr ? 'إجمالي الأسئلة' : 'Questions'}</th>
+                      <th>${isAr ? 'الصحيحة' : 'Correct'}</th>
+                      <th>${isAr ? 'الأخطاء' : 'Wrong'}</th>
+                      <th>${isAr ? 'الدقة' : 'Accuracy'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${historyList.map(h => `
+                      <tr>
+                        <td class="mono"><strong>${h.date}</strong></td>
+                        <td>${h.total}</td>
+                        <td style="color: var(--teal); font-weight: 600;">✓ ${h.correct}</td>
+                        <td style="color: var(--rust); font-weight: 600;">✗ ${h.wrong}</td>
+                        <td>
+                          <span class="badge ${h.accuracy_pct >= 80 ? 'badge-teal' : (h.accuracy_pct >= 60 ? 'badge-brass' : 'badge-rust')}">
+                            ${h.accuracy_pct}%
+                          </span>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `}
+          </div>
+        `;
+      } catch (e) {
+        content.innerHTML = UI.errorState(e);
+      }
+      return;
+    }
     if (route === 'notes') return Notes.renderAllNotesPage(content);
     if (route === 'favorites') return Favorites.render(content);
     if (route === 'ai-insights') return AIInsightsPage.render(content);

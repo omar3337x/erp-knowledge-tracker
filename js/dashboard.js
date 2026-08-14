@@ -123,6 +123,29 @@ const Dashboard = (function () {
     if (allTopics.length) API._dashboardTopics = allTopics;
 
     const html = `
+      <!-- 🧠 AI DAILY ERP CHALLENGE HERO BANNER -->
+      <div class="card" style="margin-bottom:24px; padding:20px; background:linear-gradient(135deg, rgba(181, 119, 46, 0.08) 0%, rgba(44, 122, 107, 0.08) 100%); border-inline-start:4px solid var(--brass); display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:240px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <h2 style="font-size:18px; font-weight:700; color:var(--ink); margin:0;">
+              🧠 ${isAr ? 'تحدي الـ ERP اليومي بالذكاء الاصطناعي' : 'Today\'s AI Daily ERP Challenge'}
+            </h2>
+            <span class="badge badge-brass" style="font-size:11px;">10 Questions</span>
+          </div>
+          <p style="font-size:13px; color:var(--ink-soft); margin:0;">
+            ${isAr ? 'أسئلة تدريب تفاعلية مخصصة اليوم تركز على فجواتك المعرفية والمواضيع المستحقة للمراجعة.' : 'Personalized interactive practice questions tailored to your knowledge gaps & review queue.'}
+          </p>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="btn btn-primary" onclick="Router.go('daily-challenge')" style="padding:10px 20px; font-weight:600; font-size:13px;">
+            🚀 ${isAr ? 'بدء تحدي اليوم' : 'Start Today\'s Challenge'}
+          </button>
+          <button class="btn btn-secondary" onclick="Router.go('question-bank')" style="padding:10px 16px; font-size:13px;">
+            📚 ${isAr ? 'بنك الأسئلة' : 'Question Bank'}
+          </button>
+        </div>
+      </div>
+
       <div class="grid grid-kpi" style="margin-bottom:24px;">
         ${kpiCard(I18n.t('dashboard.overallProgress'), k.overall_progress + '%', 'brass')}
         ${kpiCard(I18n.t('dashboard.totalTopics'), k.total_topics, '')}

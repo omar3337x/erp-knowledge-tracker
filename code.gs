@@ -50,7 +50,12 @@ var SHEET_NAMES = {
   STREAKS: 'Streaks',
   EMAIL_LOGS: 'EmailLogs',
   AI_INSIGHTS: 'AI_Insights',
-  AI_FAVORITES: 'AI_Favorites'
+  AI_FAVORITES: 'AI_Favorites',
+  QUESTIONS: 'Questions',
+  QUESTION_ATTEMPTS: 'Question_Attempts',
+  QUESTION_REVIEWS: 'Question_Reviews',
+  TOPIC_PERFORMANCE: 'Topic_Performance',
+  QUESTION_REPORTS: 'Question_Reports'
 };
 
 var SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 7;           // 7 days default
@@ -60,7 +65,7 @@ var STATUS_VALUES = ['Not Started', 'Learning', 'Understood', 'Practiced', 'Mast
 var PRIORITY_VALUES = ['Low', 'Medium', 'High', 'Critical'];
 var LANGUAGE_VALUES = ['en', 'ar'];
 
-var SCHEMA_VERSION_TARGET = '6';
+var SCHEMA_VERSION_TARGET = '7';
 
 // Actions that mutate data. Only these acquire the script lock — read
 // actions run without locking so parallel requests from the same page
@@ -74,6 +79,7 @@ var WRITE_ACTIONS = {
   createCategory: 1, updateCategory: 1, deleteCategory: 1, toggleCategoryStatus: 1,
   createNote: 1, updateNote: 1, deleteNote: 1,
   refreshModuleInsights: 1, updateAISettings: 1, addFavorite: 1, removeFavorite: 1,
+  submitQuestionAttempt: 1, saveQuestion: 1, reportQuestion: 1, adminUpdateQuestion: 1,
   seed: 1
 };
 
@@ -265,6 +271,15 @@ function handleRequest(action, payload, token, isBatchSubRequest) {
       case 'getFavorites':         return jsonResponse(withAuth(token, function(user){ return actionGetFavorites(user); }));
       case 'addFavorite':          return jsonResponse(withAuth(token, function(user){ return actionAddFavorite(user, payload); }));
       case 'removeFavorite':       return jsonResponse(withAuth(token, function(user){ return actionRemoveFavorite(user, payload); }));
+
+      // AI Daily ERP Challenge & Question Bank
+      case 'getDailyChallenge':    return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionGetDailyChallenge(user, payload); }));
+      case 'submitQuestionAttempt':return jsonResponse(withAuth(token, function(user){ recordActivity(user.id); return actionSubmitQuestionAttempt(user, payload); }));
+      case 'getQuestionBank':      return jsonResponse(withAuth(token, function(user){ return actionGetQuestionBank(user, payload); }));
+      case 'getChallengeHistory':  return jsonResponse(withAuth(token, function(user){ return actionGetChallengeHistory(user, payload); }));
+      case 'getTopicDrill':        return jsonResponse(withAuth(token, function(user){ return actionGetTopicDrill(user, payload); }));
+      case 'reportQuestion':       return jsonResponse(withAuth(token, function(user){ return actionReportQuestion(user, payload); }));
+      case 'adminUpdateQuestion':  return jsonResponse(withAuth(token, function(user){ return actionAdminUpdateQuestion(user, payload); }));
 
       // Setup
       case 'seed':                  return jsonResponse(actionSeed());
@@ -1360,7 +1375,12 @@ function createSheetsIfMissing() {
     Streaks: ['user_id', 'date', 'activity_count', 'streak_count'],
     EmailLogs: ['user_id', 'sent_at', 'status', 'error_message'],
     AI_Insights: ['id', 'user_id', 'module_id', 'title', 'type', 'content', 'example', 'why_it_matters', 'generated_at', 'date_key', 'model', 'language'],
-    AI_Favorites: ['id', 'user_id', 'insight_id', 'module_id', 'title', 'type', 'content', 'example', 'why_it_matters', 'created_at']
+    AI_Favorites: ['id', 'user_id', 'insight_id', 'module_id', 'title', 'type', 'content', 'example', 'why_it_matters', 'created_at'],
+    Questions: ['id', 'module_id', 'category_id', 'topic_id', 'concept_id', 'question_type', 'difficulty', 'question', 'options_json', 'correct_answer', 'explanation', 'distractors_json', 'hint_1', 'hint_2', 'hint_3', 'reference_title', 'reference_url', 'reference_source', 'language', 'question_fingerprint', 'times_asked', 'times_correct', 'times_wrong', 'status', 'created_at'],
+    Question_Attempts: ['id', 'question_id', 'user_id', 'module_id', 'category_id', 'topic_id', 'answer', 'correct', 'confidence', 'hints_used', 'time_spent_sec', 'user_reasoning', 'created_at'],
+    Question_Reviews: ['id', 'user_id', 'question_id', 'module_id', 'topic_id', 'interval_days', 'repetition_level', 'next_review_date', 'last_reviewed_at', 'status', 'created_at'],
+    Topic_Performance: ['id', 'user_id', 'module_id', 'category_id', 'topic_id', 'concept_id', 'total_questions', 'correct_count', 'wrong_count', 'accuracy_pct', 'mastery_score', 'priority', 'last_wrong_at', 'last_correct_at', 'updated_at'],
+    Question_Reports: ['id', 'question_id', 'user_id', 'reason', 'feedback_type', 'details', 'status', 'created_at']
   };
   Object.keys(schemas).forEach(function(name) {
     var sheet = spreadsheet.getSheetByName(name);
@@ -2556,4 +2576,704 @@ function actionRemoveFavorite(user, payload) {
   }
 
   return successResponse(null, 'Removed from favorites.');
+}
+
+// ---------------------------------------------------------------------------
+// AI DAILY ERP CHALLENGE & QUESTION BANK ENGINE
+// ---------------------------------------------------------------------------
+
+function actionGetDailyChallenge(user, payload) {
+  payload = payload || {};
+  var moduleId = payload.module_id || '';
+  var mode = payload.mode || 'Practice'; // Learning, Practice, Interview, Troubleshooting, Accounting, Mixed
+  var isAr = user.language === 'ar' || payload.language === 'ar';
+  var todayStr = new Date().toISOString().slice(0, 10);
+
+  // 1. Fetch user's due reviews for this module
+  var allReviews = readAllRows(SHEET_NAMES.QUESTION_REVIEWS).filter(function(r) {
+    var matchUser = String(r.user_id) === String(user.id);
+    var matchMod = !moduleId || String(r.module_id) === String(moduleId);
+    var isDue = r.next_review_date <= todayStr && r.status !== 'Mastered';
+    return matchUser && matchMod && isDue;
+  });
+
+  // 2. Fetch user's weak topics / performance
+  var allTopicPerf = readAllRows(SHEET_NAMES.TOPIC_PERFORMANCE).filter(function(p) {
+    var matchUser = String(p.user_id) === String(user.id);
+    var matchMod = !moduleId || String(p.module_id) === String(moduleId);
+    return matchUser && matchMod;
+  });
+
+  var weakTopicIds = allTopicPerf.filter(function(p) {
+    return Number(p.accuracy_pct) < 60 || Number(p.wrong_count) >= 2 || p.priority === 'High' || p.priority === 'Critical';
+  }).map(function(p) { return String(p.topic_id); });
+
+  // 3. Fetch questions from Question Bank
+  var bankQuestions = readAllRows(SHEET_NAMES.QUESTIONS).filter(function(q) {
+    var matchMod = !moduleId || String(q.module_id) === String(moduleId);
+    var isActive = q.status === 'Active' || !q.status;
+    return matchMod && isActive;
+  });
+
+  var selectedQuestions = [];
+  var selectedIds = {};
+
+  // Step A: Priority to Due Reviews (Yesterday's mistakes or spaced repetition)
+  for (var i = 0; i < allReviews.length && selectedQuestions.length < 4; i++) {
+    var rev = allReviews[i];
+    var foundQ = bankQuestions.find(function(q) { return String(q.id) === String(rev.question_id); });
+    if (foundQ && !selectedIds[foundQ.id]) {
+      var qObj = formatQuestionForClient(foundQ, isAr);
+      qObj.is_review_due = true;
+      qObj.review_interval = rev.interval_days || 1;
+      selectedQuestions.push(qObj);
+      selectedIds[foundQ.id] = true;
+    }
+  }
+
+  // Step B: Questions targeted at weak topics
+  for (var j = 0; j < bankQuestions.length && selectedQuestions.length < 8; j++) {
+    var bq = bankQuestions[j];
+    if (!selectedIds[bq.id] && weakTopicIds.indexOf(String(bq.topic_id)) !== -1) {
+      var qObjWeak = formatQuestionForClient(bq, isAr);
+      qObjWeak.is_targeted_gap = true;
+      selectedQuestions.push(qObjWeak);
+      selectedIds[bq.id] = true;
+    }
+  }
+
+  // Step C: Fill remaining slots with questions from bank
+  for (var k = 0; k < bankQuestions.length && selectedQuestions.length < 10; k++) {
+    var bqOther = bankQuestions[k];
+    if (!selectedIds[bqOther.id]) {
+      selectedQuestions.push(formatQuestionForClient(bqOther, isAr));
+      selectedIds[bqOther.id] = true;
+    }
+  }
+
+  // Step D: If Question Bank has fewer than 10 questions, generate curated high-yield questions
+  if (selectedQuestions.length < 10) {
+    var curModule = getModulesRows().find(function(m) { return String(m.id) === String(moduleId); }) || getModulesRows()[0];
+    var fallbackList = getCuratedChallengeQuestions(curModule ? curModule.id : 'MOD-1', isAr);
+    for (var f = 0; f < fallbackList.length && selectedQuestions.length < 10; f++) {
+      var fb = fallbackList[f];
+      if (!selectedIds[fb.id]) {
+        // Save to Questions sheet for persistence and future reuse
+        try {
+          appendRow(SHEET_NAMES.QUESTIONS, {
+            id: fb.id,
+            module_id: fb.module_id,
+            category_id: fb.category_id || '',
+            topic_id: fb.topic_id || '',
+            concept_id: fb.concept_id || '',
+            question_type: fb.question_type || 'Multiple Choice',
+            difficulty: fb.difficulty || 'Intermediate',
+            question: fb.question,
+            options_json: JSON.stringify(fb.options || []),
+            correct_answer: fb.correct_answer,
+            explanation: fb.explanation,
+            distractors_json: JSON.stringify(fb.distractors || {}),
+            hint_1: (fb.hints && fb.hints[0]) || '',
+            hint_2: (fb.hints && fb.hints[1]) || '',
+            hint_3: (fb.hints && fb.hints[2]) || '',
+            reference_title: (fb.reference && fb.reference.title) || '',
+            reference_url: (fb.reference && fb.reference.url) || '',
+            reference_source: (fb.reference && fb.reference.source) || '',
+            language: isAr ? 'ar' : 'en',
+            question_fingerprint: fb.question_fingerprint || generateId('FPR'),
+            times_asked: 1,
+            times_correct: 0,
+            times_wrong: 0,
+            status: 'Active',
+            created_at: nowIso()
+          });
+        } catch (e) {}
+
+        selectedQuestions.push(fb);
+        selectedIds[fb.id] = true;
+      }
+    }
+  }
+
+  return successResponse({
+    module_id: moduleId,
+    mode: mode,
+    date: todayStr,
+    total_questions: selectedQuestions.length,
+    due_reviews_count: allReviews.length,
+    weak_topics_count: weakTopicIds.length,
+    questions: selectedQuestions
+  });
+}
+
+function formatQuestionForClient(rawQ, isAr) {
+  var options = [];
+  try {
+    options = rawQ.options_json ? JSON.parse(rawQ.options_json) : [];
+  } catch (e) {
+    options = [];
+  }
+
+  var distractors = {};
+  try {
+    distractors = rawQ.distractors_json ? JSON.parse(rawQ.distractors_json) : {};
+  } catch (e) {
+    distractors = {};
+  }
+
+  return {
+    id: rawQ.id,
+    module_id: rawQ.module_id,
+    category_id: rawQ.category_id,
+    topic_id: rawQ.topic_id,
+    concept_id: rawQ.concept_id,
+    question_type: rawQ.question_type || 'Multiple Choice',
+    difficulty: rawQ.difficulty || 'Intermediate',
+    question: rawQ.question,
+    options: options,
+    correct_answer: rawQ.correct_answer,
+    explanation: rawQ.explanation,
+    distractors: distractors,
+    hints: [rawQ.hint_1, rawQ.hint_2, rawQ.hint_3].filter(Boolean),
+    reference: {
+      title: rawQ.reference_title,
+      url: rawQ.reference_url,
+      source: rawQ.reference_source
+    },
+    times_asked: Number(rawQ.times_asked) || 0,
+    success_rate: (Number(rawQ.times_asked) > 0) ? Math.round((Number(rawQ.times_correct) / Number(rawQ.times_asked)) * 100) : 100
+  };
+}
+
+function actionSubmitQuestionAttempt(user, payload) {
+  payload = payload || {};
+  var questionId = payload.question_id;
+  var userAnswer = String(payload.answer || '').trim();
+  var confidence = payload.confidence || 'Confident'; // Guessing, Not Sure, Confident, Very Confident
+  var hintsUsed = Number(payload.hints_used) || 0;
+  var timeSpent = Number(payload.time_spent_sec) || 0;
+  var userReasoning = payload.user_reasoning || '';
+  var todayStr = new Date().toISOString().slice(0, 10);
+
+  if (!questionId) return errorResponse('Question ID is required.', 'QUESTION_REQUIRED');
+
+  // 1. Locate question in Questions sheet
+  var allQ = readAllRows(SHEET_NAMES.QUESTIONS);
+  var question = allQ.find(function(q) { return String(q.id) === String(questionId); });
+
+  var isCorrect = false;
+  var correctAnswer = '';
+  var explanation = '';
+  var distractors = {};
+  var reference = {};
+
+  if (question) {
+    correctAnswer = String(question.correct_answer || '').trim();
+    isCorrect = (userAnswer.toLowerCase() === correctAnswer.toLowerCase());
+    explanation = question.explanation || '';
+    try { distractors = question.distractors_json ? JSON.parse(question.distractors_json) : {}; } catch (e) {}
+    reference = {
+      title: question.reference_title,
+      url: question.reference_url,
+      source: question.reference_source
+    };
+
+    // Update question statistics
+    var newAsked = (Number(question.times_asked) || 0) + 1;
+    var newCorrect = (Number(question.times_correct) || 0) + (isCorrect ? 1 : 0);
+    var newWrong = (Number(question.times_wrong) || 0) + (isCorrect ? 0 : 1);
+    updateRowByObj(SHEET_NAMES.QUESTIONS, question, {
+      times_asked: newAsked,
+      times_correct: newCorrect,
+      times_wrong: newWrong
+    });
+  } else {
+    // If not found in sheet, check fallback match
+    correctAnswer = String(payload.correct_answer || '').trim();
+    isCorrect = (userAnswer.toLowerCase() === correctAnswer.toLowerCase());
+    explanation = payload.explanation || '';
+    distractors = payload.distractors || {};
+    reference = payload.reference || {};
+  }
+
+  // 2. Record Attempt in Question_Attempts
+  var attemptObj = {
+    id: generateId('ATT'),
+    question_id: questionId,
+    user_id: user.id,
+    module_id: (question && question.module_id) || payload.module_id || '',
+    category_id: (question && question.category_id) || payload.category_id || '',
+    topic_id: (question && question.topic_id) || payload.topic_id || '',
+    answer: userAnswer,
+    correct: isCorrect,
+    confidence: confidence,
+    hints_used: hintsUsed,
+    time_spent_sec: timeSpent,
+    user_reasoning: userReasoning,
+    created_at: nowIso()
+  };
+  appendRow(SHEET_NAMES.QUESTION_ATTEMPTS, attemptObj);
+
+  // 3. Update / Create Topic Performance Record
+  var topicId = attemptObj.topic_id;
+  var topicPerf = null;
+  if (topicId) {
+    var allPerf = readAllRows(SHEET_NAMES.TOPIC_PERFORMANCE);
+    var existingPerf = allPerf.find(function(p) {
+      return String(p.user_id) === String(user.id) && String(p.topic_id) === String(topicId);
+    });
+
+    var totalQ = (existingPerf ? Number(existingPerf.total_questions) || 0 : 0) + 1;
+    var correctQ = (existingPerf ? Number(existingPerf.correct_count) || 0 : 0) + (isCorrect ? 1 : 0);
+    var wrongQ = (existingPerf ? Number(existingPerf.wrong_count) || 0 : 0) + (isCorrect ? 0 : 1);
+    var accPct = Math.round((correctQ / totalQ) * 100);
+
+    // Dynamic Mastery Score (0-100)
+    var masteryScore = Math.min(100, Math.round(accPct * 0.7 + (correctQ >= 5 ? 30 : correctQ * 6)));
+    if (!isCorrect) masteryScore = Math.max(0, masteryScore - 15);
+
+    var priority = 'Medium';
+    if (accPct < 50 || wrongQ >= 3) priority = 'Critical';
+    else if (accPct < 70 || wrongQ >= 2) priority = 'High';
+    else if (accPct >= 85 && totalQ >= 5) priority = 'Low';
+
+    if (existingPerf) {
+      updateRowByObj(SHEET_NAMES.TOPIC_PERFORMANCE, existingPerf, {
+        total_questions: totalQ,
+        correct_count: correctQ,
+        wrong_count: wrongQ,
+        accuracy_pct: accPct,
+        mastery_score: masteryScore,
+        priority: priority,
+        last_wrong_at: isCorrect ? existingPerf.last_wrong_at : nowIso(),
+        last_correct_at: isCorrect ? nowIso() : existingPerf.last_correct_at,
+        updated_at: nowIso()
+      });
+      topicPerf = { total_questions: totalQ, accuracy_pct: accPct, mastery_score: masteryScore, priority: priority };
+    } else {
+      var newPerfObj = {
+        id: generateId('TPF'),
+        user_id: user.id,
+        module_id: attemptObj.module_id,
+        category_id: attemptObj.category_id,
+        topic_id: topicId,
+        concept_id: (question && question.concept_id) || '',
+        total_questions: totalQ,
+        correct_count: correctQ,
+        wrong_count: wrongQ,
+        accuracy_pct: accPct,
+        mastery_score: masteryScore,
+        priority: priority,
+        last_wrong_at: isCorrect ? '' : nowIso(),
+        last_correct_at: isCorrect ? nowIso() : '',
+        updated_at: nowIso()
+      };
+      appendRow(SHEET_NAMES.TOPIC_PERFORMANCE, newPerfObj);
+      topicPerf = { total_questions: totalQ, accuracy_pct: accPct, mastery_score: masteryScore, priority: priority };
+    }
+
+    // Auto-sync status with Topics table if mastery threshold is achieved or knowledge gap detected
+    var allTopics = getTopicsRows();
+    var topicRow = allTopics.find(function(t) { return String(t.id) === String(topicId); });
+    if (topicRow) {
+      if (isCorrect && masteryScore >= 85 && totalQ >= 3) {
+        updateRowByObj(SHEET_NAMES.TOPICS, topicRow, { status: 'Mastered', progress: 100, updated_at: nowIso() });
+      } else if (!isCorrect && (accPct < 60 || wrongQ >= 2)) {
+        if (topicRow.status === 'Mastered') {
+          updateRowByObj(SHEET_NAMES.TOPICS, topicRow, { status: 'Learning', progress: 50, updated_at: nowIso() });
+        }
+      }
+    }
+  }
+
+  // 4. Update Spaced Repetition in Question_Reviews
+  var allRev = readAllRows(SHEET_NAMES.QUESTION_REVIEWS);
+  var existingRev = allRev.find(function(r) {
+    return String(r.user_id) === String(user.id) && String(r.question_id) === String(questionId);
+  });
+
+  var nextReviewDate = '';
+  var SP_INTERVALS = [1, 3, 7, 14, 30]; // Spaced repetition schedule (days)
+
+  if (!isCorrect) {
+    // Mistake Flow: Schedule immediately for Tomorrow (interval = 1)
+    var tom = new Date();
+    tom.setDate(tom.getDate() + 1);
+    nextReviewDate = tom.toISOString().slice(0, 10);
+
+    if (existingRev) {
+      updateRowByObj(SHEET_NAMES.QUESTION_REVIEWS, existingRev, {
+        interval_days: 1,
+        repetition_level: 0,
+        next_review_date: nextReviewDate,
+        last_reviewed_at: nowIso(),
+        status: 'Needs Review'
+      });
+    } else {
+      appendRow(SHEET_NAMES.QUESTION_REVIEWS, {
+        id: generateId('QRV'),
+        user_id: user.id,
+        question_id: questionId,
+        module_id: attemptObj.module_id,
+        topic_id: topicId,
+        interval_days: 1,
+        repetition_level: 0,
+        next_review_date: nextReviewDate,
+        last_reviewed_at: nowIso(),
+        status: 'Needs Review',
+        created_at: nowIso()
+      });
+    }
+  } else {
+    // Correct Flow: Advance to next repetition interval
+    var curLevel = existingRev ? (Number(existingRev.repetition_level) || 0) : 0;
+    var nextLevel = curLevel + 1;
+    var nextInterval = SP_INTERVALS[Math.min(nextLevel, SP_INTERVALS.length - 1)];
+    var isFullyMastered = (nextLevel >= SP_INTERVALS.length);
+
+    var targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + nextInterval);
+    nextReviewDate = targetDate.toISOString().slice(0, 10);
+
+    if (existingRev) {
+      updateRowByObj(SHEET_NAMES.QUESTION_REVIEWS, existingRev, {
+        interval_days: nextInterval,
+        repetition_level: nextLevel,
+        next_review_date: nextReviewDate,
+        last_reviewed_at: nowIso(),
+        status: isFullyMastered ? 'Mastered' : 'Scheduled'
+      });
+    } else {
+      appendRow(SHEET_NAMES.QUESTION_REVIEWS, {
+        id: generateId('QRV'),
+        user_id: user.id,
+        question_id: questionId,
+        module_id: attemptObj.module_id,
+        topic_id: topicId,
+        interval_days: nextInterval,
+        repetition_level: nextLevel,
+        next_review_date: nextReviewDate,
+        last_reviewed_at: nowIso(),
+        status: isFullyMastered ? 'Mastered' : 'Scheduled',
+        created_at: nowIso()
+      });
+    }
+  }
+
+  return successResponse({
+    correct: isCorrect,
+    correct_answer: correctAnswer,
+    explanation: explanation,
+    distractors: distractors,
+    reference: reference,
+    next_review_date: nextReviewDate,
+    topic_performance: topicPerf
+  });
+}
+
+function actionGetQuestionBank(user, payload) {
+  payload = payload || {};
+  var moduleId = payload.module_id || '';
+  var difficulty = payload.difficulty || '';
+  var search = (payload.search || '').toLowerCase();
+  var limit = Number(payload.limit) || 50;
+
+  var allQ = readAllRows(SHEET_NAMES.QUESTIONS);
+  var filtered = allQ.filter(function(q) {
+    if (moduleId && String(q.module_id) !== String(moduleId)) return false;
+    if (difficulty && String(q.difficulty).toLowerCase() !== difficulty.toLowerCase()) return false;
+    if (search) {
+      var text = (q.question + ' ' + (q.explanation || '')).toLowerCase();
+      if (text.indexOf(search) === -1) return false;
+    }
+    return true;
+  });
+
+  return successResponse({
+    total: filtered.length,
+    questions: filtered.slice(0, limit).map(function(q) { return formatQuestionForClient(q, user.language === 'ar'); })
+  });
+}
+
+function actionGetChallengeHistory(user, payload) {
+  var attempts = readAllRows(SHEET_NAMES.QUESTION_ATTEMPTS).filter(function(a) {
+    return String(a.user_id) === String(user.id);
+  });
+
+  var daysMap = {};
+  attempts.forEach(function(att) {
+    var date = (att.created_at || '').slice(0, 10);
+    if (!date) return;
+    if (!daysMap[date]) {
+      daysMap[date] = { date: date, total: 0, correct: 0, wrong: 0, hints_used: 0, time_sec: 0 };
+    }
+    daysMap[date].total++;
+    if (att.correct === true || att.correct === 'TRUE') daysMap[date].correct++;
+    else daysMap[date].wrong++;
+    daysMap[date].hints_used += Number(att.hints_used) || 0;
+    daysMap[date].time_sec += Number(att.time_spent_sec) || 0;
+  });
+
+  var historyList = Object.keys(daysMap).sort().reverse().map(function(d) {
+    var item = daysMap[d];
+    item.accuracy_pct = item.total > 0 ? Math.round((item.correct / item.total) * 100) : 0;
+    return item;
+  });
+
+  return successResponse(historyList);
+}
+
+function actionGetTopicDrill(user, payload) {
+  payload = payload || {};
+  var topicId = payload.topic_id;
+  if (!topicId) return errorResponse('Topic ID is required.', 'TOPIC_REQUIRED');
+
+  var perf = readAllRows(SHEET_NAMES.TOPIC_PERFORMANCE).find(function(p) {
+    return String(p.user_id) === String(user.id) && String(p.topic_id) === String(topicId);
+  });
+
+  var attempts = readAllRows(SHEET_NAMES.QUESTION_ATTEMPTS).filter(function(a) {
+    return String(a.user_id) === String(user.id) && String(a.topic_id) === String(topicId);
+  });
+
+  var questions = readAllRows(SHEET_NAMES.QUESTIONS).filter(function(q) {
+    return String(q.topic_id) === String(topicId);
+  });
+
+  return successResponse({
+    topic_id: topicId,
+    performance: perf ? stripRow(perf) : null,
+    total_attempts: attempts.length,
+    wrong_attempts: attempts.filter(function(a) { return a.correct === false || a.correct === 'FALSE'; }),
+    questions: questions.map(function(q) { return formatQuestionForClient(q, user.language === 'ar'); })
+  });
+}
+
+function actionReportQuestion(user, payload) {
+  payload = payload || {};
+  var questionId = payload.question_id;
+  var reason = payload.reason || 'Incorrect Answer';
+  var details = payload.details || '';
+
+  if (!questionId) return errorResponse('Question ID is required.', 'QUESTION_REQUIRED');
+
+  var reportObj = {
+    id: generateId('QRP'),
+    question_id: questionId,
+    user_id: user.id,
+    reason: reason,
+    feedback_type: payload.feedback_type || 'Report',
+    details: details,
+    status: 'Pending',
+    created_at: nowIso()
+  };
+  appendRow(SHEET_NAMES.QUESTION_REPORTS, reportObj);
+
+  return successResponse(reportObj, 'Question reported for review. Thank you for your feedback.');
+}
+
+function actionAdminUpdateQuestion(user, payload) {
+  if (user.role !== 'Admin') return errorResponse('Admin privileges required.', 'UNAUTHORIZED');
+  var questionId = payload.id;
+  if (!questionId) return errorResponse('Question ID required.', 'ID_REQUIRED');
+
+  var allQ = readAllRows(SHEET_NAMES.QUESTIONS);
+  var existing = allQ.find(function(q) { return String(q.id) === String(questionId); });
+  if (!existing) return errorResponse('Question not found.', 'NOT_FOUND');
+
+  var updates = {};
+  if (payload.status) updates.status = payload.status;
+  if (payload.difficulty) updates.difficulty = payload.difficulty;
+  if (payload.question) updates.question = payload.question;
+  if (payload.explanation) updates.explanation = payload.explanation;
+
+  updateRowByObj(SHEET_NAMES.QUESTIONS, existing, updates);
+  return successResponse(updates, 'Question updated.');
+}
+
+// ---------------------------------------------------------------------------
+// CURATED HIGH-YIELD ERP CHALLENGE QUESTIONS (FALLBACK & SEED BANK)
+// ---------------------------------------------------------------------------
+
+function getCuratedChallengeQuestions(moduleId, isAr) {
+  var modLower = String(moduleId || '').toLowerCase();
+  
+  // 1. Inventory & Stock Management
+  if (modLower.indexOf('inv') !== -1 || modLower.indexOf('مخزون') !== -1 || modLower.indexOf('e05842a37c') !== -1 || /\bmod-1\b/i.test(modLower)) {
+    return [
+      {
+        id: 'Q-INV-001',
+        module_id: moduleId,
+        category_id: 'CAT-INV-VAL',
+        topic_id: 'TOP-FIFO',
+        concept_id: 'CON-FIFO-VAL',
+        question_type: 'Accounting Impact',
+        difficulty: 'Intermediate',
+        question: isAr ? 'عند شراء 100 وحدة بسعر 10 ريال ثم 100 وحدة بسعر 12 ريال، ثم صرف 150 وحدة للإنتاج بنظام FIFO: ما هي تكلفة البضاعة المباعة (COGS) وقيمة المخزون المتبقي؟' : 'Under FIFO inventory valuation, if 100 units are purchased at $10 and 100 units at $12, then 150 units are issued to production: What is the resulting COGS and ending inventory value?',
+        options: [
+          { id: 'A', text: isAr ? 'COGS: 1,600 ريال | المخزون المتبقي: 600 ريال' : 'COGS: $1,600 | Ending Inventory: $600' },
+          { id: 'B', text: isAr ? 'COGS: 1,500 ريال | المخزون المتبقي: 700 ريال' : 'COGS: $1,500 | Ending Inventory: $700' },
+          { id: 'C', text: isAr ? 'COGS: 1,650 ريال | المخزون المتبقي: 550 ريال' : 'COGS: $1,650 | Ending Inventory: $550' },
+          { id: 'D', text: isAr ? 'COGS: 1,700 ريال | المخزون المتبقي: 500 ريال' : 'COGS: $1,700 | Ending Inventory: $500' }
+        ],
+        correct_answer: 'A',
+        explanation: isAr ? 'في نظام FIFO، يتم صرف أقدم مخزون أولاً: (100 وحدة × 10 ريال = 1,000 ريال) + (50 وحدة × 12 ريال = 600 ريال) = 1,600 ريال COGS. ويتبقى في المخزن (50 وحدة × 12 ريال = 600 ريال).' : 'Under FIFO, older units are depleted first: (100 units * $10 = $1,000) + (50 units * $12 = $600) = $1,600 COGS. Ending inventory comprises the remaining 50 units * $12 = $600.',
+        distractors: {
+          'B': isAr ? 'خطأ: تم حساب المتوسط بدلاً من تسلسل FIFO.' : 'Incorrect: Assumes simple average pricing rather than FIFO queue.',
+          'C': isAr ? 'خطأ: حساب خاطئ في كميات الصرف.' : 'Incorrect: Arithmetic error in unit cost allocation.',
+          'D': isAr ? 'خطأ: تطبيق نظام LIFO بدلاً من FIFO.' : 'Incorrect: Represents LIFO valuation rather than FIFO.'
+        },
+        hints: [
+          isAr ? 'تذكر مبدأ FIFO: الوارد أولاً يُصرف أولاً.' : 'Remember FIFO: First-In, First-Out pricing order.',
+          isAr ? 'احسب تكلفة أول 100 وحدة من الشحنة الأولى بسعر 10 ريال.' : 'Calculate the first 100 units from the initial batch at $10.',
+          isAr ? 'أضف الـ 50 وحدة المتبقية من الشحنة الثانية بسعر 12 ريال.' : 'Add the remaining 50 units from the second batch at $12.'
+        ],
+        reference: {
+          title: 'IAS 2 - Inventories Standard & Cost Formulas',
+          url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/',
+          source: 'IFRS Official Standards'
+        }
+      },
+      {
+        id: 'Q-INV-002',
+        module_id: moduleId,
+        category_id: 'CAT-INV-OPS',
+        topic_id: 'TOP-TRANSIT',
+        concept_id: 'CON-INTER-WH',
+        question_type: 'Troubleshooting',
+        difficulty: 'Advanced',
+        question: isAr ? 'تم إنشاء أمر تحويل مخزني بين مستودع الرياض ومستودع جدة، وتم تأكيد الشحن ولكن البضاعة لم تظهر في رصيد مستودع جدة لمدة 3 أيام. ما هو السبب الأكثر ترجيحاً وكيف تعالجه؟' : 'An internal transfer between Riyadh and Jeddah warehouses was dispatched, but inventory is not showing in Jeddah after 3 days. What is the root cause and standard ERP remedy?',
+        options: [
+          { id: 'A', text: isAr ? 'البضاعة ما زالت في موقع العبور (Transit Location) بانتظار تأكيد استلام مستودع جدة.' : 'The stock is in the Inter-warehouse Transit Location awaiting receipt validation at Jeddah.' },
+          { id: 'B', text: isAr ? 'تم شطب البضاعة تلقائياً بسبب انتهاء مهلة الشحن.' : 'The stock was automatically written off due to dispatch timeout.' },
+          { id: 'C', text: isAr ? 'النظام حذف القيد المخزني بسبب نقص الكميات.' : 'The ERP deleted the inventory journal entry due to negative stock.' },
+          { id: 'D', text: isAr ? 'يجب إلغاء أمر الشحن وإعادة إصدار فاتورة مبيعات جديدة.' : 'The transfer must be canceled and converted into an inter-company sales invoice.' }
+        ],
+        correct_answer: 'A',
+        explanation: isAr ? 'في أنظمة الـ ERP القياسية (مثل Odoo و SAP)، تعتمد التحويلات بين الفروع على موقع وسيط (Transit Location). لا تدخل البضاعة رصيد المستودع المستلم إلا بعد عمل Validate / Good Receipt.' : 'In standard ERP architecture (Odoo, SAP), two-step transfers hold stock in an internal Transit Location. The destination warehouse balance increases only after confirming the Goods Receipt validation step.',
+        distractors: {
+          'B': isAr ? 'خطأ: أنظمة ERP لا تشطب البضائع أثناء النقل بدون إذن جرد.' : 'Incorrect: ERPs never automatically scrap transit items without manual inventory write-off.',
+          'C': isAr ? 'خطأ: القيود المخزنية لا تُحذف بعد الترحيل.' : 'Incorrect: Posted stock moves cannot be deleted.',
+          'D': isAr ? 'خطأ: التحويل الداخلي لا يتطلب فواتير مبيعات إلا بين الكيانات القانونية المنفصلة.' : 'Incorrect: Internal movements within the same legal entity do not require customer invoicing.'
+        },
+        hints: [
+          isAr ? 'فكر في التحويلات ذات الخطوتين (Two-step transfers).' : 'Consider two-step transfer workflows.',
+          isAr ? 'أين تستقر البضاعة محاسبياً أثناء تواجدها على الطريق في الشاحنة؟' : 'Where does stock sit physically and ledger-wise while en route?',
+          isAr ? 'تحقق من خطوة Goods Receipt المعلقة في المستودع الوجهة.' : 'Check the pending Goods Receipt step at the destination warehouse.'
+        ],
+        reference: {
+          title: 'Odoo Inventory - Internal Transfers & Transit Locations Documentation',
+          url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/warehouses_storage/transfers.html',
+          source: 'Odoo Official Documentation'
+        }
+      }
+    ];
+  }
+
+  // 2. Financial Accounting
+  if (modLower.indexOf('acc') !== -1 || modLower.indexOf('حسابات') !== -1 || modLower.indexOf('24696b93e6') !== -1 || /\bmod-2\b/i.test(modLower)) {
+    return [
+      {
+        id: 'Q-ACC-001',
+        module_id: moduleId,
+        category_id: 'CAT-ACC-GL',
+        topic_id: 'TOP-CLOSING',
+        concept_id: 'CON-RETAINED-EARNINGS',
+        question_type: 'Accounting Impact',
+        difficulty: 'Intermediate',
+        question: isAr ? 'عند إجراء قيد إقفال نهاية السنة المالية (Year-End Closing Entry)، ما هو الحساب الدائن والمدين الصحيح لإقفال صافي ربح قدره 500,000 ريال؟' : 'When executing the Year-End Financial Closing entry for a net profit of $500,000, what is the correct debit and credit journal entry?',
+        options: [
+          { id: 'A', text: isAr ? 'مدين: حـ/ الأرباح والخسائر (P&L Summary) 500,000 | دائن: حـ/ الأرباح المبقاة (Retained Earnings) 500,000' : 'Debit: P&L Summary $500,000 | Credit: Retained Earnings $500,000' },
+          { id: 'B', text: isAr ? 'مدين: حـ/ النقدية 500,000 | دائن: حـ/ الإيرادات 500,000' : 'Debit: Cash $500,000 | Credit: Revenue $500,000' },
+          { id: 'C', text: isAr ? 'مدين: حـ/ الأرباح المبقاة 500,000 | دائن: حـ/ المصروفات 500,000' : 'Debit: Retained Earnings $500,000 | Credit: Expenses $500,000' },
+          { id: 'D', text: isAr ? 'مدين: حـ/ رأس المال 500,000 | دائن: حـ/ البنك 500,000' : 'Debit: Share Capital $500,000 | Credit: Bank $500,000' }
+        ],
+        correct_answer: 'A',
+        explanation: isAr ? 'يتم إقفال أرصدة قائمة الدخل المؤقتة في حـ/ ملخص الدخل، ثم يُرحل صافي الربح الدائن بإثباته مديناً في ملخص الدخل ودائناً في حـ/ الأرباح المبقاة (حقوق الملكية) في الميزانية العمومية.' : 'Net profit in temporary P&L accounts is transferred to equity by debiting Income Summary and crediting Retained Earnings in the Balance Sheet.',
+        distractors: {
+          'B': isAr ? 'خطأ: قيد الإقفال لا يؤثر على السيولة النقدية الفعلية.' : 'Incorrect: Closing entries do not touch physical cash balances.',
+          'C': isAr ? 'خطأ: هذا القيد يعكس خسارة وليس ربحاً صافياً.' : 'Incorrect: This structure records a net loss rather than profit.',
+          'D': isAr ? 'خطأ: رأس المال الأساسي لا يتأثر مباشرة بأرباح التشغيل الدورية دون قرار جمعية عمومية.' : 'Incorrect: Paid-in capital is not modified directly by operational closing.'
+        },
+        hints: [
+          isAr ? 'أين تستقر أرباح الشركة التراكمية في قسم حقوق الملكية؟' : 'Where do cumulative profits accumulate within Balance Sheet Equity?',
+          isAr ? 'صافي الربح طبيعته دائنة، لذا لإقفاله يجعَل مديناً.' : 'Credit balance profits are debited to zero out and credited to equity.',
+          isAr ? 'ابحث عن حـ/ الأرباح المبقاة (Retained Earnings).' : 'Look for the Retained Earnings equity account.'
+        ],
+        reference: {
+          title: 'IAS 1 - Presentation of Financial Statements & Equity Movements',
+          url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-1-presentation-of-financial-statements/',
+          source: 'IFRS Accounting Standards'
+        }
+      }
+    ];
+  }
+
+  // Generic ERP Module Challenge Fallback (3 Questions for remaining modules)
+  return [
+    {
+      id: 'Q-GEN-001',
+      module_id: moduleId,
+      category_id: 'CAT-GEN-OPS',
+      topic_id: 'TOP-PROCESS',
+      concept_id: 'CON-WORKFLOW',
+      question_type: 'Process Decision',
+      difficulty: 'Intermediate',
+      question: isAr ? 'ما هي الخطوة الإلزامية في دورة العمل لضمان صحة الرقابة الداخلية وفصل المهام (Segregation of Duties) قبل ترحيل المستندات المالية والتشغيلية؟' : 'What is the mandatory governance step in an ERP workflow to enforce Segregation of Duties before posting financial and operational transactions?',
+      options: [
+        { id: 'A', text: isAr ? 'اعتماد المستند من مسؤول بصلاحيات مستقلة عن منشئ المستند (Approval Workflow).' : 'Two-step multi-tier approval by an authorized user independent from the creator.' },
+        { id: 'B', text: isAr ? 'طباعة المستند ورقياً وحفظه في الأرشيف اليدوي فقط.' : 'Printing physical paper copies and manual stamping only.' },
+        { id: 'C', text: isAr ? 'منح منشئ المعاملة كافة صلاحيات الترحيل والتعديل لتسريع الإنجاز.' : 'Granting creator full posting and editing bypass rights.' },
+        { id: 'D', text: isAr ? 'إلغاء قيود الإقفال الشهري.' : 'Bypassing monthly subledger reconciliations.' }
+      ],
+      correct_answer: 'A',
+      explanation: isAr ? 'مبدأ الرقابة الداخلية وفصل المهام (SoD) يتطلب عدم قيام نفس المستخدم بإنشاء واعتماد المعاملة، وتطبيق مسار موافقات آلي بحسب الصلاحيات.' : 'Segregation of Duties (SoD) requires strict separation between transaction creators and approvers to prevent fraud and operational error.',
+      distractors: {
+        'B': isAr ? 'خطأ: الأرشفة الورقية لا تمنع الأخطاء النظامية داخل الـ ERP.' : 'Incorrect: Physical paper archiving does not provide ERP system control.',
+        'C': isAr ? 'خطأ: مخالف لمعايير الرقابة والامتثال الداخلي.' : 'Incorrect: Violates basic internal audit and governance rules.',
+        'D': isAr ? 'خطأ: التسويات الشهرية إلزامية لسلامة القوائم المالية.' : 'Incorrect: Reconciliations are required for financial reporting integrity.'
+      },
+      hints: [
+        isAr ? 'فكر في مسار الموافقات والصلاحيات (Approval Hierarchy).' : 'Think about role-based approval workflows.',
+        isAr ? 'لا يجوز للموظف اعتماد عمله بنفسه.' : 'Creators must not approve their own vouchers.'
+      ],
+      reference: {
+        title: 'COSO Internal Control - Integrated Framework & ERP Segregation of Duties',
+        url: 'https://www.coso.org/guidance-on-ic',
+        source: 'COSO Governance Standards'
+      }
+    },
+    {
+      id: 'Q-GEN-002',
+      module_id: moduleId,
+      category_id: 'CAT-GEN-TRB',
+      topic_id: 'TOP-RECON',
+      concept_id: 'CON-VARIANCE',
+      question_type: 'Troubleshooting',
+      difficulty: 'Advanced',
+      question: isAr ? 'عند ظهور فارق مالي بين ميزان المراجعة والحساب الوسيط للموديول في نهاية الشهر: ما هو الإجراء التشخيصي الأول الواجب تنفيذه؟' : 'When an unallocated variance appears between the General Ledger control account and the module subledger at month-end: What is the first diagnostic step?',
+      options: [
+        { id: 'A', text: isAr ? 'استخراج تقرير مطابقة الأستاذ المساعد مع الأستاذ العام (Subledger to GL Reconciliation) وتحديد الحركات غير المرحلة.' : 'Run Subledger to GL Reconciliation report to identify unposted, orphaned, or manual journal entries.' },
+        { id: 'B', text: isAr ? 'إدخال قيد تسوية مباشر بحساب الأرباح والخسائر دون بحث الأسباب.' : 'Post a direct blind adjustment to P&L without identifying root cause.' },
+        { id: 'C', text: isAr ? 'حذف القيود السابقة وإعادة تسجيل المعاملات من جديد.' : 'Delete historical journal batches and re-key entries.' },
+        { id: 'D', text: isAr ? 'تغيير العملة الأساسية للنظام.' : 'Modify system functional base currency.' }
+      ],
+      correct_answer: 'A',
+      explanation: isAr ? 'الإجراء القياسي هو مطابقة الأستاذ المساعد (Subledger) مع الأستاذ العام (GL Control Account) لاكتشاف الحركات اليدوية المباشرة أو القيود المعلقة غير المرحلة.' : 'Standard ERP reconciliation matches the subledger detail against the GL control account to isolate unposted batches or unauthorized manual entries.',
+      distractors: {
+        'B': isAr ? 'خطأ: التسوية العمياء تخالف المعايير المحاسبية وتخفي الاختلاسات والأخطاء.' : 'Incorrect: Blind adjustments violate auditing standards and conceal operational leaks.',
+        'C': isAr ? 'خطأ: حذف السجلات التاريخية ممنوع ومستحيل في الأنظمة المعتمدة.' : 'Incorrect: Posted financial records cannot be deleted.',
+        'D': isAr ? 'خطأ: تغيير العملة يؤدي إلى إفساد شجرة الحسابات بالكامل.' : 'Incorrect: Currency modification corrupts historical valuation.'
+      },
+      hints: [
+        isAr ? 'قارن تفاصيل الأستاذ المساعد مع حساب المراقبة في الأستاذ العام.' : 'Compare subledger lines against GL control balance.',
+        isAr ? 'ابحث عن القيود اليدوية المباشرة على حساب المراقبة.' : 'Check for direct manual journals on control accounts.'
+      ],
+      reference: {
+        title: 'ERP Month-End Close Best Practices & Subledger Reconciliation',
+        url: 'https://www.oracle.com/erp/financials/general-ledger/',
+        source: 'Oracle ERP Documentation'
+      }
+    }
+  ];
 }
