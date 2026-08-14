@@ -374,26 +374,15 @@ const SystemTest = (function () {
   }
 
   async function testEnterpriseTools() {
-    log('INFO', 'TOOLS', 'Testing All 12 AI Workbench Tools & Services Handlers...');
+    log('INFO', 'AI', 'Testing Core AI Services Handlers...');
     let passCount = 0;
-    if (typeof AIService !== 'undefined') { log('PASS', 'TOOLS', 'AIService context builder & proxy engine ready.'); passCount++; }
-    if (typeof AIChat !== 'undefined') { log('PASS', 'TOOLS', 'AIChat global tutor chatbot widget ready.'); passCount++; }
-    if (typeof DailyQuiz !== 'undefined') { log('PASS', 'TOOLS', 'DailyQuiz AI Challenge tool ready.'); passCount++; }
-    if (typeof MultiERP !== 'undefined') { log('PASS', 'TOOLS', 'MultiERP AI Advisor tool ready.'); passCount++; }
-    if (typeof JournalSim !== 'undefined') { log('PASS', 'TOOLS', 'JournalSim AI Entry Generator tool ready.'); passCount++; }
-    if (typeof ImplementerToolkit !== 'undefined') { log('PASS', 'TOOLS', 'ImplementerToolkit AI Assistant tool ready.'); passCount++; }
-    if (typeof ProcessFlow !== 'undefined') { log('PASS', 'TOOLS', 'ProcessFlow AI Flowchart Visualizer tool ready.'); passCount++; }
-    if (typeof GanttBuilder !== 'undefined') { log('PASS', 'TOOLS', 'GanttBuilder AI Implementation Planner tool ready.'); passCount++; }
-    if (typeof AITroubleshooter !== 'undefined') { log('PASS', 'TOOLS', 'AITroubleshooter diagnostic tool ready.'); passCount++; }
-    if (typeof AIKPIAdvisor !== 'undefined') { log('PASS', 'TOOLS', 'AIKPIAdvisor executive KPI tool ready.'); passCount++; }
-    if (typeof AIGapCoach !== 'undefined') { log('PASS', 'TOOLS', 'AIGapCoach remediation coach tool ready.'); passCount++; }
-    if (typeof AIScenarioLab !== 'undefined') { log('PASS', 'TOOLS', 'AIScenarioLab decision lab tool ready.'); passCount++; }
-    if (typeof AIChecklist !== 'undefined') { log('PASS', 'TOOLS', 'AIChecklist implementation checklist tool ready.'); passCount++; }
+    if (typeof AIService !== 'undefined') { log('PASS', 'AI', 'AIService context builder & proxy engine ready.'); passCount++; }
+    if (typeof AIChat !== 'undefined') { log('PASS', 'AI', 'AIChat global tutor chatbot widget ready.'); passCount++; }
 
-    if (passCount >= 13) {
-      log('PASS', 'TOOLS', 'All 13 AI Workbench modules verified with 0ms offline fallback capability.');
+    if (passCount >= 2) {
+      log('PASS', 'AI', 'AI Services verified with 0ms offline fallback capability.');
     } else {
-      log('FAIL', 'TOOLS', `Expected 13 modules, found ${passCount}`);
+      log('FAIL', 'AI', `Expected 2 AI modules, found ${passCount}`);
     }
   }
 

@@ -26,11 +26,7 @@ const I18N_DICT = {
     },
 
     nav: {
-      dashboard: 'Dashboard', modules: 'Modules', learning: 'Learning', toolsSection: 'AI Enterprise Workbench',
-      dailyQuiz: '🎯 Daily Quiz', multiErp: '🔄 Multi-ERP Matrix', journalSim: '📑 Journal Simulator',
-      implementerToolkit: '🛠️ Implementer Toolkit', processFlow: '🔄 Process Flows', ganttBuilder: '📅 Gantt Builder',
-      aiTroubleshooter: '🛠️ AI Troubleshooter', aiKpiAdvisor: '📊 AI KPI Advisor', aiGapCoach: '🎯 AI Gap Coach',
-      aiScenarioLab: '🧪 AI Scenario Lab', aiChecklist: '📋 AI Implementation Checklist',
+      dashboard: 'Dashboard', modules: 'Modules', learning: 'Learning',
       allNotes: 'All Notes', favorites: 'Favorites', aiInsights: 'AI Daily Insights',
       knowledgeGaps: 'Knowledge Gaps', reviewCenter: 'Review Center', analytics: 'Analytics', systemTest: '🧪 System Test',
       account: 'Account', myProfile: 'My Profile', administration: 'Administration', logout: 'Logout',
@@ -253,11 +249,7 @@ const I18N_DICT = {
     },
 
     nav: {
-      dashboard: 'لوحة التحكم', modules: 'الموديولات', learning: 'التعلّم', toolsSection: 'منصة أدوات الـ AI المتقدمة',
-      dailyQuiz: '🎯 التحدي اليومي', multiErp: '🔄 مقارنة الأنظمة', journalSim: '📑 محاكي القيود',
-      implementerToolkit: '🛠️ أدوات المطبق', processFlow: '🔄 خرائط العمليات', ganttBuilder: '📅 مخطط جانت',
-      aiTroubleshooter: '🛠️ تشخيص الأخطاء بالـ AI', aiKpiAdvisor: '📊 مؤشرات الأداء والتقارير', aiGapCoach: '🎯 مدرب الفجوات المعرفية',
-      aiScenarioLab: '🧪 معمل سيناريوهات القرارات', aiChecklist: '📋 قائمة تنفيذ الموديول',
+      dashboard: 'لوحة التحكم', modules: 'الموديولات', learning: 'التعلّم',
       allNotes: 'جميع الملاحظات', favorites: 'المفضلة', aiInsights: 'رؤى الذكاء الاصطناعي',
       knowledgeGaps: 'فجوات المعرفة', reviewCenter: 'مركز المراجعة', analytics: 'التحليلات', systemTest: '🧪 الاختبار والتشخيص',
       myProfile: 'ملفي الشخصي', administration: 'الإدارة', account: 'الحساب', logout: 'تسجيل الخروج',
