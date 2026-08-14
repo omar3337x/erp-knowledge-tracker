@@ -894,9 +894,36 @@ tbody tr:hover{ background:var(--line-soft); }
   overflow-y: auto;
 }
 
+/* Notes Table View Styles */
+.notes-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.notes-data-table th {
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 12px 14px;
+  border-bottom: 1.5px solid var(--line);
+  white-space: nowrap;
+}
+.notes-data-table td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line-soft);
+}
+.note-table-row {
+  transition: background var(--transition-fast);
+}
+.note-table-row:hover {
+  background: var(--line-soft) !important;
+}
+.note-table-row.is-pinned-row {
+  background: rgba(212, 175, 55, 0.04);
+}
 
-
-/* --------------------------------------------------------------------------- */
 /* TAGS, PINNING, IMAGE ATTACHMENTS & PRINT STYLES                            */
 /* --------------------------------------------------------------------------- */
 

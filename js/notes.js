@@ -397,7 +397,7 @@ const Notes = (function () {
   }
 
   /**
-   * Render notes inside a specific module view.
+   * Render notes inside a specific module view as a clean Table.
    */
   function renderModuleNotesList(listWrap, query, badgeEl) {
     if (!listWrap) return;
@@ -413,12 +413,15 @@ const Notes = (function () {
         String(n.title || '').toLowerCase().includes(query) ||
         String(n.section_name || '').toLowerCase().includes(query) ||
         String(n.content || '').toLowerCase().includes(query) ||
-        n.tags.some(t => t.toLowerCase().includes(query))
+        (n.tags || []).some(t => t.toLowerCase().includes(query))
       );
     }
 
-    // Sort pinned notes to top
-    filtered.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+    // Sort pinned notes to top, then by date desc
+    filtered.sort((a, b) => {
+      if (b.pinned !== a.pinned) return b.pinned ? 1 : -1;
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
 
     if (!moduleNotes.length) {
       listWrap.innerHTML = UI.emptyState(
@@ -436,40 +439,18 @@ const Notes = (function () {
       return;
     }
 
-    // Group by section_name
-    const groups = {};
-    filtered.forEach(note => {
-      const section = String(note.section_name || '').trim() || I18n.t('notes.uncategorized');
-      if (!groups[section]) groups[section] = [];
-      groups[section].push(note);
-    });
-
-    let html = '';
-    Object.keys(groups).forEach(sectionName => {
-      html += `
-        <div class="notes-group">
-          <div class="notes-group-header">
-            <span>[ ${escapeHtml(sectionName)} ]</span>
-          </div>
-          <div class="notes-grid">
-            ${groups[sectionName].map(n => noteCardHtml(n, false)).join('')}
-          </div>
-        </div>
-      `;
-    });
-
-    listWrap.innerHTML = html;
-    bindCardActions(listWrap, badgeEl, query, false);
+    listWrap.innerHTML = renderNotesTableHtml(filtered, false, false);
+    bindTableActions(listWrap, badgeEl, query, false);
   }
 
   /**
-   * Render notes grouped by Module & Section Name for the "All Notes" page.
+   * Render notes in a clean Data Table for the "All Notes" page.
    */
   function renderAllNotesGrouped(listWrap, query, selectedModuleId, badgeEl) {
     if (!listWrap) return;
 
     const tagsBarEl = document.querySelector('#all-notes-tags-bar');
-    if (tagsBarEl && !tagsBarEl.innerHTML) {
+    if (tagsBarEl) {
       renderTagsBar(tagsBarEl, listWrap, document.querySelector('#all-notes-search-input'), document.querySelector('#all-notes-module-filter'), badgeEl);
     }
 
@@ -481,7 +462,7 @@ const Notes = (function () {
     }
 
     if (_activeTagFilter) {
-      filtered = filtered.filter(n => n.tags.includes(_activeTagFilter));
+      filtered = filtered.filter(n => (n.tags || []).includes(_activeTagFilter));
     }
 
     if (query) {
@@ -493,15 +474,18 @@ const Notes = (function () {
           String(n.title || '').toLowerCase().includes(query) ||
           String(n.section_name || '').toLowerCase().includes(query) ||
           String(n.content || '').toLowerCase().includes(query) ||
-          n.tags.some(t => t.toLowerCase().includes(query)) ||
+          (n.tags || []).some(t => t.toLowerCase().includes(query)) ||
           modNameAr.includes(query) ||
           modNameEn.includes(query)
         );
       });
     }
 
-    // Sort pinned notes to top
-    filtered.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+    // Sort pinned notes to top, then by date desc
+    filtered.sort((a, b) => {
+      if (b.pinned !== a.pinned) return b.pinned ? 1 : -1;
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
 
     if (badgeEl) badgeEl.textContent = filtered.length;
 
@@ -521,100 +505,114 @@ const Notes = (function () {
       return;
     }
 
-    // Group by Module ID -> then Section Name
-    const moduleMap = {};
-    filtered.forEach(note => {
-      const modId = note.module_id || 'UNKNOWN';
-      if (!moduleMap[modId]) moduleMap[modId] = {};
-      const section = String(note.section_name || '').trim() || I18n.t('notes.uncategorized');
-      if (!moduleMap[modId][section]) moduleMap[modId][section] = [];
-      moduleMap[modId][section].push(note);
-    });
-
-    let html = '';
-    Object.keys(moduleMap).forEach(modId => {
-      const modObj = (State.modulesCache || []).find(m => String(m.id) === String(modId));
-      const modTitle = modObj ? `📦 ${I18n.localizedName(modObj)}` : `📦 ${modId}`;
-      const sections = moduleMap[modId];
-
-      html += `
-        <div class="card" style="margin-bottom:24px; padding:20px; border-radius:var(--radius-lg);">
-          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--line); padding-bottom:12px; margin-bottom:16px;">
-            <h3 style="font-size:17px; font-weight:700; color:var(--ink); margin:0;">${escapeHtml(modTitle)}</h3>
-            <span class="badge" style="background:var(--paper-raised); color:var(--ink-soft);">${Object.values(sections).flat().length} ${I18n.t('notes.notesSection')}</span>
-          </div>
-      `;
-
-      Object.keys(sections).forEach(sectionName => {
-        html += `
-          <div class="notes-group" style="margin-bottom:16px;">
-            <div class="notes-group-header">
-              <span>[ ${escapeHtml(sectionName)} ]</span>
-            </div>
-            <div class="notes-grid">
-              ${sections[sectionName].map(n => noteCardHtml(n, true)).join('')}
-            </div>
-          </div>
-        `;
-      });
-
-      html += `</div>`;
-    });
-
-    listWrap.innerHTML = html;
-    bindCardActions(listWrap, badgeEl, query, true);
+    listWrap.innerHTML = renderNotesTableHtml(filtered, true, true);
+    bindTableActions(listWrap, badgeEl, query, true);
   }
 
-  function noteCardHtml(n, showModuleBadge) {
-    const sName = String(n.section_name || '').trim();
-    const sectionBadge = sName ? escapeHtml(sName) : I18n.t('notes.uncategorized');
-
-    let modBadgeHtml = '';
-    if (showModuleBadge) {
-      const modObj = (State.modulesCache || []).find(m => String(m.id) === String(n.module_id));
-      const modName = modObj ? I18n.localizedName(modObj) : n.module_id;
-      modBadgeHtml = `<span class="badge" style="background:var(--gold-soft); color:var(--ink); font-size:11px; font-weight:600;">📦 ${escapeHtml(modName)}</span>`;
-    }
-
-    const tagsHtml = (n.tags || []).map(t => `<span class="tag-badge">#${escapeHtml(t)}</span>`).join(' ');
-    const pinBadge = n.pinned ? `<span class="pinned-badge">📌 ${I18n.t('common.pinned')}</span>` : '';
-    const imgThumb = n.image_url ? `<div style="margin-top:10px; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--line);"><img src="${n.image_url}" style="width:100%; max-height:140px; object-fit:cover; display:block;"></div>` : '';
-
-    const safeContent = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(n.content) : escapeHtml(n.content);
+  /**
+   * Renders the master Data Table HTML for notes.
+   */
+  function renderNotesTableHtml(notes, showModuleCol, isAllNotesPage) {
+    const isAr = I18n.getLang() === 'ar';
 
     return `
-      <div class="note-card ${n.pinned ? 'is-pinned' : ''}" data-id="${n.id}" style="${n.pinned ? 'border-color:var(--gold); background:rgba(212,175,55,0.03);' : ''}">
-        <div class="note-card-header" style="flex-wrap:wrap; gap:6px;">
-          <div style="display:flex; align-items:center; gap:8px; flex:1;">
-            <button class="pin-toggle-btn ${n.pinned ? 'pinned' : ''}" data-action="toggle-pin" data-id="${n.id}" title="${n.pinned ? I18n.t('common.unpin') : I18n.t('common.pin')}">📌</button>
-            <h3 class="note-card-title">${escapeHtml(n.title)}</h3>
-          </div>
-          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-            ${pinBadge}
-            ${modBadgeHtml}
-            <span class="note-section-badge">${sectionBadge}</span>
-          </div>
-        </div>
-        <div class="note-card-content ql-editor" style="padding:0;">${safeContent}</div>
-        ${imgThumb}
-        ${tagsHtml ? `<div style="margin-top:10px; display:flex; gap:4px; flex-wrap:wrap;">${tagsHtml}</div>` : ''}
-        <div class="note-card-footer">
-          <div class="note-card-dates">
-            <span>${I18n.t('notes.createdAt')}: ${UI.fmtDate(n.created_at)}</span>
-          </div>
-          <div class="note-card-actions">
-            <button class="note-action-btn" data-action="view" data-id="${n.id}">${I18n.t('notes.view')}</button>
-            <button class="note-action-btn" data-action="edit" data-id="${n.id}">${I18n.t('notes.edit')}</button>
-            <button class="note-action-btn danger" data-action="delete" data-id="${n.id}">${I18n.t('notes.delete')}</button>
-          </div>
-        </div>
+      <div class="table-wrap" style="background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-sm); margin-bottom:20px;">
+        <table class="notes-data-table">
+          <thead>
+            <tr>
+              <th style="width:40px; text-align:center;">📌</th>
+              <th style="min-width:180px;">${isAr ? 'العنوان' : 'Title'}</th>
+              ${showModuleCol ? `<th style="min-width:130px;">${isAr ? 'الموديول' : 'Module'}</th>` : ''}
+              <th style="min-width:130px;">${isAr ? 'القسم / البند' : 'Section'}</th>
+              <th style="min-width:200px;">${isAr ? 'مقتطف المحتوى' : 'Preview'}</th>
+              <th style="min-width:120px;">${isAr ? 'الوسوم' : 'Tags'}</th>
+              <th style="min-width:110px;">${isAr ? 'تاريخ الإضافة' : 'Date'}</th>
+              <th style="text-align:center; min-width:130px;">${isAr ? 'الإجراءات' : 'Actions'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${notes.map(n => noteTableRowHtml(n, showModuleCol)).join('')}
+          </tbody>
+        </table>
       </div>
     `;
   }
 
-  function bindCardActions(listWrap, badgeEl, query, isAllNotesPage) {
+  function noteTableRowHtml(n, showModuleCol) {
+    const isAr = I18n.getLang() === 'ar';
+    const sName = String(n.section_name || '').trim() || (isAr ? 'عام' : 'General');
+    
+    let modName = n.module_id;
+    if (showModuleCol) {
+      const modObj = (State.modulesCache || []).find(m => String(m.id) === String(n.module_id));
+      modName = modObj ? I18n.localizedName(modObj) : n.module_id;
+    }
+
+    const tagsHtml = (n.tags || []).slice(0, 3).map(t => `<span class="tag-badge" style="font-size:10.5px; padding:2px 6px;">#${escapeHtml(t)}</span>`).join(' ') + ((n.tags || []).length > 3 ? ` <small style="color:var(--ink-soft);">+${n.tags.length - 3}</small>` : '');
+
+    // Clean text preview from HTML content
+    const tmp = document.createElement('div');
+    tmp.innerHTML = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(n.content) : n.content;
+    const plainText = (tmp.textContent || tmp.innerText || '').trim();
+    const previewText = plainText.length > 70 ? plainText.substring(0, 70) + '...' : plainText;
+
+    const hasImg = !!n.image_url;
+
+    return `
+      <tr class="note-table-row ${n.pinned ? 'is-pinned-row' : ''}" data-id="${n.id}" style="cursor:pointer;">
+        <td style="text-align:center;" onclick="event.stopPropagation();">
+          <button class="pin-toggle-btn ${n.pinned ? 'pinned' : ''}" data-action="toggle-pin" data-id="${n.id}" title="${n.pinned ? (isAr ? 'إلغاء التثبيت' : 'Unpin') : (isAr ? 'تثبيت' : 'Pin')}" style="background:none; border:none; cursor:pointer; font-size:14px; opacity:${n.pinned ? '1' : '0.4'}; transition:opacity 0.2s ease;">
+            📌
+          </button>
+        </td>
+        <td>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <strong style="color:var(--ink); font-size:13.5px;">${escapeHtml(n.title)}</strong>
+            ${hasImg ? `<span title="${isAr ? 'تحتوي على صورة مرفقة' : 'Has Image'}" style="font-size:12px;">🖼️</span>` : ''}
+          </div>
+        </td>
+        ${showModuleCol ? `
+          <td>
+            <span class="badge" style="background:var(--gold-soft); color:var(--ink); font-size:11.5px; font-weight:600; white-space:nowrap;">
+              📦 ${escapeHtml(modName)}
+            </span>
+          </td>
+        ` : ''}
+        <td>
+          <span class="note-section-badge" style="font-size:11px; white-space:nowrap;">${escapeHtml(sName)}</span>
+        </td>
+        <td style="color:var(--ink-soft); font-size:12.5px;">
+          <div style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(plainText)}">
+            ${escapeHtml(previewText || (isAr ? '(بدون نص)' : '(No text)'))}
+          </div>
+        </td>
+        <td>
+          ${tagsHtml || '<span style="color:var(--ink-soft); font-size:11px;">—</span>'}
+        </td>
+        <td style="font-family:var(--font-mono); font-size:11.5px; color:var(--ink-soft); white-space:nowrap;">
+          ${UI.fmtDate(n.created_at)}
+        </td>
+        <td style="text-align:center;" onclick="event.stopPropagation();">
+          <div style="display:inline-flex; gap:6px; align-items:center; justify-content:center;">
+            <button class="btn btn-secondary btn-sm note-action-btn" data-action="view" data-id="${n.id}" style="padding:4px 10px; font-size:11.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px;" title="${isAr ? 'عرض الملاحظة' : 'View Note'}">
+              👁️ ${isAr ? 'عرض' : 'View'}
+            </button>
+            <button class="btn btn-ghost btn-sm note-action-btn" data-action="edit" data-id="${n.id}" style="padding:4px 8px; font-size:11.5px;" title="${isAr ? 'تعديل' : 'Edit'}">
+              ✏️
+            </button>
+            <button class="btn btn-ghost btn-sm note-action-btn danger" data-action="delete" data-id="${n.id}" style="padding:4px 8px; font-size:11.5px; color:var(--rust);" title="${isAr ? 'حذف' : 'Delete'}">
+              🗑️
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  function bindTableActions(listWrap, badgeEl, query, isAllNotesPage) {
     const searchInput = document.querySelector(isAllNotesPage ? '#all-notes-search-input' : '#notes-search-input');
 
+    // Pin toggle
     listWrap.querySelectorAll('.pin-toggle-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -636,6 +634,7 @@ const Notes = (function () {
       });
     });
 
+    // Action buttons (view, edit, delete)
     listWrap.querySelectorAll('.note-action-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -644,18 +643,19 @@ const Notes = (function () {
         const note = _allNotesCache.find(n => String(n.id) === String(noteId));
         if (!note) return;
 
-        if (action === 'view') openViewModal(note);
+        if (action === 'view') openViewModal(note, listWrap, badgeEl, searchInput, isAllNotesPage);
         else if (action === 'edit') openEditModal(note, listWrap, badgeEl, searchInput, isAllNotesPage);
         else if (action === 'delete') openDeleteConfirmModal(note, listWrap, badgeEl, searchInput, isAllNotesPage);
       });
     });
 
-    listWrap.querySelectorAll('.note-card').forEach(card => {
-      card.addEventListener('click', (e) => {
+    // Clicking anywhere on the row opens the View Modal!
+    listWrap.querySelectorAll('.note-table-row').forEach(row => {
+      row.addEventListener('click', (e) => {
         if (e.target.closest('.note-action-btn') || e.target.closest('.pin-toggle-btn')) return;
-        const noteId = card.dataset.id;
+        const noteId = row.dataset.id;
         const note = _allNotesCache.find(n => String(n.id) === String(noteId));
-        if (note) openViewModal(note);
+        if (note) openViewModal(note, listWrap, badgeEl, searchInput, isAllNotesPage);
       });
     });
   }
@@ -1083,7 +1083,7 @@ const Notes = (function () {
     });
   }
 
-  function openViewModal(note) {
+  function openViewModal(note, listWrap, badgeEl, searchInput, isAllNotesPage) {
     const sName = String(note.section_name || '').trim();
     const sectionBadge = sName ? escapeHtml(sName) : I18n.t('notes.uncategorized');
     const modObj = (State.modulesCache || []).find(m => String(m.id) === String(note.module_id));
@@ -1091,7 +1091,7 @@ const Notes = (function () {
     const tagsHtml = (note.tags || []).map(t => `<span class="tag-badge">#${escapeHtml(t)}</span>`).join(' ');
     const pinBadge = note.pinned ? `<span class="pinned-badge">📌 ${I18n.t('common.pinned')}</span>` : '';
     const safeContent = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(note.content) : escapeHtml(note.content);
-    const imgHtml = note.image_url ? `<div style="margin-top:12px;"><img src="${escapeHtml(note.image_url)}" style="max-width:100%; border-radius:var(--radius-sm); border:1px solid var(--line);" alt=""></div>` : '';
+    const imgHtml = note.image_url ? `<div style="margin-top:14px; text-align:center;"><img src="${escapeHtml(note.image_url)}" style="max-width:100%; max-height:400px; border-radius:var(--radius-sm); border:1px solid var(--line); object-fit:contain;" alt=""></div>` : '';
 
     const html = `
       <div class="modal-head">
@@ -1107,17 +1107,26 @@ const Notes = (function () {
           </div>
           <span class="mono" style="font-size:12px; color:var(--ink-soft);">${UI.fmtDate(note.created_at)}</span>
         </div>
-        <h3 style="font-size:18px; font-weight:700; margin:0 0 12px; color:var(--ink);">${escapeHtml(note.title)}</h3>
-        <div class="note-detail-content ql-editor" style="padding:0;">${safeContent}</div>
+        <h3 style="font-size:18px; font-weight:700; margin:0 0 12px; color:var(--ink); line-height:1.4;">${escapeHtml(note.title)}</h3>
+        <div class="note-detail-content ql-editor" style="padding:14px; background:var(--paper-raised); border-radius:var(--radius-sm); line-height:1.7;">${safeContent}</div>
         ${imgHtml}
         ${tagsHtml ? `<div style="margin-top:16px; display:flex; gap:6px; flex-wrap:wrap;">${tagsHtml}</div>` : ''}
-        <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-          <button type="button" class="btn btn-secondary" data-close>${I18n.t('common.close')}</button>
+        <div class="modal-footer" style="margin-top:20px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <button type="button" class="btn btn-secondary" id="view-modal-edit-btn">✏️ ${I18n.t('notes.edit')}</button>
+          <button type="button" class="btn btn-primary" data-close>${I18n.t('common.close')}</button>
         </div>
       </div>
     `;
 
     UI.openModal(html);
+
+    const editBtn = document.getElementById('view-modal-edit-btn');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        UI.closeModal();
+        openEditModal(note, listWrap, badgeEl, searchInput, isAllNotesPage);
+      });
+    }
   }
 
   function openDeleteConfirmModal(note, listWrap, badgeEl, searchInput, isAllNotesPage) {
