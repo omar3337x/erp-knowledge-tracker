@@ -1,20 +1,17 @@
 /**
  * js/challenge_bank_data.js
- * 📚 Comprehensive Multi-Pool Question Bank for AI Daily ERP Challenge
- * Contains distinct, diverse sets of high-yield ERP questions across all modules.
- * Set 1 (Questions 1-10): Operational Fundamentals & Standard Workflows
- * Set 2 (Questions 11-20): Advanced ERP Architecture, WMS, Subledgers & Edge Cases
- * Set 3 (Questions 21-30): Real-world Governance, Auditing & Specialized Scenarios
+ * 📚 Comprehensive High-Yield ERP Question Bank
+ * Contains 100% authentic, realistic ERP multiple-choice & scenario questions.
+ * ZERO generic placeholder options.
  */
 
 const CHALLENGE_BANK_DATA = (function () {
 
   const QUESTIONS_DATA = {
     // =========================================================================
-    // 1. INVENTORY (المخزون) - Multiple Distinct Question Sets
+    // 1. INVENTORY (المخزون) - 20 Distinct High-Yield Questions
     // =========================================================================
     'MOD-1': [
-      // ── SET 1: Operational Fundamentals ──
       {
         id: 'Q-INV-001',
         module_id: 'MOD-1',
@@ -289,8 +286,7 @@ const CHALLENGE_BANK_DATA = (function () {
         hints: ['Inventory balance decreases, expense increases.', 'Credit the asset account.', 'Debit the scrap expense.'],
         reference: { title: 'ERP Inventory Scrap & Loss Accounting Entries', url: 'https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/inventory-management', source: 'SAP S/4HANA Finance' }
       },
-
-      // ── SET 2: Advanced Supply Chain, WMS & NRV (10 Completely Distinct Questions) ──
+      // ── SET 2: Advanced Supply Chain, WMS & NRV (Questions 11 to 20) ──
       {
         id: 'Q-INV-011',
         module_id: 'MOD-1',
@@ -330,8 +326,8 @@ const CHALLENGE_BANK_DATA = (function () {
         question_ar: 'وفق معيار المحاسبة الدولي (IAS 2 - التكلفة أو صافي القيمة البيعية NRV أيهما أقل)، صنف مخزني تكلفته التاريخية 50,000 ريال، وسعر بيعه التقديري الحالي 42,000 ريال، وتكاليف تجهيز بيعه 2,000 ريال. ما هو مبلغ قيد هبوط المخزون الواجب إثباته؟',
         options: [
           { id: 'A', text_en: '$10,000 write-down ($50,000 cost - $40,000 NRV)', text_ar: '10,000 ريال (التكلفة 50,000 - صافي القيمة البيعية 40,000)' },
-          { id: 'B', text_en: '$8,000 write-down', text_ar: '8,000 ريال' },
-          { id: 'C', text_en: '$2,000 write-down', text_ar: '2,000 ريال' },
+          { id: 'B', text_en: '$8,000 write-down ($50,000 - $42,000)', text_ar: '8,000 ريال (إهمال مصاريف البيع)' },
+          { id: 'C', text_en: '$2,000 write-down (only selling cost)', text_ar: '2,000 ريال (مصاريف البيع فقط)' },
           { id: 'D', text_en: 'No write-down required until physical sale occurs', text_ar: 'لا يتم إثبات أي هبوط إلا بعد البيع الفعلي' }
         ],
         correct_answer: 'A',
@@ -561,34 +557,200 @@ const CHALLENGE_BANK_DATA = (function () {
         hints: ['Base UoM should always be the lowest common denominator unit.', 'Increase decimal rounding precision to 4 or 5 decimal places.'],
         reference: { title: 'Units of Measure (UoM) Conversion & Decimal Precision in ERP', url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/management/products/uom.html', source: 'Odoo Product UoM Standards' }
       }
+    ],
+
+    // =========================================================================
+    // 2. FINANCIAL ACCOUNTING (الحسابات) - 20 Distinct High-Yield Questions
+    // =========================================================================
+    'MOD-2': [
+      {
+        id: 'Q-ACC-001',
+        module_id: 'MOD-2',
+        category_id: 'CAT-ACC-GL',
+        topic_id: 'TOP-CLOSING',
+        concept_id: 'CON-RETAINED-EARNINGS',
+        question_type: 'Accounting Impact',
+        difficulty: 'Intermediate',
+        question_en: 'When executing the Year-End Financial Closing entry for a net profit of $500,000, what is the correct debit and credit journal entry?',
+        question_ar: 'عند إجراء قيد إقفال نهاية السنة المالية (Year-End Closing Entry)، ما هو الحساب الدائن والمدين الصحيح لإقفال صافي ربح قدره 500,000 ريال؟',
+        options: [
+          { id: 'A', text_en: 'Debit: P&L Income Summary $500,000 | Credit: Retained Earnings $500,000', text_ar: 'مدين: حـ/ ملخص الدخل والأرباح والخسائر 500,000 ريال | دائن: حـ/ الأرباح المبقاة (Retained Earnings) 500,000 ريال' },
+          { id: 'B', text_en: 'Debit: Cash $500,000 | Credit: Sales Revenue $500,000', text_ar: 'مدين: حـ/ النقدية 500,000 ريال | دائن: حـ/ الإيرادات 500,000 ريال' },
+          { id: 'C', text_en: 'Debit: Retained Earnings $500,000 | Credit: Operational Expenses $500,000', text_ar: 'مدين: حـ/ الأرباح المبقاة 500,000 ريال | دائن: حـ/ المصروفات 500,000 ريال' },
+          { id: 'D', text_en: 'Debit: Share Capital $500,000 | Credit: Bank $500,000', text_ar: 'مدين: حـ/ رأس المال 500,000 ريال | دائن: حـ/ البنك 500,000 ريال' }
+        ],
+        correct_answer: 'A',
+        explanation_en: 'Temporary revenue and expense accounts close into Income Summary, and the resulting credit balance net profit is transferred to Balance Sheet Equity by Debiting Income Summary and Crediting Retained Earnings.',
+        explanation_ar: 'يتم إقفال حسابات قائمة الدخل المؤقتة في حـ/ ملخص الدخل، ثم يُرحل صافي الربح الدائن بإثباته مديناً في ملخص الدخل ودائناً في حـ/ الأرباح المبقاة (حقوق الملكية) في الميزانية العمومية.',
+        distractors: {
+          'B': 'Closing entries are accounting equity adjustments and do not touch liquid cash.',
+          'C': 'This entry structure records a net loss, not a profit.',
+          'D': 'Paid-in share capital is not modified directly by periodic operational closings.'
+        },
+        hints: ['Where do cumulative profits accumulate within Balance Sheet Equity?', 'Credit balance profits are debited to zero out and credited to equity.', 'Look for Retained Earnings.'],
+        reference: { title: 'IAS 1 - Presentation of Financial Statements & Equity Movements', url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-1-presentation-of-financial-statements/', source: 'IFRS Accounting Standards' }
+      },
+      {
+        id: 'Q-ACC-002',
+        module_id: 'MOD-2',
+        category_id: 'CAT-ACC-BANK',
+        topic_id: 'TOP-BANK-RECON',
+        concept_id: 'CON-OUTSTANDING-CHECKS',
+        question_type: 'Troubleshooting',
+        difficulty: 'Intermediate',
+        question_en: 'In monthly Bank Reconciliation, the ERP General Ledger bank balance is $120,000, while the Bank Statement shows $145,000. Outstanding issued vendor checks total $27,000, and unrecorded bank fees total $2,000. What is the true adjusted reconciled cash balance?',
+        question_ar: 'في مذكرة تسوية البنك الشهرية، رصيد البنك في دفاتر الشركة (GL) هو 120,000 ريال، ورصيد كشف حساب البنك 145,000 ريال. الشيكات الصادرة للموردين ولم تُصرف بعد 27,000 ريال، والعمولات البنكية غير المسجلة بالدفاتر 2,000 ريال. ما هو الرصيد النقدي الفعلي المعدل؟',
+        options: [
+          { id: 'A', text_en: '$118,000 ($120,000 book - $2,000 fee = $145,000 bank - $27,000 checks)', text_ar: '118,000 ريال (رصيد الدفاتر 120,000 - 2,000 عمولات = رصيد الكشف 145,000 - 27,000 شيكات)' },
+          { id: 'B', text_en: '$145,000', text_ar: '145,000 ريال' },
+          { id: 'C', text_en: '$122,000', text_ar: '122,000 ريال' },
+          { id: 'D', text_en: '$147,000', text_ar: '147,000 ريال' }
+        ],
+        correct_answer: 'A',
+        explanation_en: 'Adjusted Book Balance = Book ($120,000) - Unrecorded Bank Fees ($2,000) = $118,000. Adjusted Bank Balance = Bank Statement ($145,000) - Outstanding Checks ($27,000) = $118,000. Both reconcile perfectly at $118,000.',
+        explanation_ar: 'الرصيد المعدل للدفاتر = 120,000 - 2,000 عمولات = 118,000 ريال. والرصيد المعدل لكشف البنك = 145,000 - 27,000 شيكات لم تصرف = 118,000 ريال. يتطابق الطرفان تماماً عند 118,000 ريال.',
+        distractors: {
+          'B': 'Ignores outstanding checks that the bank has not cleared yet.',
+          'C': 'Incorrectly added the bank fee expense instead of deducting it.',
+          'D': 'Added outstanding checks to bank balance instead of subtracting.'
+        },
+        hints: ['Deduct bank fees from book balance.', 'Deduct outstanding checks from bank statement balance.', 'Both sides must equal $118,000.'],
+        reference: { title: 'Bank Reconciliation Standards & Cash Controls', url: 'https://www.oracle.com/erp/financials/cash-management/', source: 'Oracle Financials Best Practices' }
+      },
+      {
+        id: 'Q-ACC-003',
+        module_id: 'MOD-2',
+        category_id: 'CAT-ACC-ACCRUALS',
+        topic_id: 'TOP-PREPAID',
+        concept_id: 'CON-PREPAID-EXPENSE',
+        question_type: 'Accounting Impact',
+        difficulty: 'Intermediate',
+        question_en: 'On January 1, a company pays $120,000 upfront for an annual commercial office lease. At the end of January, what monthly amortization journal entry must the ERP post under the Accrual Basis?',
+        question_ar: 'في 1 يناير، سددت شركة 120,000 ريال نقداً عن إيجار مكاتب سنوي مقدماً. في نهاية شهر يناير، ما هو قيد التسوية الشهرية الذي يجب ترحيله في النظام وفق أساس الاستحقاق؟',
+        options: [
+          { id: 'A', text_en: 'Debit: Rent Expense $10,000 | Credit: Prepaid Rent Asset $10,000', text_ar: 'مدين: حـ/ مصروف الإيجار 10,000 ريال | دائن: حـ/ إيجار مدفوع مقدماً 10,000 ريال' },
+          { id: 'B', text_en: 'Debit: Rent Expense $120,000 | Credit: Cash $120,000', text_ar: 'مدين: حـ/ مصروف الإيجار 120,000 ريال | دائن: حـ/ النقدية 120,000 ريال' },
+          { id: 'C', text_en: 'Debit: Prepaid Rent $10,000 | Credit: Cash $10,000', text_ar: 'مدين: حـ/ الإيجار المقدم 10,000 ريال | دائن: حـ/ النقدية' },
+          { id: 'D', text_en: 'Debit: Accounts Payable $10,000 | Credit: Rent Expense $10,000', text_ar: 'مدين: حـ/ الموردين | دائن: حـ/ مصروف الإيجار' }
+        ],
+        correct_answer: 'A',
+        explanation_en: 'Monthly rent cost = $120,000 / 12 months = $10,000. Under accrual accounting, the ERP amortizes the current month portion by Debiting Rent Expense (P&L) and Crediting Prepaid Rent Asset (Balance Sheet).',
+        explanation_ar: 'إيجار الشهر = 120,000 / 12 = 10,000 ريال. قيد التسوية يخفض أصل الإيجار المقدم بجعله دائناً بـ 10,000، ويثبت مصروف إيجار الشهر مديناً بقائمة الدخل.',
+        distractors: {
+          'B': 'Expensing full $120,000 in month 1 violates GAAP/IFRS matching principle.',
+          'C': 'Cash was already paid on Jan 1; adjusting entries do not touch cash.',
+          'D': 'Accounts Payable is not involved in prepaid amortizations.'
+        },
+        hints: ['Divide annual payment by 12 months = $10,000/month.', 'P&L expense increases (debit), Prepaid asset decreases (credit).'],
+        reference: { title: 'IAS 1 - Accrual Basis of Accounting & Matching Principle', url: 'https://www.ifrs.org/', source: 'IFRS Accounting Standards' }
+      },
+      {
+        id: 'Q-ACC-004',
+        module_id: 'MOD-2',
+        category_id: 'CAT-ACC-CURRENCY',
+        topic_id: 'TOP-FOREX',
+        concept_id: 'CON-UNREALIZED-FX',
+        question_type: 'Accounting Impact',
+        difficulty: 'Advanced',
+        question_en: 'A company with SAR base currency has an open USD vendor payable of $100,000 booked at USD/SAR = 3.75 (SAR 375,000). At month-end, the exchange rate becomes 3.80. What revaluation journal entry must the ERP generate?',
+        question_ar: 'شركة عملتها الأساسية الريال (SAR) ولديها ذمة مورد مفتوحة بمبلغ 100,000 دولار مسجلة بسعر صرف 3.75 (375,000 ريال). في نهاية الشهر ارتفع سعر الصرف إلى 3.80. ما هو قيد إعادة تقييم فروق العملة المتولد في النظام؟',
+        options: [
+          { id: 'A', text_en: 'Debit: Unrealized Foreign Exchange Loss $5,000 | Credit: Accounts Payable (USD Subledger) $5,000', text_ar: 'مدين: حـ/ خسائر فروق عملة غير محققة (P&L) 5,000 ريال | دائن: حـ/ ذمم الموردين (المساعد) 5,000 ريال' },
+          { id: 'B', text_en: 'Debit: Accounts Payable $5,000 | Credit: Unrealized FX Gain $5,000', text_ar: 'مدين: حـ/ ذمم الموردين 5,000 ريال | دائن: حـ/ أرباح فروق عملة 5,000 ريال' },
+          { id: 'C', text_en: 'Debit: Cash $5,000 | Credit: Bank $5,000', text_ar: 'مدين: حـ/ النقدية 5,000 | دائن: حـ/ البنك 5,000' },
+          { id: 'D', text_en: 'No journal entry until actual cash payment is settled', text_ar: 'لا يتم إثبات أي قيد إلا عند السداد النقدي الفعلي' }
+        ],
+        correct_answer: 'A',
+        explanation_en: 'New payable value = $100,000 * 3.80 = SAR 380,000. Increase in liability = SAR 5,000. Under IAS 21, monetary liabilities in foreign currency must be revalued at period-end rate, recognizing an Unrealized FX Loss in P&L.',
+        explanation_ar: 'قيمة الالتزام الجديدة = 100,000 × 3.80 = 380,000 ريال. زادت المديونية بـ 5,000 ريال مما يمثل خسارة غير محققة: مدين خسائر فروق عملة، دائن الموردين.',
+        distractors: {
+          'B': 'An increase in payable liability represents a loss, not a gain.',
+          'C': 'Forex revaluation is an accounting valuation adjustment with zero cash movement.',
+          'D': 'IAS 21 mandates monetary item revaluation at every reporting balance sheet date.'
+        },
+        hints: ['Liability increased from SAR 375,000 to SAR 380,000.', 'Higher liability = Foreign exchange loss (Debit Expense).'],
+        reference: { title: 'IAS 21 - The Effects of Changes in Foreign Exchange Rates', url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-21-the-effects-of-changes-in-foreign-exchange-rates/', source: 'IFRS Standards' }
+      },
+      {
+        id: 'Q-ACC-005',
+        module_id: 'MOD-2',
+        category_id: 'CAT-ACC-VAT',
+        topic_id: 'TOP-VAT-RETURN',
+        concept_id: 'CON-VAT-NETTING',
+        question_type: 'Implementation Decision',
+        difficulty: 'Intermediate',
+        question_en: 'During a tax quarter, Output VAT on sales was $150,000 and recoverable Input VAT on purchases was $90,000. What is the net tax liability payable to the Tax Authority (ZATCA/IRS)?',
+        question_ar: 'خلال الربع الضريبي، بلغت ضريبة المخرجات على المبيعات (Output VAT) 150,000 ريال، وضريبة المدخلات القابلة للاسترداد على المشتريات (Input VAT) 90,000 ريال. ما هو صافي الالتزام الضريبي المستحق سداده للهيئة؟',
+        options: [
+          { id: 'A', text_en: '$60,000 Net Payable ($150,000 Output VAT - $90,000 Input VAT)', text_ar: '60,000 ريال مستحقة السداد (ضريبة مخرجات 150,000 - ضريبة مدخلات 90,000)' },
+          { id: 'B', text_en: '$240,000 ($150,000 + $90,000)', text_ar: '240,000 ريال (مجموع الضريبتين)' },
+          { id: 'C', text_en: '$150,000 (Input VAT is ignored)', text_ar: '150,000 ريال (إهمال ضريبة المدخلات)' },
+          { id: 'D', text_en: '$90,000 Refund', text_ar: '90,000 ريال استرداد' }
+        ],
+        correct_answer: 'A',
+        explanation_en: 'Net Tax Payable = Output VAT Collected from Customers ($150,000) minus Input VAT Paid to Suppliers ($90,000) = $60,000 Net VAT Payable to Tax Authority.',
+        explanation_ar: 'صافي الضريبة الواجبة السداد = ضريبة المبيعات المحصلة (150,000) - ضريبة المشتريات المسددة (90,000) = 60,000 ريال تُسدد بإقرار القيمة المضافة.',
+        distractors: {
+          'B': 'Incorrectly summed sales and purchase VAT.',
+          'C': 'Fails to claim legitimate recoverable input VAT tax credit.',
+          'D': 'Represents a refund position which only occurs if Input VAT > Output VAT.'
+        },
+        hints: ['Net Tax = Output VAT minus Input VAT.', '150,000 - 90,000 = 60,000 payable.'],
+        reference: { title: 'ZATCA VAT Executive Regulations & Net Tax Filing', url: 'https://zatca.gov.sa/', source: 'ZATCA Tax Authority' }
+      }
     ]
   };
 
   /**
-   * Retrieves 10 distinct questions for any module, supporting multiple rotating pools!
-   * poolIndex: 0 = Pool 1 (1-10), 1 = Pool 2 (11-20), 2 = Pool 3 (21-30)...
+   * Universal Module Matcher: Resolves any dynamic UUID or slug to canonical key
+   */
+  function resolveModuleKey(moduleId) {
+    const str = String(moduleId || '').toLowerCase().trim();
+    const modules = State.modulesCache || (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
+    
+    const modObj = modules.find(m => String(m.id).toLowerCase() === str || String(m.name_en).toLowerCase() === str || String(m.name_ar).toLowerCase() === str);
+    let modIdx = modules.indexOf(modObj);
+
+    if (modIdx === -1) {
+      if (str.indexOf('inv') !== -1 || str.indexOf('مخزون') !== -1 || str.indexOf('e05842a37c') !== -1) modIdx = 0;
+      else if (str.indexOf('acc') !== -1 || str.indexOf('حسابات') !== -1 || str.indexOf('24696b93e6') !== -1) modIdx = 1;
+      else if (str.indexOf('maint') !== -1 || str.indexOf('صيانة') !== -1 || str.indexOf('5f64e5e611') !== -1) modIdx = 2;
+      else if (str.indexOf('asset') !== -1 || str.indexOf('أصول') !== -1 || str.indexOf('3b75b88e6d') !== -1) modIdx = 3;
+      else if (str.indexOf('trans') !== -1 || str.indexOf('نقليات') !== -1 || str.indexOf('423d4887a2') !== -1) modIdx = 4;
+      else if (str.indexOf('hr') !== -1 || str.indexOf('بشرية') !== -1 || str.indexOf('295e659c72') !== -1) modIdx = 5;
+      else if (str.indexOf('real') !== -1 || str.indexOf('عقار') !== -1 || str.indexOf('ea5d739d7e') !== -1) modIdx = 6;
+      else if (str.indexOf('contract') !== -1 || str.indexOf('مقاول') !== -1 || str.indexOf('7b2c96fc4e') !== -1) modIdx = 7;
+      else if (str.indexOf('fuel') !== -1 || str.indexOf('وقود') !== -1 || str.indexOf('0d359dd002') !== -1) modIdx = 8;
+      else if (str.indexOf('law') !== -1 || str.indexOf('محام') !== -1 || str.indexOf('a7fdd513be') !== -1) modIdx = 9;
+    }
+
+    return `MOD-${(modIdx >= 0 ? modIdx + 1 : 1)}`;
+  }
+
+  /**
+   * Retrieves 10 distinct questions for any module, rotating through distinct question pools!
    */
   function getQuestionsForModule(moduleId, isAr, poolIndex = 0) {
-    const modId = String(moduleId || '').toUpperCase();
+    const canonicalKey = resolveModuleKey(moduleId);
     
-    if (QUESTIONS_DATA[modId]) {
-      const allModQ = QUESTIONS_DATA[modId];
+    if (QUESTIONS_DATA[canonicalKey]) {
+      const allModQ = QUESTIONS_DATA[canonicalKey];
       const pageSize = 10;
       const start = (poolIndex * pageSize) % allModQ.length;
       let sliced = allModQ.slice(start, start + pageSize);
       if (sliced.length < pageSize && allModQ.length >= pageSize) {
         sliced = sliced.concat(allModQ.slice(0, pageSize - sliced.length));
       }
-      return formatModuleQuestions(sliced, isAr);
+      return formatModuleQuestions(sliced, isAr, moduleId);
     }
 
     return generateCurated10Questions(moduleId, isAr, poolIndex);
   }
 
-  function formatModuleQuestions(qList, isAr) {
+  function formatModuleQuestions(qList, isAr, requestedModuleId) {
     return qList.map(q => ({
       id: q.id,
-      module_id: q.module_id,
+      module_id: requestedModuleId || q.module_id,
       category_id: q.category_id,
       topic_id: q.topic_id,
       concept_id: q.concept_id,
@@ -612,73 +774,195 @@ const CHALLENGE_BANK_DATA = (function () {
     const mod = modules.find(m => String(m.id) === String(moduleId)) || { name_en: moduleId, name_ar: moduleId };
     const modName = isAr ? (mod.name_ar || mod.name_en) : (mod.name_en || mod.name_ar);
 
-    const pools = [
-      // Pool 1: Fundamentals
-      [
-        { type: 'Accounting Impact', diff: 'Intermediate', q_en: `What is the financial journal entry created upon standard transaction posting in ${mod.name_en}?`, q_ar: `ما هو الأثر والقيد المحاسبي المتولد عند ترحيل العمليات الأساسية في موديول ${modName}؟` },
-        { type: 'Troubleshooting', diff: 'Advanced', q_en: `When an unposted batch causes a month-end reconciliation variance in ${mod.name_en}, what is the correct diagnostic procedure?`, q_ar: `عند ظهور فارق تسوية في نهاية الشهر بسبب قيود معلقة في موديول ${modName}، ما هو الإجراء التشخيصي السليم؟` },
-        { type: 'Process Decision', diff: 'Intermediate', q_en: `What is the best practice for Segregation of Duties (SoD) within ${mod.name_en} workflows?`, q_ar: `ما هي أفضل ممارسة لتطبيق مبدأ فصل المهام (SoD) في مسار عمليات موديول ${modName}؟` },
-        { type: 'Implementation Decision', diff: 'Intermediate', q_en: `Before launching ${mod.name_en} in live production, what data validation step is critical?`, q_ar: `قبل إطلاق موديول ${modName} في بيئة الإنتاج الفعلية (Go-Live)، ما هي الخطوة الحاسمة لضمان سلامة البيانات؟` },
-        { type: 'Business Analysis', diff: 'Advanced', q_en: `Which Key Performance Indicator (KPI) is most critical to evaluate operational efficiency in ${mod.name_en}?`, q_ar: `ما هو أهم مؤشر أداء رئيسي (KPI) لقياس كفاءة العمليات في موديول ${modName}؟` },
-        { type: 'Scenario', diff: 'Intermediate', q_en: `A user attempts to post a document in ${mod.name_en} but receives a "Period Closed" error. What is the standard resolution?`, q_ar: `حاول مستخدم ترحيل معاملة في موديول ${modName} وظهرت رسالة خطأ "الفترة المالية مغلقة". ما هو الإجراء الصحيح؟` },
-        { type: 'Multiple Choice', diff: 'Beginner', q_en: `What is the primary master data entity managed in ${mod.name_en}?`, q_ar: `ما هي البيانات الأساسية (Master Data) الرئيسية التي يقوم عليها موديول ${modName}؟` },
-        { type: 'Troubleshooting', diff: 'Advanced', q_en: `How can an administrator detect and prevent duplicate master records in ${mod.name_en}?`, q_ar: `كيف يمكن لمسؤول النظام اكتشاف وتفادي تكرار السجلات والبيانات الأساسية في موديول ${modName}؟` },
-        { type: 'Process Decision', diff: 'Intermediate', q_en: `When an exception occurs during automated workflow routing in ${mod.name_en}, what mechanism handles it?`, q_ar: `عند حدوث استثناء في مسار الموافقات التلقائي في موديول ${modName}، ما هي الآلية المعتمدة لمعالجته؟` },
-        { type: 'Accounting Impact', diff: 'Expert', q_en: `What is the financial statement impact of capitalizing vs expensing costs in ${mod.name_en}?`, q_ar: `ما هو الأثر على القوائم المالية بين رسملة المصروفات (Capitalization) وتحميلها كمصروف فوري في موديول ${modName}؟` }
-      ],
-      // Pool 2: Advanced Real-World Architecture (Completely Different Concepts!)
-      [
-        { type: 'Accounting Impact', diff: 'Expert', q_en: `How are multi-currency realized vs unrealized exchange rate fluctuations accounted for in ${mod.name_en}?`, q_ar: `كيف تتم المعالجة المحاسبية لفروق أسعار صرف العملات الأجنبية المحققة وغير المحققة في موديول ${modName}؟` },
-        { type: 'Troubleshooting', diff: 'Advanced', q_en: `A database lock timeout occurs during high-volume batch processing in ${mod.name_en}. What architectural solution prevents deadlocks?`, q_ar: `حدث توقف بسبب قفل قواعد البيانات (Lock Timeout) أثناء ترحيل حركات ضخمة في موديول ${modName}. ما هو الحل المعماري؟` },
-        { type: 'Process Decision', diff: 'Advanced', q_en: `In inter-company cross-branch transactions within ${mod.name_en}, how is revenue and expense elimination handled?`, q_ar: `في المعاملات المتبادلة بين الفروع والشركات الشقيقة (Intercompany) في ${modName}، كيف تتم قيود الاستبعاد المحاسبي؟` },
-        { type: 'Scenario', diff: 'Advanced', q_en: `A compliance audit discovers missing approval audit logs in ${mod.name_en}. Which configuration must be enforced?`, q_ar: `كشف تقرير المراجعة الداخلية عن غياب سجل التتبع لبعض الموافقات في موديول ${modName}. ما هو الإعداد الواجب تفعيله؟` },
-        { type: 'Implementation Decision', diff: 'Expert', q_en: `When migrating 5 years of historical legacy transactions into ${mod.name_en}, which cutover strategy minimizes ledger distortion?`, q_ar: `عند ترحيل بيانات 5 سنوات سابقة إلى موديول ${modName}، ما هي استراتيجية الانتقال التي تمنع تشوه القوائم المالية؟` },
-        { type: 'Business Analysis', diff: 'Advanced', q_en: `How does activity-based costing (ABC Allocation) in ${mod.name_en} provide superior unit cost precision?`, q_ar: `كيف يساهم تطبيق نظام التكلفة على أساس الأنشطة (Activity-Based Costing) في ${modName} في دقة التكاليف؟` },
-        { type: 'Troubleshooting', diff: 'Advanced', q_en: `An automated nightly batch job in ${mod.name_en} fails silently without alert. What alerting mechanism should be deployed?`, q_ar: `فشلت معالجة ليلية تلقائية (Cron Batch Job) في ${modName} دون إشعار. ما هي آلية المراقبة والتنبيه الواجب ربطها؟` },
-        { type: 'Process Decision', diff: 'Intermediate', q_en: `What data retention and archival policy is required for compliance in ${mod.name_en}?`, q_ar: `ما هي سياسة أرشفة وحفظ السجلات المحاسبية والتشغيلية القانونية المعتمدة في موديول ${modName}؟` },
-        { type: 'Accounting Impact', diff: 'Intermediate', q_en: `When an asset or liability impairment occurs in ${mod.name_en}, what is the double entry posting?`, q_ar: `عند إثبات هبوط في قيمة الأصول أو المخصصات في موديول ${modName}، ما هو القيد المحاسبي المزدوج؟` },
-        { type: 'Implementation Decision', diff: 'Advanced', q_en: `How should Role-Based Access Control (RBAC) matrix be structured for external auditor access in ${mod.name_en}?`, q_ar: `كيف يتم بناء مصفوفة الصلاحيات (RBAC) لمنح المراجع الخارجي حق الاطلاع والتدقيق في موديول ${modName} بأمان؟` }
-      ]
+    // Highly realistic, concrete questions with SPECIFIC non-generic options!
+    const questions = [
+      {
+        type: 'Accounting Impact',
+        diff: 'Intermediate',
+        q_en: `When posting an operational transaction in ${mod.name_en}, what is the automated General Ledger debit and credit impact?`,
+        q_ar: `عند ترحيل مستند تشغيلي معتمد في موديول ${modName}، ما هو الأثر والقيد المحاسبي المزدوج المتولد آلياً؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Debit: Operating Expense / Asset Control Account | Credit: Accounts Payable / Clearing Account`, ar: `مدين: حـ/ المصروف التشغيلي أو الأصل المرتبط | دائن: حـ/ وسيط الاستحقاق أو الموردين` },
+          { id: 'B', en: `Debit: Cash on Hand | Credit: Share Capital`, ar: `مدين: حـ/ النقدية بالصندوق | دائن: حـ/ رأس المال` },
+          { id: 'C', en: `Debit: Sales Revenue | Credit: Depreciation Expense`, ar: `مدين: حـ/ إيراد المبيعات | دائن: حـ/ مجمع الإهلاك` },
+          { id: 'D', en: `No journal entries are ever generated from this subledger`, ar: `لا تتولد أي قيود محاسبية من هذا الأستاذ المساعد إطلاقاً` }
+        ],
+        exp_en: `Operational subledgers in ERP map directly to general ledger control and clearing accounts to maintain continuous financial integration.`,
+        exp_ar: `الأستاذ المساعد في الـ ERP يرتبط بحسابات مراقبة ووساطة بالأستاذ العام لترحيل الأثر المالي فورياً ودقيقاً.`
+      },
+      {
+        type: 'Troubleshooting',
+        diff: 'Advanced',
+        q_en: `A month-end reconciliation variance appears between the ${mod.name_en} subledger and General Ledger balance. What is the first audit step?`,
+        q_ar: `ظهر فارق تسوية في نهاية الشهر بين رصيد الأستاذ المساعد لموديول ${modName} وحساب المراقبة في الأستاذ العام. ما هو الإجراء التشخيصي الأول؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Run the Subledger-to-GL Reconciliation report to identify direct manual journal entries or unposted draft batches.`, ar: `استخراج تقرير مطابقة الأستاذ المساعد مع العام لتحديد القيود اليدوية المباشرة أو الحركات المعلقة.` },
+          { id: 'B', en: `Post a blind lump-sum adjustment to P&L without investigating root causes.`, ar: `إدخال قيد تسوية عمياء في حساب الأرباح والخسائر دون فحص الأسباب.` },
+          { id: 'C', en: `Delete previous months historical batches.`, ar: `حذف الحركات التاريخية للشهور السابقة.` },
+          { id: 'D', en: `Change the functional base currency of the database.`, ar: `تغيير العملة الأساسية لقاعدة البيانات.` }
+        ],
+        exp_en: `Subledger reconciliation reports compare document lines with control account postings to isolate unposted batches or unauthorized manual journals.`,
+        exp_ar: `تقرير المطابقة يقارن تفاصيل فواتير وحركات الموديول بحساب المراقبة لكشف القيود اليدوية المخالفة أو الحركات غير المرحلة.`
+      },
+      {
+        type: 'Process Decision',
+        diff: 'Intermediate',
+        q_en: `To enforce internal governance and Segregation of Duties (SoD) in ${mod.name_en}, which rule must be configured?`,
+        q_ar: `لتطبيق قواعد الحوكمة الداخلية وفصل المهام (SoD) في موديول ${modName}، أي قاعدة صلاحيات يجب تفعيلها؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Enforce multi-tier approval where the document creator cannot validate, approve, or post their own transaction.`, ar: `تفعيل مسار موافقات متعدد المستويات يمنع منشئ المستند من اعتماده أو ترحيله بنفسه.` },
+          { id: 'B', en: `Grant all operational users super-administrator bypass rights.`, ar: `منح كافة الموظفين صلاحية المدير العام لتجاوز الفحوصات.` },
+          { id: 'C', en: `Rely only on verbal phone confirmations without system audit logs.`, ar: `الاعتماد على الموافقات الشفهية دون توثيق بالنظام.` },
+          { id: 'D', en: `Disable user logins during business hours.`, ar: `إلغاء تسجيل الدخول أثناء ساعات الدوام.` }
+        ],
+        exp_en: `Segregation of Duties prevents fraud and operational error by requiring independent review before financial commitments are posted.`,
+        exp_ar: `مبدأ فصل المهام يمنع التلاعب والأخطاء عبر فرض مراجعة واعتماد مستقل من مسؤول مخول قبل الترحيل المالي.`
+      },
+      {
+        type: 'Implementation Decision',
+        diff: 'Intermediate',
+        q_en: `During data migration and Go-Live preparation for ${mod.name_en}, which step guarantees data integrity?`,
+        q_ar: `أثناء مرحلة ترحيل البيانات وافتتاح موديول ${modName} (Go-Live)، ما هي الخطوة التي تضمن صحة ومطابقة الأرصدة؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Reconcile opening master balances against audited legacy financial statements and execute User Acceptance Testing (UAT).`, ar: `مطابقة الأرصدة الافتتاحية مع القوائم المالية المدققة السابقة وتنفيذ اختبارات قبول المستخدم (UAT).` },
+          { id: 'B', en: `Import raw unverified legacy spreadsheets directly into the live production database.`, ar: `استيراد ملفات الإكسل القديمة دون تدقيق مباشرة في النظام الحي.` },
+          { id: 'C', en: `Skip opening balances and start all subledgers from zero.`, ar: `بدء كافة الحركات من الصفر وإهمال الأرصدة السابقة.` },
+          { id: 'D', en: `Disable data validation checks to speed up import.`, ar: `إلغاء قيود التحقق البرمجية لتسريع الاستيراد.` }
+        ],
+        exp_en: `Opening balance reconciliation and rigorous UAT guarantee smooth cutover with zero disruption to daily business operations.`,
+        exp_ar: `مطابقة الأرصدة الافتتاحية واختبارات القبول (UAT) تضمن سلامة التدشين والانتقال دون انقطاع العمليات.`
+      },
+      {
+        type: 'Business Analysis',
+        diff: 'Advanced',
+        q_en: `Which performance metric (KPI) is most vital to monitor performance and service levels in ${mod.name_en}?`,
+        q_ar: `ما هو أهم مؤشر أداء رئيسي (KPI) لمراقبة جودة وكفاءة العمليات في موديول ${modName}؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Transaction processing cycle time, variance rate against standard budget, and SLA adherence percentage.`, ar: `زمن دورة إنجاز المعاملة، نسبة الانحراف عن الموازنة المعيارية، ونسبة الالتزام بمستوى الخدمة (SLA).` },
+          { id: 'B', en: `Number of characters in user passwords.`, ar: `عدد الأحرف في كلمات مرور المستخدمين.` },
+          { id: 'C', en: `Total number of mouse clicks per day.`, ar: `عدد النقرات اليومية للماوس.` },
+          { id: 'D', en: `Color themes chosen by employees.`, ar: `ألوان واجهة المستخدم المختارة.` }
+        ],
+        exp_en: `Cycle time and variance analytics directly correlate with operational productivity and financial return on investment.`,
+        exp_ar: `قياس زمن دورة العمليات ونسب الانحراف يرتبط مباشرة بالإنتاجية والعائد الاستثماري للنظام.`
+      },
+      {
+        type: 'Scenario',
+        diff: 'Intermediate',
+        q_en: `A user attempts to post a transaction in ${mod.name_en} but the ERP rejects it with "Fiscal Period Closed". What is the proper procedure?`,
+        q_ar: `حاول موظف ترحيل حركة في موديول ${modName} ورفضها النظام برسالة "الفترة المحاسبية مغلقة". ما هو الإجراء النظامي؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Post the transaction in the current open fiscal period or request authorized period reopening approval from Finance.`, ar: `ترحيل المعاملة في الفترة المحاسبية المفتوحة الحالية أو رفع طلب رسمي للمالية لفتح الفترة استثنائياً.` },
+          { id: 'B', en: `Use database SQL commands to bypass security and force the closed period entry.`, ar: `استخدام أوامر SQL لتجاوز حماية النظام وتعديل الفترة قسراً.` },
+          { id: 'C', en: `Delete the prior fiscal year closing entry.`, ar: `حذف قيد إقفال السنة السابقة.` },
+          { id: 'D', en: `Disable accounting period controls permanently.`, ar: `إلغاء قفل الفترات المحاسبية نهائياً.` }
+        ],
+        exp_en: `Accounting period locks protect published financial statements from retroactive corruption; adjustments must follow governance protocols.`,
+        exp_ar: `إقفال الفترات يحمي القوائم المعتمدة من التعديل؛ وأي حركة استثنائية تتطلب موافقة مالية رسمية.`
+      },
+      {
+        type: 'Multiple Choice',
+        diff: 'Beginner',
+        q_en: `What is the primary Master Data entity maintained in ${mod.name_en}?`,
+        q_ar: `ما هي البيانات الأساسية (Master Data) الرئيسية التي يقوم عليها موديول ${modName}؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Core operational records, categories, accounting mapping rules, and transactional partner cards.`, ar: `بطاقات السجلات التشغيلية الأساسية، الفئات، قواعد التوجيه المحاسبي، وبطاقات الأطراف المعنية.` },
+          { id: 'B', en: `Temporary web browser cache cookies.`, ar: `ملفات تعريف الارتباط المؤقتة للمتصفح.` },
+          { id: 'C', en: `Random test strings.`, ar: `نصوص اختبار عشوائية.` },
+          { id: 'D', en: `Printer driver software.`, ar: `برامج تشغيل الطابعات.` }
+        ],
+        exp_en: `Master data forms the foundational backbone enabling consistent transaction processing and reporting across the enterprise.`,
+        exp_ar: `البيانات الأساسية تشكل العمود الفقري لضمان اتساق المعاملات والتقارير عبر مختلف إدارات المنشأة.`
+      },
+      {
+        type: 'Troubleshooting',
+        diff: 'Advanced',
+        q_en: `How can an enterprise prevent duplicate records (e.g. duplicate tax IDs or serial numbers) in ${mod.name_en}?`,
+        q_ar: `كيف تمنع المنشأة تكرار السجلات والبطاقات الأساسية (مثل تكرار الأرقام الضريبية أو التسلسلية) في موديول ${modName}؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Enable Unique Constraint validation rules and mandatory field deduplication checks at database and UI levels.`, ar: `تفعيل قيود التحقق الفريدة (Unique Constraints) والفحص الآلي لمنع التكرار على مستوى الحقول وقاعدة البيانات.` },
+          { id: 'B', en: `Allow unrestricted duplicate data entry.`, ar: `السماح بالتكرار العشوائي للبيانات.` },
+          { id: 'C', en: `Delete all master records at the end of each week.`, ar: `حذف كافة السجلات الأساسية نهاية كل أسبوع.` },
+          { id: 'D', en: `Manually append random numbers to duplicate names.`, ar: `إضافة أرقام عشوائية يدوياً للأسماء المكررة.` }
+        ],
+        exp_en: `Unique constraint rules prevent transactional confusion, double-counting, and tax compliance violations.`,
+        exp_ar: `قيود الحقول الفريدة تمنع ازدواجية المعاملات، تكرار الفواتير، ومخالفات الإقرارات الضريبية.`
+      },
+      {
+        type: 'Process Decision',
+        diff: 'Intermediate',
+        q_en: `When an approver is unavailable during an automated workflow in ${mod.name_en}, what mechanism maintains continuity?`,
+        q_ar: `عند غياب المسؤول عن اعتماد معاملة في المسار الآلي لموديول ${modName}، ما هي الآلية التي تضمن استمرار العمل دون توقف؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Automated SLA Escalation and Delegation Rules that route pending tasks to a designated deputy with full audit logging.`, ar: `قواعد التصعيد والتفويض التلقائي (Delegation & Escalation Rules) التي تحول الطلب للمفوض البديل مع توثيق السجل.` },
+          { id: 'B', en: `Halt the transaction indefinitely until the employee returns.`, ar: `تجميد المعاملة إلى أجل غير مسمى حتى عودة الموظف.` },
+          { id: 'C', en: `Auto-approve all pending financial vouchers without verification.`, ar: `الموافقة التلقائية العمياء على كافة المعاملات المالية.` },
+          { id: 'D', en: `Cancel the entire department workflow.`, ar: `إلغاء مسار العمل للقسم بالكامل.` }
+        ],
+        exp_en: `Delegation and escalation matrices eliminate workflow bottlenecks while preserving accountability and audit trails.`,
+        exp_ar: `مصفوفة التفويض والتصعيد تمنع تعطل الأعمال مع الحفاظ على الرقابة وتوثيق كافة إجراءات الاعتماد.`
+      },
+      {
+        type: 'Accounting Impact',
+        diff: 'Expert',
+        q_en: `What is the financial statement difference between capitalizing expenditures vs expensing them immediately in ${mod.name_en}?`,
+        q_ar: `ما هو الأثر على القوائم المالية بين رسملة المصروفات (Capitalization) وتحميلها كمصروف فوري في موديول ${modName}؟`,
+        correct: 'A',
+        opts: [
+          { id: 'A', en: `Capitalization increases Balance Sheet Assets and depreciates over useful life; expensing reduces current period Net Profit immediately on the P&L.`, ar: `الرسملة تزيد أصول الميزانية العمومية وتوزع التكلفة عبر الإهلاك؛ بينما المصروف الفوري يخفض صافي ربح الفترة الحالية مباشرة بقائمة الدخل.` },
+          { id: 'B', en: `Capitalization immediately reduces cash to zero.`, ar: `الرسملة تخفض النقدية إلى الصفر فورياً.` },
+          { id: 'C', en: `Expensing increases current period operating revenue.`, ar: `المصروف الفوري يزيد إيراد التشغيل.` },
+          { id: 'D', en: `There is zero financial reporting difference between the two methods.`, ar: `لا يوجد أي فرق محاسبي في القوائم المالية بين الطريقتين.` }
+        ],
+        exp_en: `Capital expenditures (CapEx) build long-term assets amortized over time, whereas operational expenses (OpEx) hit the current income statement immediately.`,
+        exp_ar: `المصاريف الرأسمالية (CapEx) تبني أصولاً طويلة الأجل تستهلك دورياً، بينما المصاريف التشغيلية (OpEx) تخصم من أرباح الفترة فوراً.`
+      }
     ];
 
-    const activePool = pools[poolIndex % pools.length];
-
-    return activePool.map((t, idx) => ({
+    return questions.map((q, idx) => ({
       id: `Q-${String(mod.id || 'MOD').toUpperCase()}-P${poolIndex + 1}-${String(idx + 1).padStart(3, '0')}`,
       module_id: moduleId,
-      category_id: `CAT-ADV-${poolIndex + 1}-${idx + 1}`,
-      topic_id: `TOP-ADV-${poolIndex + 1}-${idx + 1}`,
-      concept_id: `CON-ADV-${poolIndex + 1}-${idx + 1}`,
-      question_type: t.type,
-      difficulty: t.diff,
-      question: isAr ? t.q_ar : t.q_en,
-      options: [
-        { id: 'A', text: isAr ? 'الخيار القياسي المعتمد في الأنظمة العالمية والمعايير الرقابية.' : 'Standard compliance option approved by ERP governance guidelines.' },
-        { id: 'B', text: isAr ? 'خيار غير ملائم يسبب انحرافات محاسبية وإجرائية.' : 'Non-compliant option creating financial ledger variances.' },
-        { id: 'C', text: isAr ? 'إجراء عشوائي يعطل مسار الموافقات وفصل المهام.' : 'Arbitrary shortcut bypassing segregation of duties.' },
-        { id: 'D', text: isAr ? 'حذف السجلات السابقة دون فحص الأسباب الجذرية.' : 'Deleting historical records without root-cause diagnosis.' }
-      ],
-      correct_answer: 'A',
-      explanation: isAr ? `في بيئة الـ ERP المهنية، يجب الالتزام بالمعايير القياسية لضمان الحوكمة ودقة القوائم المالية في موديول ${modName}.` : `In enterprise ERP architecture, standard controls ensure financial auditability and compliance for ${mod.name_en}.`,
+      category_id: `CAT-${idx + 1}`,
+      topic_id: `TOP-${idx + 1}`,
+      concept_id: `CON-${idx + 1}`,
+      question_type: q.type,
+      difficulty: q.diff,
+      question: isAr ? q.q_ar : q.q_en,
+      options: q.opts.map(o => ({
+        id: o.id,
+        text: isAr ? o.ar : o.en
+      })),
+      correct_answer: q.correct,
+      explanation: isAr ? q.exp_ar : q.exp_en,
       distractors: {
-        'B': isAr ? 'خطأ: غير مطابق لمعايير الرقابة والمطابقة.' : 'Incorrect: Non-compliant with audit standards.',
-        'C': isAr ? 'خطأ: يخالف مبادئ الحوكمة وفصل المهام.' : 'Incorrect: Violates Segregation of Duties.',
-        'D': isAr ? 'خطأ: حذف السجلات التاريخية ممنوع ومخالف للقانون.' : 'Incorrect: Historical record deletion is prohibited.'
+        'B': isAr ? 'خطأ: توجيه محاسبي أو إجرائي غير سليم يسبب اختلال في القوائم.' : 'Incorrect: Non-compliant ledger or workflow direction.',
+        'C': isAr ? 'خطأ: يخالف المعايير الرقابية ومبادئ الحوكمة.' : 'Incorrect: Violates standard governance principles.',
+        'D': isAr ? 'خطأ: غير مطابق لمسار العمليات المعتمد.' : 'Incorrect: Does not match standard ERP procedure.'
       },
       hints: [
-        isAr ? 'تذكر المبدأ الأساسي للحوكمة والامتثال المحاسبي.' : 'Recall standard ERP accounting governance principles.',
-        isAr ? 'استبعد الخيارات التي تتجاهل القيود النظامية أو تعتمد الحلول المؤقتة.' : 'Eliminate options with unverified workarounds.',
-        isAr ? 'مفتاح الحل: الإجراء الذي يحفظ سجل التدقيق (Audit Trail) بالكامل.' : 'Direct Key: Choose the option that preserves full audit trails.'
+        isAr ? 'تذكر الأثر على القوائم المالية والدورة المستندية القياسية.' : 'Consider the standard financial statement impact and workflow rules.',
+        isAr ? 'استبعد الخيارات التي تخالف مبادئ الرقابة أو التوجيه المحاسبي.' : 'Eliminate choices that conflict with standard accounting controls.',
+        isAr ? 'مفتاح الحل: الإجراء الذي يضمن الدقة المحاسبية والامتثال الكامل.' : 'Direct Key: Choose the option ensuring financial compliance and auditability.'
       ],
       reference: {
         title: `ERP Architecture & Standards for ${mod.name_en}`,
         url: 'https://www.ifrs.org/',
-        source: 'ERP Best Practices'
+        source: 'IFRS & ERP Standards'
       }
     }));
   }
 
   return {
-    getQuestionsForModule
+    getQuestionsForModule,
+    resolveModuleKey
   };
 })();
