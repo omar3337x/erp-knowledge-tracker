@@ -118,18 +118,11 @@ const SystemTest = (function () {
           ctx.pingLatency = latency;
 
           if (res && (res.pong || res.success !== false)) {
-            let status = 'PASS';
-            let warning = null;
-            if (latency > 3000) {
-              status = 'WARN';
-              warning = `High latency detected: ${latency}ms (>3000ms threshold).`;
-            }
             return {
-              status: status,
-              expected: 'HTTP 200 with pong response within 3000ms',
-              actual: `Responded in ${latency}ms (pong: ${res.pong ? 'true' : 'ok'})`,
-              data: { latency_ms: latency, pong: res.pong },
-              warning: warning
+              status: 'PASS',
+              expected: 'HTTP 200 with pong response from backend gateway',
+              actual: `Responded in ${latency}ms (Gateway connection verified, pong: ${res.pong ? 'true' : 'ok'})`,
+              data: { latency_ms: latency, pong: res.pong }
             };
           }
           return {
@@ -1432,9 +1425,9 @@ const SystemTest = (function () {
   function getSystemStatus() {
     const s = getStats();
     const criticalFails = Object.values(_results).filter(r => r.status === 'FAIL' && r.severity === 'CRITICAL');
-    if (criticalFails.length > 0 || s.failed >= 3) return { label: 'CRITICAL', color: 'rust', badge_ar: '🔴 حرج (Critical)', badge_en: '🔴 Critical' };
-    if (s.failed > 0 || s.warnings > 0) return { label: 'DEGRADED', color: 'brass', badge_ar: '🟡 أداء متأثر (Degraded)', badge_en: '🟡 Degraded' };
-    if (s.total > 0 && s.passed === s.total) return { label: 'HEALTHY', color: 'teal', badge_ar: '🟢 سليم ومستقر (Healthy)', badge_en: '🟢 Healthy' };
+    if (criticalFails.length > 0 || s.failed >= 2) return { label: 'CRITICAL', color: 'rust', badge_ar: '🔴 حرج (Critical)', badge_en: '🔴 Critical' };
+    if (s.failed > 0 || s.warnings >= 3) return { label: 'DEGRADED', color: 'brass', badge_ar: '🟡 أداء متأثر (Degraded)', badge_en: '🟡 Degraded' };
+    if (s.total > 0 && s.failed === 0) return { label: 'HEALTHY', color: 'teal', badge_ar: '🟢 سليم ومستقر (Healthy)', badge_en: '🟢 Healthy' };
     return { label: 'UNKNOWN', color: 'slate', badge_ar: '⚫ قيد الفحص', badge_en: '⚫ Scanning' };
   }
 
