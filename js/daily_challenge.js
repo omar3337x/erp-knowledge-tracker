@@ -808,6 +808,9 @@ const DailyChallenge = (function () {
     };
   }
 
+  const _modulePoolIndex = {};
+  const _seenQuestionIds = new Set();
+
   async function generateFreshAIQuestions(moduleId) {
     const isAr = I18n.getLang() === 'ar';
     const workspace = document.getElementById('challenge-workspace');
@@ -821,7 +824,7 @@ const DailyChallenge = (function () {
       <div class="card" style="padding: 40px 20px; text-align: center; border-inline-start: 4px solid var(--brass);">
         <div class="spinner" style="margin: 0 auto 16px auto;"></div>
         <h3 style="font-size: 16px; font-weight: 700; margin: 0 0 8px 0; color: var(--ink);">
-          🧠 ${isAr ? `الذكاء الاصطناعي يقوم الآن بصياغة 10 أسئلة وسيناريوهات جديدة لموديول: ${modTitle}` : `AI is generating 10 fresh scenarios for: ${modTitle}`}
+          🧠 ${isAr ? `الذكاء الاصطناعي يقوم الآن بصياغة 10 أسئلة ومفاهيم جديدة لموديول: ${modTitle}` : `AI is generating 10 fresh scenarios for: ${modTitle}`}
         </h3>
         <p style="font-size: 13px; color: var(--ink-soft); margin: 0;">
           ${isAr ? 'يتم فحص أحدث المعايير المحاسبية والتشغيلية وابتكار سيناريوهات وحسابات غير مكررة...' : 'Crafting unique scenarios, ledger impacts, and distractor rationale...'}
@@ -832,19 +835,20 @@ const DailyChallenge = (function () {
     try {
       let aiGeneratedQuestions = null;
 
-      // Attempt AI generation if AI Service is active
+      // 1. Attempt Real AI Generation via AIService.ask with correct signature
       if (typeof AIService !== 'undefined' && typeof AIService.ask === 'function') {
         const prompt = `You are a Senior ERP Solution Architect and Master Accounting Specialist.
-Generate 10 completely fresh, realistic, high-yield practice questions for the ERP Module "${curMod.name_en}" (${curMod.name_ar || ''}).
+Generate 10 completely fresh, realistic, unique practice questions for the ERP Module "${curMod.name_en}" (${curMod.name_ar || ''}).
 Language: ${isAr ? 'Arabic (العربية الفصحى المهنية)' : 'English'}.
 Requirements:
-1. Distribute question types across: Accounting Impact, Troubleshooting, Process Decision, Implementation Decision, Scenario, Business Analysis, Multiple Choice.
-2. Provide exactly 4 options (A, B, C, D) for each.
-3. Provide the single correct option letter.
-4. Deep explanation why the correct answer is right.
-5. Distractor analysis explaining why other options are wrong.
-6. 3 tiers of hints (Concept -> Hint -> Direct Lead).
-7. Verified official standard reference (IFRS, SAP, Odoo, Oracle, COSO).
+1. Cover distinct advanced topics: Consignment Stock, Impairment NRV, Multi-currency, WMS Putaway, RMA Reverse Logistics, Purchase Price Variance (PPV), Intercompany Reconciliations, Batch Picking, Unit of Measure Conversions.
+2. Distribute question types across: Accounting Impact, Troubleshooting, Process Decision, Implementation Decision, Scenario, Business Analysis, Multiple Choice.
+3. Provide exactly 4 options (A, B, C, D) for each with clear distinct texts.
+4. Provide the correct answer option letter.
+5. Deep explanation why the correct answer is right.
+6. Distractor analysis explaining why other options are wrong.
+7. 3 tiers of hints (Concept -> Hint -> Direct Lead).
+8. Verified official standard reference (IFRS, SAP, Odoo, Oracle, COSO).
 Return ONLY a valid JSON array of 10 objects:
 [
   {
@@ -868,33 +872,37 @@ Return ONLY a valid JSON array of 10 objects:
 ]`;
 
         try {
-          const aiRaw = await AIService.ask(prompt, { max_tokens: 3000, temperature: 0.7 });
-          const jsonMatch = aiRaw.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            aiGeneratedQuestions = JSON.parse(jsonMatch[0]);
+          const aiRes = await AIService.ask('challenge_generator', prompt, { moduleId: moduleId, forceFresh: true });
+          if (aiRes && aiRes.success) {
+            if (Array.isArray(aiRes.parsed)) {
+              aiGeneratedQuestions = aiRes.parsed;
+            } else if (aiRes.text) {
+              const cleanText = aiRes.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+              const match = cleanText.match(/\[[\s\S]*\]/);
+              if (match) {
+                aiGeneratedQuestions = JSON.parse(match[0]);
+              }
+            }
           }
         } catch (aiErr) {
-          console.warn('Direct AI generation fallback to variations:', aiErr);
+          console.warn('AI live generation call fallback:', aiErr);
         }
       }
 
-      // If AI service is not configured or failed, generate algorithmic variations
+      // 2. If AI key is not connected or failed, rotate to the next distinct question pool!
       if (!Array.isArray(aiGeneratedQuestions) || aiGeneratedQuestions.length === 0) {
+        _modulePoolIndex[moduleId] = ((_modulePoolIndex[moduleId] || 0) + 1);
+        const poolIdx = _modulePoolIndex[moduleId];
+
         if (typeof CHALLENGE_BANK_DATA !== 'undefined') {
-          const baseBank = CHALLENGE_BANK_DATA.getQuestionsForModule(moduleId, isAr);
-          aiGeneratedQuestions = baseBank.map((q, idx) => {
-            const seedNum = Math.floor(Math.random() * 800) + 100;
-            const cloned = JSON.parse(JSON.stringify(q));
-            cloned.id = `Q-GEN-${Date.now()}-${idx + 1}`;
-            cloned.question = isAr ?
-              `[سيناريو متقدم #${idx + 1}] في منشأة صناعية بحجم معاملات (${seedNum} حركة): ${cloned.question}` :
-              `[Advanced Scenario #${idx + 1}] For an enterprise with (${seedNum} volume): ${cloned.question}`;
-            return cloned;
-          });
+          aiGeneratedQuestions = CHALLENGE_BANK_DATA.getQuestionsForModule(moduleId, isAr, poolIdx);
         }
       }
 
       if (Array.isArray(aiGeneratedQuestions) && aiGeneratedQuestions.length > 0) {
+        // Mark these IDs as seen
+        aiGeneratedQuestions.forEach(q => _seenQuestionIds.add(q.id));
+
         _currentChallenge = {
           module_id: moduleId,
           mode: _activeMode,
@@ -905,7 +913,7 @@ Return ONLY a valid JSON array of 10 objects:
         _completedResults = [];
         resetQuestionState();
         renderQuestionCard();
-        Toast.show(isAr ? '✨ تم توليد 10 أسئلة جديدة بنجاح! بالتوفيق في التحدي.' : '✨ 10 fresh AI questions generated successfully!', 'success');
+        Toast.show(isAr ? '✨ تم توليد 10 أسئلة وسيناريوهات جديدة كلياً بنجاح!' : '✨ 10 fresh, unique questions generated successfully!', 'success');
       } else {
         await loadChallengeData();
       }
