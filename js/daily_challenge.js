@@ -206,11 +206,16 @@ const DailyChallenge = (function () {
       }
 
       if (questions.length > 0) {
+        // Shuffle options for all questions so the correct answer is randomly distributed across A, B, C, D
+        const shuffledQuestions = questions.map(q => {
+          return typeof CHALLENGE_BANK_DATA !== 'undefined' ? CHALLENGE_BANK_DATA.shuffleQuestion(q) : q;
+        });
+
         _currentChallenge = {
           module_id: _activeModuleId,
           mode: _activeMode,
-          total_questions: questions.length,
-          questions: questions
+          total_questions: shuffledQuestions.length,
+          questions: shuffledQuestions
         };
         _currentIndex = 0;
         _completedResults = [];
@@ -266,7 +271,16 @@ const DailyChallenge = (function () {
   }
 
   function getThreeTierHints(q, isAr) {
-    const rawHints = (Array.isArray(q.hints) ? q.hints : [q.hint_1, q.hint_2, q.hint_3]).filter(Boolean);
+    let rawHints = [];
+    if (isAr && Array.isArray(q.hints_ar) && q.hints_ar.length > 0) {
+      rawHints = q.hints_ar;
+    } else if (!isAr && Array.isArray(q.hints_en) && q.hints_en.length > 0) {
+      rawHints = q.hints_en;
+    } else if (Array.isArray(q.hints) && q.hints.length > 0) {
+      rawHints = q.hints;
+    } else {
+      rawHints = [q.hint_1, q.hint_2, q.hint_3].filter(Boolean);
+    }
     const hints = [...rawHints];
 
     if (hints.length < 1) {
@@ -603,42 +617,53 @@ const DailyChallenge = (function () {
             </div>
 
             <!-- Distractor Analysis (Why others are wrong) -->
-            ${(q.distractors && Object.keys(q.distractors).length > 0) ? `
-              <div style="margin-bottom: 16px; padding: 12px; background: var(--paper-raised); border-radius: var(--radius-sm); border: 1px solid var(--line);">
-                <strong style="font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 8px;">
-                  🔍 ${isAr ? 'تحليل الاختيارات الخاطئة (Distractor Analysis):' : 'Distractor Analysis (Why other options are incorrect):'}
-                </strong>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                  ${Object.keys(q.distractors).map(optKey => `
-                    <div style="font-size: 12px; color: var(--ink); line-height: 1.4;">
-                      <strong style="color: var(--rust);">${escapeHtml(optKey)}:</strong> ${escapeHtml(q.distractors[optKey])}
-                    </div>
-                  `).join('')}
+            ${(() => {
+              const distMap = (isAr && q.distractors_ar) ? q.distractors_ar : (q.distractors || {});
+              const keys = Object.keys(distMap);
+              if (keys.length === 0) return '';
+              return `
+                <div style="margin-bottom: 16px; padding: 12px; background: var(--paper-raised); border-radius: var(--radius-sm); border: 1px solid var(--line);">
+                  <strong style="font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 8px;">
+                    🔍 ${isAr ? 'تحليل الاختيارات الخاطئة (Distractor Analysis):' : 'Distractor Analysis (Why other options are incorrect):'}
+                  </strong>
+                  <div style="display: flex; flex-direction: column; gap: 6px;">
+                    ${keys.map(optKey => `
+                      <div style="font-size: 12px; color: var(--ink); line-height: 1.4;">
+                        <strong style="color: var(--rust);">${escapeHtml(optKey)}:</strong> ${escapeHtml(distMap[optKey])}
+                      </div>
+                    `).join('')}
+                  </div>
                 </div>
-              </div>
-            ` : ''}
+              `;
+            })()}
 
             <!-- Official Documentation Reference -->
-            ${(q.reference && q.reference.title) ? `
-              <div style="margin-bottom: 20px; padding: 10px 14px; background: var(--paper-raised); border-radius: var(--radius-sm); border: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                <div>
-                  <div style="font-size: 11px; text-transform: uppercase; color: var(--brass-deep); font-weight: 700;">
-                    📚 ${isAr ? 'المصدر والتوثيق الرسمي المعتمد' : 'Verified Official Documentation'}
+            ${(() => {
+              const refObj = q.reference || {};
+              const title = isAr ? (refObj.title_ar || refObj.title || '') : (refObj.title_en || refObj.title || '');
+              const source = isAr ? (refObj.source_ar || refObj.source || '') : (refObj.source_en || refObj.source || '');
+              if (!title) return '';
+              return `
+                <div style="margin-bottom: 20px; padding: 10px 14px; background: var(--paper-raised); border-radius: var(--radius-sm); border: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                  <div>
+                    <div style="font-size: 11px; text-transform: uppercase; color: var(--brass-deep); font-weight: 700;">
+                      📚 ${isAr ? 'المصدر والتوثيق الرسمي المعتمد' : 'Verified Official Documentation'}
+                    </div>
+                    <div style="font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 2px;">
+                      ${escapeHtml(title)}
+                    </div>
+                    <div style="font-size: 11px; color: var(--ink-soft);">
+                      ${escapeHtml(source)}
+                    </div>
                   </div>
-                  <div style="font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 2px;">
-                    ${escapeHtml(q.reference.title)}
-                  </div>
-                  <div style="font-size: 11px; color: var(--ink-soft);">
-                    ${escapeHtml(q.reference.source || '')}
-                  </div>
+                  ${refObj.url ? `
+                    <a href="${escapeHtml(refObj.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 12px; white-space: nowrap;">
+                      🔗 ${isAr ? 'فتح التوثيق' : 'Learn More'}
+                    </a>
+                  ` : ''}
                 </div>
-                ${q.reference.url ? `
-                  <a href="${escapeHtml(q.reference.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 12px; white-space: nowrap;">
-                    🔗 ${isAr ? 'فتح التوثيق' : 'Learn More'}
-                  </a>
-                ` : ''}
-              </div>
-            ` : ''}
+              `;
+            })()}
 
             <!-- Next Question Action Button -->
             <div style="display: flex; justify-content: flex-end;">
@@ -903,11 +928,16 @@ Return ONLY a valid JSON array of 10 objects:
         // Mark these IDs as seen
         aiGeneratedQuestions.forEach(q => _seenQuestionIds.add(q.id));
 
+        // Shuffle options so correct answers are randomly spread across A, B, C, D
+        const finalShuffled = aiGeneratedQuestions.map(q => {
+          return typeof CHALLENGE_BANK_DATA !== 'undefined' ? CHALLENGE_BANK_DATA.shuffleQuestion(q) : q;
+        });
+
         _currentChallenge = {
           module_id: moduleId,
           mode: _activeMode,
-          total_questions: aiGeneratedQuestions.length,
-          questions: aiGeneratedQuestions
+          total_questions: finalShuffled.length,
+          questions: finalShuffled
         };
         _currentIndex = 0;
         _completedResults = [];

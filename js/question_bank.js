@@ -199,7 +199,8 @@ const QuestionBank = (function () {
                 const text = (bq.question + ' ' + (bq.explanation || '')).toLowerCase();
                 if (text.indexOf(_searchQuery.toLowerCase()) === -1) continue;
               }
-              questions.push(bq);
+              const shuffledBq = typeof CHALLENGE_BANK_DATA !== 'undefined' ? CHALLENGE_BANK_DATA.shuffleQuestion(bq) : bq;
+              questions.push(shuffledBq);
               existingIds.add(bq.id);
             }
           }
@@ -303,16 +304,42 @@ const QuestionBank = (function () {
 
               <!-- Collapsible Explanation & Distractor Analysis -->
               ${isRevealed ? `
-                <div style="font-size: 13px; color: var(--ink); line-height: 1.6; padding-top: 12px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.02); padding: 12px; border-radius: var(--radius-sm);">
+                <div style="font-size: 13px; color: var(--ink); line-height: 1.6; padding-top: 12px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.02); padding: 14px; border-radius: var(--radius-sm);">
                   <div>
                     <strong style="color: var(--teal);">💡 ${isAr ? 'التفسير المحاسبي والتشغيلي:' : 'Explanation:'}</strong>
                     <div style="margin-top: 4px;">${escapeHtml(q.explanation || '—')}</div>
                   </div>
-                  ${(q.reference && q.reference.url) ? `
-                    <div style="margin-top: 4px;">
-                      <a href="${escapeHtml(q.reference.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 2px 8px; display: inline-flex; align-items: center; gap: 4px;">
-                        🔗 ${escapeHtml(q.reference.title || (isAr ? 'التوثيق المعتمد' : 'Reference Source'))}
-                      </a>
+
+                  ${(() => {
+                    const distMap = (isAr && q.distractors_ar) ? q.distractors_ar : (q.distractors || {});
+                    const keys = Object.keys(distMap);
+                    if (keys.length === 0) return '';
+                    return `
+                      <div style="padding: 10px; background: var(--paper); border-radius: var(--radius-sm); border: 1px solid var(--line);">
+                        <strong style="font-size: 12px; color: var(--ink-soft); display: block; margin-bottom: 6px;">
+                          🔍 ${isAr ? 'تحليل الاختيارات الخاطئة (Distractor Analysis):' : 'Distractor Analysis:'}
+                        </strong>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                          ${keys.map(k => `
+                            <div style="font-size: 12px; color: var(--ink);">
+                              <strong style="color: var(--rust);">${escapeHtml(k)}:</strong> ${escapeHtml(distMap[k])}
+                            </div>
+                          `).join('')}
+                        </div>
+                      </div>
+                    `;
+                  })()}
+
+                  ${(q.reference && (q.reference.title || q.reference.title_ar || q.reference.title_en)) ? `
+                    <div style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between;">
+                      <span style="font-size: 11px; color: var(--ink-soft);">
+                        📚 ${escapeHtml(isAr ? (q.reference.source_ar || q.reference.source || '') : (q.reference.source_en || q.reference.source || ''))}
+                      </span>
+                      ${q.reference.url ? `
+                        <a href="${escapeHtml(q.reference.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 2px 8px; display: inline-flex; align-items: center; gap: 4px;">
+                          🔗 ${escapeHtml(isAr ? (q.reference.title_ar || q.reference.title || 'التوثيق المعتمد') : (q.reference.title_en || q.reference.title || 'Documentation'))}
+                        </a>
+                      ` : ''}
                     </div>
                   ` : ''}
                 </div>

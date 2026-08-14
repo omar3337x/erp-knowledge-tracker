@@ -1,8 +1,13 @@
 /**
  * js/challenge_bank_data.js
- * 📚 Comprehensive High-Yield ERP Question Bank
- * Contains 100% authentic, realistic ERP multiple-choice & scenario questions.
- * ZERO generic placeholder options.
+ * 📚 Complete Multi-Pool Question Bank with 100% Full Bilingual Arabic & English
+ * Every question contains dedicated:
+ * - question_ar / question_en
+ * - options: text_ar / text_en
+ * - explanation_ar / explanation_en
+ * - hints_ar / hints_en (3 distinct tiers: Concept -> Hint -> Direct Lead)
+ * - distractors_ar / distractors_en (Specific reasoning for every distractor)
+ * - reference: title_ar / title_en / source_ar / source_en
  */
 
 const CHALLENGE_BANK_DATA = (function () {
@@ -30,18 +35,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Under FIFO, older units are depleted first: (100 units * $10 = $1,000) + (50 units * $12 = $600) = $1,600 COGS. Ending inventory comprises the remaining 50 units * $12 = $600.',
-        explanation_ar: 'في نظام FIFO، يتم صرف أقدم مخزون أولاً: (100 وحدة × 10 ريال = 1,000 ريال) + (50 وحدة × 12 ريال = 600 ريال) = 1,600 ريال COGS. ويتبقى في المخزن (50 وحدة × 12 ريال = 600 ريال).',
-        distractors: {
-          'B': 'Assumes simple average pricing rather than FIFO queue.',
-          'C': 'Arithmetic error in unit cost allocation.',
-          'D': 'Represents LIFO valuation rather than FIFO.'
+        explanation_ar: 'في نظام الوارد أولاً يصرف أولاً (FIFO)، يتم استنفاد الدفعة الأولى الأقدم: (100 وحدة × 10 ريال = 1,000 ريال) ثم استكمال 50 وحدة من الدفعة الثانية (50 وحدة × 12 ريال = 600 ريال) ليكون إجمالي تكلفة البضاعة المباعة 1,600 ريال. ويتبقى في المخزون 50 وحدة بسعر 12 ريال بقيمة 600 ريال.',
+        distractors_ar: {
+          'B': 'خطأ: يفترض حساب متوسط بسيط للأسعار بدلاً من تتبع طابور FIFO.',
+          'C': 'خطأ حسابي في توزيع تكلفة الوحدات المنصرفة والمتبقية.',
+          'D': 'خطأ: يمثل تقييم الوارد أخيراً يصرف أولاً (LIFO) المحظور في المعايير الدولية.'
         },
-        hints: [
-          'Remember FIFO: First-In, First-Out pricing order.',
-          'Calculate the first 100 units from the initial batch at $10.',
-          'Add the remaining 50 units from the second batch at $12.'
+        distractors_en: {
+          'B': 'Incorrect: Assumes simple average pricing rather than FIFO queue.',
+          'C': 'Incorrect: Arithmetic error in unit cost allocation.',
+          'D': 'Incorrect: Represents LIFO valuation which is prohibited under IFRS.'
+        },
+        hints_ar: [
+          'تذكر قاعدة الوارد أولاً يصرف أولاً: أصناف الشراء الأقدم تُصرف للإنتاج بالبداية.',
+          'احسب أول 100 وحدة من الشحنة الأولى بسعر 10 ريال (1,000 ريال).',
+          'مفتاح الحل: أضف الـ 50 وحدة المتبقية من الشحنة الثانية بسعر 12 ريال (600 ريال)، ليصبح الإجمالي 1,600 ريال.'
         ],
-        reference: { title: 'IAS 2 - Inventories Standard & Cost Formulas', url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/', source: 'IFRS Official Standards' }
+        hints_en: [
+          'Remember FIFO principle: oldest purchased units are issued first.',
+          'Calculate the first 100 units from the initial batch at $10 ($1,000).',
+          'Direct Key: Add the remaining 50 units from the second batch at $12 ($600), total COGS = $1,600.'
+        ],
+        reference: {
+          title_ar: 'معيار المحاسبة الدولي IAS 2 - تقييم المخزون وصيغ التكلفة',
+          title_en: 'IAS 2 - Inventories Standard & Cost Formulas',
+          url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/',
+          source_ar: 'المعايير الدولية لإعداد التقارير المالية IFRS',
+          source_en: 'IFRS Official Standards'
+        }
       },
       {
         id: 'Q-INV-002',
@@ -61,14 +82,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'In two-step warehouse transfers, goods stay in the intermediate Transit location until the receiving warehouse validates the inbound Goods Receipt.',
-        explanation_ar: 'في التحويلات ذات الخطوتين، تظل البضاعة في موقع العبور الوسيط (Transit Location) حتى يقوم المستودع المستلم بتأكيد إذن الاستلام المخزني.',
-        distractors: {
-          'B': 'ERPs never automatically write off stock in transit.',
-          'C': 'Posted stock moves cannot be deleted.',
-          'D': 'Internal transfers within the same company do not require sales invoices.'
+        explanation_ar: 'في التحويلات المخزنية ذات الخطوتين (Two-Step Transfer)، تخرج البضاعة من مستودع المصدر وتستقر في موقع عبور وسيط (Transit Location) حتى يقوم أمين مستودع الوجهة بتأكيد الفحص وإذن الاستلام المخزني.',
+        distractors_ar: {
+          'B': 'خطأ: أنظمة الـ ERP لا تشطب البضائع في الطريق بشكل تلقائي.',
+          'C': 'خطأ: القيود المخزنية المرحلة لا تُحذف تلقائياً في سجلات التدقيق.',
+          'D': 'خطأ: التحويل الداخلي بين مستودعات نفس المنشأة لا يتطلب فاتورة مبيعات.'
         },
-        hints: ['Consider two-step transfer workflows.', 'Where does stock sit while on the truck?', 'Check pending Goods Receipt at destination.'],
-        reference: { title: 'Odoo Inventory - Internal Transfers & Transit Locations', url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/warehouses_storage/transfers.html', source: 'Odoo Official Documentation' }
+        distractors_en: {
+          'B': 'Incorrect: ERPs never automatically write off stock in transit.',
+          'C': 'Incorrect: Posted stock moves cannot be deleted.',
+          'D': 'Incorrect: Internal transfers within the same company do not require sales invoices.'
+        },
+        hints_ar: [
+          'تذكر دورة التحويلات المخزنية ثنائية الخطوات (Two-Step).',
+          'أين تستقر البضاعة محاسبياً ولوجستياً وهي على متن الشاحنة بالطريق؟',
+          'مفتاح الحل: البضاعة في موقع العبور (Transit) بانتظار اعتماد إذن الاستلام في جدة.'
+        ],
+        hints_en: [
+          'Consider two-step transfer workflows.',
+          'Where does stock sit while on the truck?',
+          'Direct Key: Stock is sitting in Transit location awaiting inbound Goods Receipt validation.'
+        ],
+        reference: {
+          title_ar: 'دليل إدارة المستودعات والتحويلات ومواقع العبور الوسيطة',
+          title_en: 'Odoo Inventory - Internal Transfers & Transit Locations',
+          url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/warehouses_storage/transfers.html',
+          source_ar: 'توثيق Odoo وممارسات الـ ERP العالمية',
+          source_en: 'Odoo Official Documentation'
+        }
       },
       {
         id: 'Q-INV-003',
@@ -88,14 +129,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'When on-hand inventory drops below the Minimum threshold (12 < 20), the ERP automatically orders up to the Maximum level: 100 - 12 = 88 units.',
-        explanation_ar: 'عندما ينخفض الرصيد عن الحد الأدنى (12 < 20)، يقوم النظام بتوليد أمر شراء للوصول إلى الحد الأقصى: 100 - 12 = 88 وحدة.',
-        distractors: {
-          'B': 'Only reaches the minimum threshold, causing immediate re-triggering.',
-          'C': 'Ignores existing on-hand stock and over-orders.',
-          'D': 'Orders the minimum parameter instead of the replenishment delta.'
+        explanation_ar: 'عندما ينخفض الرصيد الفعلي (12) عن نقطة إعادة الطلب الدنيا (20)، يقوم النظام آلياً بتوليد أمر شراء بالكمية التي تعيد الرصيد إلى الحد الأقصى المستهدف: 100 - 12 = 88 وحدة.',
+        distractors_ar: {
+          'B': 'خطأ: الشراء للحد الأدنى فقط يسبب تكرار انخفاض المخزون فورياً.',
+          'C': 'خطأ: يتجاهل الرصيد المتوفر الحالي ويؤدي لزيادة تكدس المخزون.',
+          'D': 'خطأ: يطلب معامل الحد الأدنى بدلاً من فرق الكمية المطلوبة.'
         },
-        hints: ['Min triggers the reorder; Max dictates the target replenishment stock.', 'Calculate target stock minus current stock.', '100 - 12 = ?'],
-        reference: { title: 'SAP Inventory Management - Reorder Point Planning', url: 'https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/inventory-management', source: 'SAP Documentation' }
+        distractors_en: {
+          'B': 'Incorrect: Only reaches the minimum threshold, causing immediate stockouts.',
+          'C': 'Incorrect: Ignores existing on-hand stock and over-orders.',
+          'D': 'Incorrect: Orders the minimum parameter instead of the replenishment delta.'
+        },
+        hints_ar: [
+          'الحد الأدنى (Min) هو زر الإطلاق، والحد الأقصى (Max) هو الهدف المطلوب الوصول إليه.',
+          'اطرح الرصيد الفعلي الحالي من الحد الأقصى المستهدف.',
+          'مفتاح الحل: 100 - 12 = 88 وحدة.'
+        ],
+        hints_en: [
+          'Min triggers the reorder; Max dictates the target replenishment stock.',
+          'Calculate target stock minus current stock.',
+          'Direct Key: 100 - 12 = 88 units.'
+        ],
+        reference: {
+          title_ar: 'تخطيط نقاط إعادة الطلب وإدارة المستويات في SAP',
+          title_en: 'SAP Inventory Management - Reorder Point Planning',
+          url: 'https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/inventory-management',
+          source_ar: 'توثيق SAP S/4HANA Supply Chain',
+          source_en: 'SAP Documentation'
+        }
       },
       {
         id: 'Q-INV-004',
@@ -115,14 +176,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'FEFO (First Expired, First Out) strictly picks the batch with the earliest expiration date (Aug 2026) to eliminate perishable inventory waste.',
-        explanation_ar: 'سياسة FEFO تلزم النظام بصرف التشغيلة الأقرب لتاريخ الانتهاء (أغسطس 2026) لتفادي تلف وانتهاء صلاحية المنتجات.',
-        distractors: {
-          'B': 'Lot A has a later expiry date.',
-          'C': 'Random picking violates regulated pharma standards.',
-          'D': 'Cost is irrelevant to perishable stock rotation.'
+        explanation_ar: 'سياسة FEFO (الأقرب انتهاءً يخرج أولاً) تلزم النظام بصرف التشغيلة ذات تاريخ الصلاحية الأقرب (أغسطس 2026) لتفادي تلف المخزون الدوائي والغذائي وتكبّد خسائر الهالك.',
+        distractors_ar: {
+          'B': 'خطأ: التشغيلة A تنتهي في موعد لاحق (ديسمبر 2026) وترك التشغيلة B سيعرضها للتلف.',
+          'C': 'خطأ: الصرف العشوائي مخالف للوائح هيئات الغذاء والدواء ومعايير GxP.',
+          'D': 'خطأ: تاريخ الصلاحية يتقدم كلياً على فروق تكلفة الشراء في المواد سريعة التلف.'
         },
-        hints: ['FEFO stands for First Expired, First Out.', 'Compare expiry dates: Aug 2026 vs Dec 2026.', 'August comes before December.'],
-        reference: { title: 'FDA Good Warehouse Practices & FEFO Stock Rotation', url: 'https://www.fda.gov/drugs', source: 'FDA Regulatory Standards' }
+        distractors_en: {
+          'B': 'Incorrect: Lot A has a later expiry date.',
+          'C': 'Incorrect: Random picking violates regulated pharma GxP standards.',
+          'D': 'Incorrect: Expiration date takes strict priority over purchase cost.'
+        },
+        hints_ar: [
+          'تذكر معنى FEFO: First Expired, First Out (الأقرب انتهاءً يصرف أولاً).',
+          'قارن بين أغسطس 2026 وديسمبر 2026.',
+          'مفتاح الحل: أغسطس يسبق ديسمبر، إذن تشغيلة Lot B تُصرف أولاً.'
+        ],
+        hints_en: [
+          'FEFO stands for First Expired, First Out.',
+          'Compare expiry dates: Aug 2026 vs Dec 2026.',
+          'Direct Key: August comes before December, so Lot B is selected.'
+        ],
+        reference: {
+          title_ar: 'الممارسات الجيدة للتخزين والتوزيع الدوائي وسياسات FEFO',
+          title_en: 'FDA Good Warehouse Practices & FEFO Stock Rotation',
+          url: 'https://www.fda.gov/drugs',
+          source_ar: 'معايير هيئات الدواء والرقابة الصحية',
+          source_en: 'FDA Regulatory Standards'
+        }
       },
       {
         id: 'Q-INV-005',
@@ -142,14 +223,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Cycle counting categorizes items by Pareto ABC value, checking fast-moving and high-value items frequently without halting plant operations.',
-        explanation_ar: 'الجرد الدوري يصنف الأصناف وفق تحليل ABC فيتم جرد الأصناف الحساسة والعالية القيمة دورياً دون تعطيل حركة البيع والتسليم.',
-        distractors: {
-          'B': 'Adjustments are still recorded for variances.',
-          'C': 'Cycle counting is structured across the entire year.',
-          'D': 'Negative inventory is a configuration flaw.'
+        explanation_ar: 'الجرد الدوري المستمر يوزع مهام العد على مدار العام وفق تحليل باريتو (ABC)، فيتم جرد الأصناف الحساسة والعالية القيمة شهرياً دون الحاجة لإيقاف عمليات البيع والتسليم وشل حركة الشركة.',
+        distractors_ar: {
+          'B': 'خطأ: قيود التسوية تظل واجبة عند اكتشاف أي فروقات بين الفعلي والدفتري.',
+          'C': 'خطأ: الجرد المستمر عمل مؤسسي منتظم يتم وفق جداول وليس في يوم واحد.',
+          'D': 'خطأ: الأرصدة السالبة خلل رقابي لا يجوز السماح به.'
         },
-        hints: ['Focus on operational continuity and Pareto analysis.', 'High value items need frequent checking.', 'Operations continue running smoothly.'],
-        reference: { title: 'APICS / ASCM Inventory Control Best Practices', url: 'https://www.ascm.org/', source: 'ASCM Standards' }
+        distractors_en: {
+          'B': 'Incorrect: Adjustments are still recorded for variances.',
+          'C': 'Incorrect: Cycle counting is structured across the entire year.',
+          'D': 'Incorrect: Negative inventory is an operational flaw.'
+        },
+        hints_ar: [
+          'ركز على استمرارية الأعمال وقاعدة باريتو (80/20).',
+          'الأصناف فئة A تمثل القيمة المالية الكبرى وتتطلب رقابة مستمرة.',
+          'مفتاح الحل: العد المستمر يمنع تعطيل المبيعات ويركز على الأصناف الحساسة.'
+        ],
+        hints_en: [
+          'Focus on operational continuity and Pareto analysis.',
+          'High value Category A items need frequent checking.',
+          'Direct Key: Cycle counting prevents shutdown while prioritizing high-value inventory.'
+        ],
+        reference: {
+          title_ar: 'معايير الجمعية الأمريكية لسلاسل الإمداد ASCM في الرقابة المخزنية',
+          title_en: 'APICS / ASCM Inventory Control Best Practices',
+          url: 'https://www.ascm.org/',
+          source_ar: 'المعهد الدولي لسلاسل الإمداد ASCM/APICS',
+          source_en: 'ASCM Standards'
+        }
       },
       {
         id: 'Q-INV-006',
@@ -169,14 +270,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Landed Costs capitalize all direct costs necessary to bring goods to their current location: ($10,000 purchase + $2,000 customs + $1,000 freight) / 1,000 units = $13.00/unit.',
-        explanation_ar: 'تكلفة الشراء المحملة (Landed Cost) ترسمل كافة المصاريف المباشرة حتى وصول الصنف: (10,000 + 2,000 + 1,000) / 1,000 = 13.00 دولار للوحدة.',
-        distractors: {
-          'B': 'Under IAS 2, import duties and freight must be capitalized into inventory.',
-          'C': 'Omits freight cost from valuation.',
-          'D': 'Over-allocates overhead.'
+        explanation_ar: 'وفق معيار IAS 2، تُرسمل كافة التكاليف المباشرة اللازمة لوصول المخزون لحالته وموقعه الحالي: (10,000 شراء + 2,000 جمارك + 1,000 شحن) = 13,000 دولار / 1,000 وحدة = 13.00 دولار للوحدة.',
+        distractors_ar: {
+          'B': 'خطأ: معايير المحاسبة تلزم برسملة الجمارك والشحن ضمن قيمة المخزون وليس كمصروف فوري.',
+          'C': 'خطأ: أسقط تكلفة الشحن البحري من التقييم.',
+          'D': 'خطأ حسابي في نسبة التوزيع.'
         },
-        hints: ['Add purchase total + customs + freight.', 'Divide sum by 1,000 total units.', 'Total = $13,000 / 1,000 = $13.00.'],
-        reference: { title: 'IAS 2 - Costs of Purchase & Landed Valuation', url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/', source: 'IFRS Standards' }
+        distractors_en: {
+          'B': 'Incorrect: Under IAS 2, import duties and freight must be capitalized into inventory.',
+          'C': 'Incorrect: Omits freight cost from valuation.',
+          'D': 'Incorrect: Over-allocates overhead.'
+        },
+        hints_ar: [
+          'اجمع تكلفة الشراء الأساسية + الجمارك + الشحن البحري.',
+          'إجمالي التكاليف = 10,000 + 2,000 + 1,000 = 13,000 دولار.',
+          'مفتاح الحل: اقسم 13,000 على 1,000 وحدة = 13.00 دولار للوحدة.'
+        ],
+        hints_en: [
+          'Add purchase total + customs + freight.',
+          'Total cost = $10,000 + $2,000 + $1,000 = $13,000.',
+          'Direct Key: Divide $13,000 by 1,000 units = $13.00 per unit.'
+        ],
+        reference: {
+          title_ar: 'معيار IAS 2 - تكلفة الشراء ورسملة المصاريف المباشرة Landed Cost',
+          title_en: 'IAS 2 - Costs of Purchase & Landed Valuation',
+          url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/',
+          source_ar: 'معايير المحاسبة الدولية IFRS',
+          source_en: 'IFRS Standards'
+        }
       },
       {
         id: 'Q-INV-007',
@@ -196,14 +317,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Dropshipping delivers goods directly from the external supplier to the customer, bypassing internal warehouse storage while maintaining financial invoicing.',
-        explanation_ar: 'في الدروب شيبينغ يتم شحن البضاعة مباشرة من المورد للعميل دون دخولها المستودع، مع بقاء فواتير الشراء والبيع بالنظام.',
-        distractors: {
-          'B': 'Vendor PO is required to trigger supplier shipment.',
-          'C': 'Customer invoice is still generated.',
-          'D': 'Vendor must still be paid.'
+        explanation_ar: 'في نظام الدروب شيبينغ (الشحن المباشر)، يسلّم المورد البضاعة للعميل النهائي مباشرة، مما يلغي دورة التخزين والاستلام والصرف الفيزيائي بالمستودع، مع بقاء فواتير الشراء والبيع في النظام المالي.',
+        distractors_ar: {
+          'B': 'خطأ: أمر الشراء إلزامي لتوجيه المورد بالشحن وإثبات الالتزام المالي.',
+          'C': 'خطأ: فاتورة العميل تصدر لتحصيل الإيرادات والأرباح.',
+          'D': 'خطأ: يجب سداد مستحقات المورد الخارجي وفق شروط الدفع.'
         },
-        hints: ['Vendor delivers straight to client.', 'Physical inventory does not enter your warehouse.', 'Invoicing still occurs.'],
-        reference: { title: 'ERP Supply Chain Routes & Dropshipping Flows', url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/shipping_receiving/advanced_routes_concepts/dropshipping.html', source: 'Odoo Documentation' }
+        distractors_en: {
+          'B': 'Incorrect: Vendor PO is required to trigger supplier shipment.',
+          'C': 'Incorrect: Customer invoice is still generated.',
+          'D': 'Incorrect: Vendor must still be paid.'
+        },
+        hints_ar: [
+          'المورد يشحن الصناديق مباشرة من مصنعه إلى باب العميل.',
+          'هل تدخل الشاحنة مستودع شركتك أصلاً؟',
+          'مفتاح الحل: لا يوجد استلام وتخزين فيزيائي داخل مستودعات الشركة.'
+        ],
+        hints_en: [
+          'Vendor delivers straight to client.',
+          'Physical inventory does not enter your warehouse.',
+          'Direct Key: Physical warehouse receiving and picking are bypassed.'
+        ],
+        reference: {
+          title_ar: 'مسارات سلاسل الإمداد والشحن المباشر Dropshipping في أنظمة الـ ERP',
+          title_en: 'ERP Supply Chain Routes & Dropshipping Flows',
+          url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/shipping_receiving/advanced_routes_concepts/dropshipping.html',
+          source_ar: 'دليل عمليات الـ ERP وسلاسل التوريد',
+          source_en: 'Odoo Documentation'
+        }
       },
       {
         id: 'Q-INV-008',
@@ -223,14 +364,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Issuing stock before recording the receipt forces the ERP to calculate COGS with undefined unit costs, resulting in massive costing distortions.',
-        explanation_ar: 'صرف بضاعة غير مسجلة دفترياً يجعل النظام يحسب تكلفة البضاعة المباعة بدون رصيد فعلي مما يحدث انحرافات حادة في الأرباح.',
-        distractors: {
-          'B': 'Database does not crash, but financial integrity is lost.',
-          'C': 'Customer records are unrelated.',
-          'D': 'VAT rules are unaffected.'
+        explanation_ar: 'صرف بضاعة غير مسجلة دفترياً يجبر النظام على حساب تكلفة المبيعات (COGS) بتكلفة صفرية أو تقريبية، وعند إدخال فاتورة الشراء لاحقاً تتولد قيود تسوية بأثر رجعي تشوه أرباح الفترات المالية.',
+        distractors_ar: {
+          'B': 'خطأ: قاعدة البيانات لا تتوقف ولكن دقة البيانات المالية تتدمر.',
+          'C': 'خطأ: بطاقات العملاء لا علاقة لها بحركة المخزون السالب.',
+          'D': 'خطأ: ضريبة القيمة المضافة تحتسب على قيمة البيع وليس أرصدة الكميات.'
         },
-        hints: ['How does ERP determine unit cost if receipt was never entered?', 'COGS calculation fails without cost foundation.', 'Distorts gross margin.'],
-        reference: { title: 'ERP Financial Integrity & Negative Inventory Controls', url: 'https://learn.microsoft.com/en-us/dynamics365/supply-chain/inventory/', source: 'Microsoft Dynamics 365' }
+        distractors_en: {
+          'B': 'Incorrect: Database does not crash, but financial integrity is lost.',
+          'C': 'Incorrect: Customer records are unrelated.',
+          'D': 'Incorrect: VAT rules are unaffected.'
+        },
+        hints_ar: [
+          'كيف يحسب النظام تكلفة الصنف المباع إذا كان رصيد الشراء غير مسجل أصلاً؟',
+          'حساب تكلفة المبيعات (COGS) ينهار بدون تكلفة شراء حقيقية.',
+          'مفتاح الحل: احتساب COGS بتكلفة خاطئة يسبب انحرافات حادة في الأرباح.'
+        ],
+        hints_en: [
+          'How does ERP determine unit cost if receipt was never entered?',
+          'COGS calculation fails without cost foundation.',
+          'Direct Key: Zero or estimated COGS distorts gross profit and ledger integrity.'
+        ],
+        reference: {
+          title_ar: 'الرقابة المحاسبية ومنع الأرصدة السالبة في Microsoft Dynamics',
+          title_en: 'ERP Financial Integrity & Negative Inventory Controls',
+          url: 'https://learn.microsoft.com/en-us/dynamics365/supply-chain/inventory/',
+          source_ar: 'أفضل ممارسات إدارة المخزون في Dynamics 365',
+          source_en: 'Microsoft Dynamics 365'
+        }
       },
       {
         id: 'Q-INV-009',
@@ -250,14 +411,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'AVCO formula = Total Value / Total Quantity = ($1,000 + $1,500) / 100 units = $2,500 / 100 = $25.00 per unit.',
-        explanation_ar: 'قانون المتوسط المرجح = إجمالي القيمة / إجمالي الكمية = (1,000 + 1,500) / 100 = 2,500 / 100 = 25.00 ريال للوحدة.',
-        distractors: {
-          'B': 'Only represents the new receipt price.',
-          'C': 'Ignores the higher cost of new incoming stock.',
-          'D': 'Incorrect mathematical weight.'
+        explanation_ar: 'قانون المتوسط المتحرك المرجح (AVCO) = إجمالي القيمة / إجمالي الكمية = (1,000 + 1,500) / (50 + 50) = 2,500 ريال / 100 وحدة = 25.00 ريال للوحدة.',
+        distractors_ar: {
+          'B': 'خطأ: يمثل سعر الشراء الجديد فقط متجاهلاً الرصيد القديم.',
+          'C': 'خطأ: يتجاهل تكلفة الشحنة الجديدة المرتفعة.',
+          'D': 'خطأ حسابي في احتساب الأوزان النسبية.'
         },
-        hints: ['Total Value divided by Total Quantity.', '$1,000 + $1,500 = $2,500 total.', 'Divide $2,500 by 100 units.'],
-        reference: { title: 'IAS 2 - Weighted Average Cost Formula', url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/', source: 'IFRS Standards' }
+        distractors_en: {
+          'B': 'Incorrect: Only represents the new receipt price.',
+          'C': 'Incorrect: Ignores the higher cost of new incoming stock.',
+          'D': 'Incorrect: Mathematical weighting error.'
+        },
+        hints_ar: [
+          'قانون المتوسط المرجح: إجمالي القيمة الإجمالية مقسوماً على إجمالي عدد الوحدات.',
+          'القيمة الإجمالية = 1,000 + 1,500 = 2,500 ريال.',
+          'مفتاح الحل: اقسم 2,500 على 100 وحدة = 25.00 ريال.'
+        ],
+        hints_en: [
+          'Total Value divided by Total Quantity.',
+          '$1,000 + $1,500 = $2,500 total.',
+          'Direct Key: Divide $2,500 by 100 units = $25.00.'
+        ],
+        reference: {
+          title_ar: 'معيار IAS 2 - معادلة المتوسط المرجح لتكلفة المخزون',
+          title_en: 'IAS 2 - Weighted Average Cost Formula',
+          url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/',
+          source_ar: 'معايير إعداد التقارير المالية الدولية',
+          source_en: 'IFRS Standards'
+        }
       },
       {
         id: 'Q-INV-010',
@@ -277,15 +458,36 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Scrap removes the asset from the balance sheet (Crediting Inventory) and recognizes an operational loss (Debiting Inventory Loss/Scrap Expense).',
-        explanation_ar: 'إذن الهالك يخفض أصل المخزون بجعله دائناً، ويثبت مصروف الخسارة التشغيلية بجعل حساب هالك المخزون مديناً.',
-        distractors: {
-          'B': 'This represents an inventory purchase.',
-          'C': 'Sales revenue is not debited on scrap.',
-          'D': 'Vendor is not credited unless a claim is accepted.'
+        explanation_ar: 'إذن الهالك يخفض أصل المخزون في الميزانية العمومية بجعله دائناً، ويثبت خسارة تشغيلية بجعل حساب هالك المخزون (P&L) مديناً.',
+        distractors_ar: {
+          'B': 'خطأ: هذا القيد يمثل عملية شراء وسداد نقدي.',
+          'C': 'خطأ: إيرادات المبيعات لا تُجعل مدينة عند تلف البضائع.',
+          'D': 'خطأ: حساب الموردين لا يتأثر إلا في حال قبول المورد لمطالبة تعويض.'
         },
-        hints: ['Inventory balance decreases, expense increases.', 'Credit the asset account.', 'Debit the scrap expense.'],
-        reference: { title: 'ERP Inventory Scrap & Loss Accounting Entries', url: 'https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/inventory-management', source: 'SAP S/4HANA Finance' }
+        distractors_en: {
+          'B': 'Incorrect: This represents an inventory purchase.',
+          'C': 'Incorrect: Sales revenue is not debited on scrap.',
+          'D': 'Incorrect: Vendor is not credited unless a claim is accepted.'
+        },
+        hints_ar: [
+          'رصيد المخزون ينقص (دائن)، ومصروف الخسارة التشغيلية يزيد (مدين).',
+          'اجعل حساب الأصل دائناً لإخراجه من الميزانية.',
+          'مفتاح الحل: مدين خسائر وهالك المخزون، دائن أصل المخزون.'
+        ],
+        hints_en: [
+          'Inventory balance decreases (credit), expense increases (debit).',
+          'Credit the asset account to remove it from balance sheet.',
+          'Direct Key: Debit Scrap Expense, Credit Inventory Asset.'
+        ],
+        reference: {
+          title_ar: 'المعالجة المحاسبية لهالك وفواقد المخزون في SAP S/4HANA',
+          title_en: 'ERP Inventory Scrap & Loss Accounting Entries',
+          url: 'https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/inventory-management',
+          source_ar: 'توثيق SAP المالي والتشغيلي',
+          source_en: 'SAP S/4HANA Finance'
+        }
       },
+
       // ── SET 2: Advanced Supply Chain, WMS & NRV (Questions 11 to 20) ──
       {
         id: 'Q-INV-011',
@@ -305,14 +507,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Consignment inventory remains off-balance sheet until control/risk transfers upon consumption. At consumption, ERP generates: Debit Inventory/COGS, Credit Accounts Payable to Consignor.',
-        explanation_ar: 'بضاعة الأمانة تظل خارج الميزانية حتى يتم استهلاكها أو بيعها، وعندها يولد النظام قيد: مدين المخزون/تكلفة المبيعات، دائن المورد.',
-        distractors: {
-          'B': 'Physical receipt without ownership transfer does not trigger GL liability.',
-          'C': 'Contract signing is not an accounting transaction.',
-          'D': 'Unconsumed stock is never capitalized arbitrarily.'
+        explanation_ar: 'وفق معايير IFRS 15 و IAS 2، تظل بضاعة الأمانة خارج الميزانية العمومية لأن مخاطر وملكية الأصل ما زالت بيد المورد. وعند قيامك بسحب الصنف واستهلاكه أو بيعه فعلياً، يقوم النظام آلياً بإنشاء القيد المحاسبي: مدين المخزون/تكلفة المبيعات، دائن حـ/ الموردين.',
+        distractors_ar: {
+          'B': 'خطأ: الاستلام الفيزيائي دون انتقال الملكية والمخاطر لا يُنشئ التزاماً مالياً بالأستاذ العام.',
+          'C': 'خطأ: توقيع العقود الإطارية ليس حدثاً محاسبياً يترتب عليه قيد مالي.',
+          'D': 'خطأ: البضاعة غير المستهلكة تظل ملكاً للمورد ولا تُرسمل تعسفياً نهاية العام.'
         },
-        hints: ['Who bears the ownership risk while the stock sits untouched on your shelf?', 'Liability occurs at consumption.', 'Off-balance sheet until consumed.'],
-        reference: { title: 'IFRS 15 & IAS 2 - Consignment Inventory Accounting Treatment', url: 'https://www.ifrs.org/', source: 'IFRS Accounting Standards' }
+        distractors_en: {
+          'B': 'Incorrect: Physical receipt without ownership transfer does not trigger GL liability.',
+          'C': 'Incorrect: Contract signing is not an accounting transaction.',
+          'D': 'Incorrect: Unconsumed stock is never capitalized arbitrarily.'
+        },
+        hints_ar: [
+          'من يتحمل مخاطر الملكية والتلف طالما البضاعة مخزنة ولم تُسحب بعد؟',
+          'الالتزام المحاسبي المالي ينشأ فقط لحظة انتقال السيطرة والاستهلاك.',
+          'مفتاح الحل: البضاعة خارج الميزانية حتى يتم استهلاكها في الإنتاج أو بيعها.'
+        ],
+        hints_en: [
+          'Who bears the ownership risk while the stock sits untouched on your shelf?',
+          'Financial liability occurs strictly upon control transfer at consumption.',
+          'Direct Key: Stays off-balance sheet until consumed in production or sold.'
+        ],
+        reference: {
+          title_ar: 'المعالجة المحاسبية لبضاعة الأمانة وفق معايير IFRS 15 و IAS 2',
+          title_en: 'IFRS 15 & IAS 2 - Consignment Inventory Accounting Treatment',
+          url: 'https://www.ifrs.org/',
+          source_ar: 'المعايير الدولية لإعداد التقارير المالية IFRS',
+          source_en: 'IFRS Accounting Standards'
+        }
       },
       {
         id: 'Q-INV-012',
@@ -332,14 +554,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'NRV = Estimated Selling Price ($42,000) - Costs to Sell ($2,000) = $40,000. Since NRV ($40,000) is below Cost ($50,000), a write-down of $10,000 is recognized in P&L: Debit Inventory Valuation Loss $10,000, Credit Allowance for Inventory NRV $10,000.',
-        explanation_ar: 'صافي القيمة البيعية NRV = سعر البيع (42,000) - مصاريف البيع (2,000) = 40,000 ريال. الفارق بين التكلفة (50,000) وصافي القيمة (40,000) هو 10,000 ريال يُحمل كمصروف هبوط بالقوائم.',
-        distractors: {
-          'B': 'Forgot to deduct the $2,000 estimated costs to sell from NRV.',
-          'C': 'Only considered the selling cost without comparing to market drop.',
-          'D': 'IAS 2 mandates immediate lower-of-cost-and-NRV recognition at reporting date.'
+        explanation_ar: 'صافي القيمة البيعية (NRV) = سعر البيع التقديري (42,000) - مصاريف إتمام البيع (2,000) = 40,000 ريال. بما أن صافي القيمة البيعية (40,000) أقل من التكلفة الدفترية (50,000)، يثبت النظام قيد هبوط بقيمة 10,000 ريال: مدين حـ/ خسائر هبوط المخزون (قائمة الدخل)، دائن حـ/ مخصص هبوط المخزون (الميزانية).',
+        distractors_ar: {
+          'B': 'خطأ: أسقط خصم مصاريف تجهيز البيع (2,000 ريال) من معادلة NRV.',
+          'C': 'خطأ: احتسب مصاريف البيع فقط دون مقارنة القيمة الإجمالية مع التكلفة.',
+          'D': 'خطأ: معيار IAS 2 يلزم بإثبات مخصص الهبوط فورياً في تاريخ إعداد القوائم المالية.'
         },
-        hints: ['Calculate NRV first: Selling price minus costs to sell.', 'NRV = 42,000 - 2,000 = 40,000.', 'Compare 50,000 cost with 40,000 NRV.'],
-        reference: { title: 'IAS 2 - Measurement of Inventories at Lower of Cost and NRV', url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/', source: 'IFRS Standards' }
+        distractors_en: {
+          'B': 'Incorrect: Forgot to deduct the $2,000 estimated costs to sell from NRV.',
+          'C': 'Incorrect: Only considered the selling cost without comparing to market drop.',
+          'D': 'Incorrect: IAS 2 mandates immediate lower-of-cost-and-NRV recognition at reporting date.'
+        },
+        hints_ar: [
+          'احسب صافي القيمة البيعية (NRV) أولاً: سعر البيع ناقص مصاريف البيع.',
+          'صافي القيمة البيعية = 42,000 - 2,000 = 40,000 ريال.',
+          'مفتاح الحل: قارن التكلفة (50,000) مع صافي القيمة (40,000) = فارق هبوط 10,000 ريال.'
+        ],
+        hints_en: [
+          'Calculate NRV first: Estimated selling price minus estimated costs to sell.',
+          'NRV = 42,000 - 2,000 = 40,000.',
+          'Direct Key: Compare 50,000 cost with 40,000 NRV = $10,000 write-down.'
+        ],
+        reference: {
+          title_ar: 'معيار IAS 2 - قياس المخزون بالتكلفة أو صافي القيمة البيعية أيهما أقل',
+          title_en: 'IAS 2 - Measurement of Inventories at Lower of Cost and NRV',
+          url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/',
+          source_ar: 'معايير المحاسبة الدولية',
+          source_en: 'IFRS Standards'
+        }
       },
       {
         id: 'Q-INV-013',
@@ -359,14 +601,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Putaway rules match product master attributes (e.g. hazardous, refrigerated, heavy, fast-moving) to pre-defined storage locations to minimize travel distance and ensure safety compliance.',
-        explanation_ar: 'قواعد التوجيه المخزني (Putaway) تربط خصائص الصنف بأماكن التخزين المناسبة لتقليل وقت الحركة وضمان اشتراطات السلامة.',
-        distractors: {
-          'B': 'WMS rules have zero impact on financial invoice lifecycle.',
-          'C': 'Corridor dumping creates severe safety and operational bottlenecks.',
-          'D': 'Barcode scanning is fundamental to verifying correct bin destination.'
+        explanation_ar: 'قواعد التوجيه المخزني (Putaway) تربط خصائص الصنف (مثل الوزن، الحجم، درجة التبريد، وسرعة الحركة) بمواقع الرفوف المناسبة لتقليل مسافات انتقال الرافعات وتفادي الازدحام وتحقيق معايير السلامة.',
+        distractors_ar: {
+          'B': 'خطأ: قواعد الـ WMS التشغيلية لا علاقة لها بحذف الفواتير المالية.',
+          'C': 'خطأ: تكديس البضائع في الممرات يسبب حوادث مهنية ويعطل مسارات العمل.',
+          'D': 'خطأ: قراءة الباركود أساسية لتأكيد وصول الرافعة للرف الصحيح.'
         },
-        hints: ['Think of bin location optimization based on product characteristics.', 'Fast-moving items go near dispatch; heavy items go on ground racks.'],
-        reference: { title: 'WMS Warehouse Layout & Putaway Strategies', url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/warehouses_storage/advanced_warehouses_management/putaway.html', source: 'Odoo WMS Documentation' }
+        distractors_en: {
+          'B': 'Incorrect: WMS rules have zero impact on financial invoice lifecycle.',
+          'C': 'Incorrect: Corridor dumping creates severe safety and operational bottlenecks.',
+          'D': 'Incorrect: Barcode scanning is fundamental to verifying correct bin destination.'
+        },
+        hints_ar: [
+          'فكر في توزيع الأصناف: الأصناف السريعة بالقرب من الشحن، والثقيلة على الأرضيات.',
+          'النظام يوجه السائق آلياً للموقع المثالي المحدد مسبقاً للصنف.',
+          'مفتاح الحل: توجيه المشغل إلى الرف الأمثل وفق الوزن وسرعة الدوران والحرارة.'
+        ],
+        hints_en: [
+          'Think of bin location optimization based on product characteristics.',
+          'Fast-moving items go near dispatch; heavy items go on ground racks.',
+          'Direct Key: Automated routing to the optimal bin based on velocity and physical attributes.'
+        ],
+        reference: {
+          title_ar: 'دليل تخطيط المستودعات وقواعد التخزين الآلي Putaway في Odoo WMS',
+          title_en: 'WMS Warehouse Layout & Putaway Strategies',
+          url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/warehouses_storage/advanced_warehouses_management/putaway.html',
+          source_ar: 'توثيق Odoo WMS المتقدم',
+          source_en: 'Odoo WMS Documentation'
+        }
       },
       {
         id: 'Q-INV-014',
@@ -386,14 +648,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Returned goods must enter a non-sellable Quarantine location first to undergo technical QA testing. Mixing uninspected returns with saleable stock causes repeat customer defects.',
-        explanation_ar: 'البضائع المرتجعة يجب أن تدخل موقع الحجر الفني غير القابل للبيع للفحص قبل البت في شطبها أو إرجاعها للمورد لضمان الجودة.',
-        distractors: {
-          'B': 'Selling uninspected defective goods damages reputation and violates quality SLAs.',
-          'C': 'Customer accounts cannot be deleted to hide returns.',
-          'D': 'Price modification bypasses standard RMA debit/credit reversal.'
+        explanation_ar: 'البضائع المرتجعة يجب أن تدخل موقع الحجر الفني غير القابل للبيع (Quarantine) لفحصها والتأكد من العيب قبل اتخاذ قرار شطبها أو إعادتها للمورد أو إعادة تصليحها، لمنع اختلاط المعيب بالمخزون الصالح للبيع.',
+        distractors_ar: {
+          'B': 'خطأ: بيع منتج معيب لعميل آخر يدمر سمعة المنشأة ويخالف معايير الجودة.',
+          'C': 'خطأ: حذف حساب العميل مستحيل برمجياً في سجلات التدقيق.',
+          'D': 'خطأ: تصفير السعر تحايل محاسبي يلغي دورة الإشعار الدائن الرسمية.'
         },
-        hints: ['Goods must be quarantined and inspected before restocked or credited.', 'Never mix defective returns with fresh saleable inventory.'],
-        reference: { title: 'Reverse Logistics & Quality Quarantine in Enterprise ERP', url: 'https://help.sap.com/', source: 'SAP Supply Chain Logistics' }
+        distractors_en: {
+          'B': 'Incorrect: Selling uninspected defective goods damages reputation and violates quality SLAs.',
+          'C': 'Incorrect: Customer accounts cannot be deleted to hide returns.',
+          'D': 'Incorrect: Price modification bypasses standard RMA debit/credit reversal.'
+        },
+        hints_ar: [
+          'يجب حجر البضاعة المعيبة وفحصها فنياً قبل أي تسوية مالية.',
+          'لا تخلط أبداً بين البضائع المعيبة المرتجعة والمخزون الجاهز للبيع.',
+          'مفتاح الحل: الاستلام في موقع الفحص (Quarantine) ثم توجيهه للهالك أو المورد.'
+        ],
+        hints_en: [
+          'Goods must be quarantined and inspected before restocked or credited.',
+          'Never mix defective returns with fresh saleable inventory.',
+          'Direct Key: Receive into Quarantine for QA testing before dispositioning.'
+        ],
+        reference: {
+          title_ar: 'اللوجستيات العكسية وحجر الجودة الفني في SAP Supply Chain',
+          title_en: 'Reverse Logistics & Quality Quarantine in Enterprise ERP',
+          url: 'https://help.sap.com/',
+          source_ar: 'دليل عمليات اللوجستيات في SAP',
+          source_en: 'SAP Supply Chain Logistics'
+        }
       },
       {
         id: 'Q-INV-015',
@@ -413,14 +695,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'A Phantom BOM is a transient sub-assembly that is never stocked. When the parent MO is confirmed, the ERP "explodes" through the phantom directly to its raw material children.',
-        explanation_ar: 'الـ Phantom BOM هي تجميعة عابرة لا تُخزن ولا يُنشأ لها أمر شغل مستقل، بل تنفجر شجرتها مباشرة لمكوناتها الأولية عند تصنيع المنتج النهائي.',
-        distractors: {
-          'B': 'Financial costing accurately rolls up raw component costs.',
-          'C': 'Components are actively picked and issued on the parent order.',
-          'D': 'Standard costing operates transparently through phantom levels.'
+        explanation_ar: 'شجرة المنتج الوهمية (Phantom BOM) تُستخدم لتجميع القطع هندسياً وتصميمياً فقط، لكنها لا تُخزن ولا يُنشأ لها أمر تصنيع مستقل؛ بل تنفجر شجرتها آلياً في أمر تصنيع المنتج النهائي لتُصرف مكوناتها الخام فورياً.',
+        distractors_ar: {
+          'B': 'خطأ: التكاليف المحاسبية تُجمع بدقة من المكونات الأولية دون إخفاء.',
+          'C': 'خطأ: المواد تُصرف وتُسحب فعلياً من المستودع على أمر التشغيل الرئيسي.',
+          'D': 'خطأ: التكاليف المعيارية تدعم الـ Phantom BOM وتعمل بكفاءة.'
         },
-        hints: ['Phantom sub-assemblies exist logically for design but are not stocked physically.', 'Parent production order explodes directly to raw components.'],
-        reference: { title: 'BOM Types & Phantom Assemblies in ERP/MRP', url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/manufacturing/management/kit_shipping.html', source: 'Odoo Manufacturing Guide' }
+        distractors_en: {
+          'B': 'Incorrect: Financial costing accurately rolls up raw component costs.',
+          'C': 'Incorrect: Components are actively picked and issued on the parent order.',
+          'D': 'Incorrect: Standard costing operates transparently through phantom levels.'
+        },
+        hints_ar: [
+          'التجميعات الوهمية (Phantom) موجودة منطقياً في التصميم لكن لا يتم تخزينها فيزيائياً.',
+          'أمر الإنتاج ينفجر مباشرة ليصل إلى المواد الخام الأولية.',
+          'مفتاح الحل: تجميع المكونات دون أمر إنتاج فرعي أو تخزين وسيط.'
+        ],
+        hints_en: [
+          'Phantom sub-assemblies exist logically for design but are not stocked physically.',
+          'Parent production order explodes directly to raw components.',
+          'Direct Key: Component grouping without separate manufacturing order or intermediate stocking.'
+        ],
+        reference: {
+          title_ar: 'أنواع شجرة المنتج والتجميعات الوهمية Phantom في أنظمة MRP/ERP',
+          title_en: 'BOM Types & Phantom Assemblies in ERP/MRP',
+          url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/manufacturing/management/kit_shipping.html',
+          source_ar: 'دليل التصنيع وإدارة المواد',
+          source_en: 'Odoo Manufacturing Guide'
+        }
       },
       {
         id: 'Q-INV-016',
@@ -440,14 +742,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'GS1 Application Identifiers (e.g. (01) GTIN, (10) Lot, (17) Expiry Date, (30) Qty) allow handheld ERP barcode scanners to populate complex traceability fields simultaneously with zero human typing error.',
-        explanation_ar: 'معايير GS1 تسمح بتضمين رقم الصنف وتشغيلته وتاريخ انتهائه في باركود واحد، فيقوم النظام بتعبئة حقول التتبع دفعة واحدة بدقة 100%.',
-        distractors: {
-          'B': 'Approval hierarchies are governed by RBAC, not barcode protocols.',
-          'C': 'Currency revaluation is unrelated to physical scanning.',
-          'D': 'Barcode scanners capture input, they do not manage multi-lingual reporting.'
+        explanation_ar: 'معرفات التطبيقات الدولية (GS1 Application Identifiers) تدمج كود الصنف العالمي ورقم التشغيلة وتاريخ الصلاحية والكمية في باركود واحد؛ فتقوم ماسحة الـ ERP بتوزيعها في الحقول المناسبة بمسحة واحدة دون أي خطأ إدخال بشري.',
+        distractors_ar: {
+          'B': 'خطأ: الصلاحيات المالية تخضع لجدول الصلاحيات (RBAC) وليس لبروتوكول الباركود.',
+          'C': 'خطأ: تحويل العملات عملية محاسبية لا علاقة لها بالماسح الضوئي.',
+          'D': 'خطأ: وظيفة الماسح قراءة وتغذية البيانات وليس تصميم قوالب الطباعة.'
         },
-        hints: ['GS1 barcodes embed multiple data points: GTIN + Lot + Expiry in one symbol.', 'Eliminates manual keyboard entry on mobile devices.'],
-        reference: { title: 'GS1-128 Barcode Standard in Supply Chain Management', url: 'https://www.gs1.org/standards/barcodes', source: 'GS1 International Standards' }
+        distractors_en: {
+          'B': 'Incorrect: Approval hierarchies are governed by RBAC, not barcode protocols.',
+          'C': 'Incorrect: Currency revaluation is unrelated to physical scanning.',
+          'D': 'Incorrect: Barcode scanners capture input, they do not manage multi-lingual reporting.'
+        },
+        hints_ar: [
+          'باركود GS1 يجمع عدة بيانات في رمز واحد: الصنف + التشغيلة + تاريخ الانتهاء.',
+          'يلغي الحاجة للكتابة اليدوية لأرقام التشغيلات والتواريخ على الشاشات المحمولة.',
+          'مفتاح الحل: قراءة كود الصنف والتشغيلة وتاريخ الانتهاء والكمية في مسحة واحدة.'
+        ],
+        hints_en: [
+          'GS1 barcodes embed multiple data points: GTIN + Lot + Expiry in one symbol.',
+          'Eliminates manual keyboard entry on mobile devices.',
+          'Direct Key: Parses item code, lot, expiry date and quantity in a single scan.'
+        ],
+        reference: {
+          title_ar: 'معايير باركود GS1-128 في إدارة سلاسل الإمداد والمستودعات',
+          title_en: 'GS1-128 Barcode Standard in Supply Chain Management',
+          url: 'https://www.gs1.org/standards/barcodes',
+          source_ar: 'منظمة المعايير الدولية GS1',
+          source_en: 'GS1 International Standards'
+        }
       },
       {
         id: 'Q-INV-017',
@@ -467,14 +789,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Under Standard Costing, Inventory Asset is debited strictly at standard ($50 * 100 = $5,000). The $5/unit unfavorable variance ($500) hits the PPV variance account in P&L, and Vendor is credited for the actual invoice total ($5,500).',
-        explanation_ar: 'في التكلفة المعيارية يدخل المخزون بسعره المعياري (5,000 ريال)، ويثبت الفارق غير الملائم (500 ريال) كحساب انحراف أسعار شراء PPV مدين بقائمة الدخل، ويثبت استحقاق المورد الفعلي (5,500 ريال).',
-        distractors: {
-          'B': 'Represents Moving Average valuation, not Standard Costing.',
-          'C': 'Cash is not touched during voucher accrual validation.',
-          'D': 'Sales revenue is not debited during vendor inventory purchasing.'
+        explanation_ar: 'في التكاليف المعيارية يدخل المخزون بسعره المعياري الثابت (100 × 50 = 5,000 ريال)، ويثبت استحقاق المورد الفعلي كاملاً (5,500 ريال)، ويُحمل فارق السعر غير الملائم (500 ريال) كحساب انحراف أسعار شراء مدين (PPV) في قائمة الدخل.',
+        distractors_ar: {
+          'B': 'خطأ: هذا القيد يمثل نظام المتوسط المتحرك وليس نظام التكاليف المعيارية.',
+          'C': 'خطأ: حساب النقدية لا يتأثر عند ترحيل فواتير الاستحقاق الآجلة.',
+          'D': 'خطأ: إيرادات المبيعات لا تُجعل مدينة عند شراء المخزون من الموردين.'
         },
-        hints: ['Inventory is debited at standard cost (100 * $50).', 'Vendor is credited at actual invoice price (100 * $55).', 'Variance of $500 balances the entry as a debit expense.'],
-        reference: { title: 'Standard Costing & Purchase Price Variance (PPV) Accounting', url: 'https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/controlling', source: 'SAP Controlling & Cost Accounting' }
+        distractors_en: {
+          'B': 'Incorrect: Represents Moving Average valuation, not Standard Costing.',
+          'C': 'Incorrect: Cash is not touched during voucher accrual validation.',
+          'D': 'Incorrect: Sales revenue is not debited during vendor inventory purchasing.'
+        },
+        hints_ar: [
+          'المخزون يُسجل بالتكلفة المعيارية (100 × 50 = 5,000 ريال).',
+          'المورد يستحق القيمة الفعلية للفاتورة (100 × 55 = 5,500 ريال).',
+          'مفتاح الحل: فارق الـ 500 ريال يوازن القيد كحساب انحراف أسعار شراء (PPV) مدين.'
+        ],
+        hints_en: [
+          'Inventory is debited at standard cost (100 * $50 = $5,000).',
+          'Vendor is credited at actual invoice price (100 * $55 = $5,500).',
+          'Direct Key: Variance of $500 balances the entry as an unfavorable debit expense.'
+        ],
+        reference: {
+          title_ar: 'محاسبة التكاليف المعيارية وانحرافات أسعار الشراء PPV في SAP Controlling',
+          title_en: 'Standard Costing & Purchase Price Variance (PPV) Accounting',
+          url: 'https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/controlling',
+          source_ar: 'دليل محاسبة التكاليف في SAP S/4HANA',
+          source_en: 'SAP Controlling & Cost Accounting'
+        }
       },
       {
         id: 'Q-INV-018',
@@ -494,14 +836,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Batch picking consolidates identical items across multiple sales orders into one consolidated picking route, drastically reducing warehouse travel time by up to 80%.',
-        explanation_ar: 'الصرف بالمجموعات (Batch Picking) يدمج بنود الطلبات المتشابهة في مسار واحد ليسحب العامل إجمالي الكمية المطلوبة برحلة واحدة فقط.',
-        distractors: {
-          'B': 'Discrete picking creates 500 redundant trips to the exact same rack location.',
-          'C': 'Random picking results in high error rates and zero auditability.',
-          'D': 'Physical inventory counts do not fulfill customer delivery orders.'
+        explanation_ar: 'الصرف بالمجموعات والموجات (Batch / Wave Picking) يدمج بنود الطلبات المتشابهة في مسار واحد، فيقوم العامل بسحب الـ 500 وحدة دفعة واحدة من موقع الرف برحلة واحدة فقط، ثم يتم فرزها وتغليفها بمحطة الشحن.',
+        distractors_ar: {
+          'B': 'خطأ: الصرف المنفصل يجبر العامل على الذهاب والإياب 500 مرة لنفس الموقع ويهدر الوقت.',
+          'C': 'خطأ: الصرف العشوائي يتسبب بنسب خطأ مرتفعة وانعدام الرقابة.',
+          'D': 'خطأ: الجرد السنوي لا علاقة له بتجهيز طلبات العملاء اليومية.'
         },
-        hints: ['Pick once in bulk, sort at packing station.', 'Compare 1 consolidated trip vs 500 individual trips.'],
-        reference: { title: 'WMS Warehouse Picking Strategies: Batch vs Wave vs Zone', url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/shipping_receiving/picking_methods.html', source: 'Odoo WMS Guide' }
+        distractors_en: {
+          'B': 'Incorrect: Discrete picking creates 500 redundant trips to the exact same rack location.',
+          'C': 'Incorrect: Random picking results in high error rates and zero auditability.',
+          'D': 'Incorrect: Physical inventory counts do not fulfill customer delivery orders.'
+        },
+        hints_ar: [
+          'اجمع الكمية في مشوار واحد ثم افرزها على طاولة التغليف.',
+          'قارن بين رحلة واحدة مجمعة مقابل 500 مشوار فردي مكرر.',
+          'مفتاح الحل: الصرف التجميعي (Batch/Wave Picking) يقلل مسافة الحركة بنسبة 80%.'
+        ],
+        hints_en: [
+          'Pick once in bulk, sort at packing station.',
+          'Compare 1 consolidated trip vs 500 individual trips.',
+          'Direct Key: Batch/Wave picking slashes warehouse travel distance.'
+        ],
+        reference: {
+          title_ar: 'استراتيجيات الصرف بالموجات والمجموعات في Odoo WMS',
+          title_en: 'WMS Warehouse Picking Strategies: Batch vs Wave vs Zone',
+          url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/shipping_receiving/picking_methods.html',
+          source_ar: 'دليل إدارة المستودعات المتطورة',
+          source_en: 'Odoo WMS Guide'
+        }
       },
       {
         id: 'Q-INV-019',
@@ -521,14 +883,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'Timing mismatches and dropped API payload webhooks (e.g. unconfirmed ASN receipts, unposted returns, or delayed goods issue callbacks) are the primary source of 3PL sync variances.',
-        explanation_ar: 'فحص سجلات رسائل الـ API يكشف العمليات التي فشل وصولها أو تأكيدها بين النظامين (مثل إشعارات الاستلام والتسليم المعلقة) لمعالجتها برمجياً.',
-        distractors: {
-          'B': 'Blind balance deletion corrupts accounting audit trails.',
-          'C': 'Disconnecting communications halts all logistics operations.',
-          'D': 'Chart of accounts has no impact on EDI integration payloads.'
+        explanation_ar: 'فحص سجلات رسائل الـ API يكشف العمليات وإشعارات الشحن المسبقة (ASN) أو أذونات الصرف التي فشل وصولها أو تأكيدها بين النظامين، مما يسمح بإعادة معالجتها برمجياً ومطابقة الأرصدة بدقة.',
+        distractors_ar: {
+          'B': 'خطأ: حذف الأرصدة دفترياً يدمر مسار التدقيق الرقابي والمحاسبي.',
+          'C': 'خطأ: قطع الاتصال يوقف العمليات اللوجستية بالكامل.',
+          'D': 'خطأ: شجرة الحسابات لا علاقة لها بحزم بيانات الـ API والـ EDI.'
         },
-        hints: ['Check failed API webhooks and pending ASN documents.', 'EDI / API integration error logs provide exact transaction mismatch root causes.'],
-        reference: { title: '3PL Logistics Integration Best Practices & EDI Standards', url: 'https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/', source: 'Microsoft Dynamics 365 Supply Chain' }
+        distractors_en: {
+          'B': 'Incorrect: Blind balance deletion corrupts accounting audit trails.',
+          'C': 'Incorrect: Disconnecting communications halts all logistics operations.',
+          'D': 'Incorrect: Chart of accounts has no impact on EDI integration payloads.'
+        },
+        hints_ar: [
+          'ابحث في سجلات أخطاء الـ API والويب هوك المعلق.',
+          'فروقات الـ 3PL تنشأ من عدم تأكيد إشعارات الشحن (ASN) أو حركات الاستلام.',
+          'مفتاح الحل: فحص سجلات أخطاء واجهة التكامل (API Logs).'
+        ],
+        hints_en: [
+          'Check failed API webhooks and pending ASN documents.',
+          'EDI / API integration error logs provide exact transaction mismatch root causes.',
+          'Direct Key: Inspect API middleware integration error logs.'
+        ],
+        reference: {
+          title_ar: 'أفضل ممارسات ربط المستودعات الخارجية 3PL ومعايير EDI في Dynamics 365',
+          title_en: '3PL Logistics Integration Best Practices & EDI Standards',
+          url: 'https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/',
+          source_ar: 'دليل سلاسل الإمداد في Microsoft Dynamics',
+          source_en: 'Microsoft Dynamics 365 Supply Chain'
+        }
       },
       {
         id: 'Q-INV-020',
@@ -548,155 +930,34 @@ const CHALLENGE_BANK_DATA = (function () {
         ],
         correct_answer: 'A',
         explanation_en: 'In ERP architecture, defining the smallest consumed unit as the Base UoM and configuring high decimal precision (e.g. 5 decimals) eliminates compounding floating-point rounding errors during unit conversions.',
-        explanation_ar: 'أفضل ممارسة في الـ ERP هي اعتماد الوحدة الأصغر كوحدة أساسية (Base UoM) ورفع دقة المنازل العشرية في معادلات التحويل لمنع تراكم فروق التقريب الحسابية.',
-        distractors: {
-          'B': 'Manufacturing formulas are core business requirements.',
-          'C': 'Negative stock compounds valuation distortions.',
-          'D': 'Zero rounding ruins production batch cost accounting.'
+        explanation_ar: 'أفضل ممارسة معمارية في الـ ERP هي جعل وحدة القياس الأساسية المرجعية (Base UoM) هي الوحدة الأصغر استهلاكاً (الجرام)، وتفعيل دقة منازل عشرية مرتفعة (5 منازل) في نسب التحويل لمنع تراكم فروق التقريب الحسابية بمرور الوقت.',
+        distractors_ar: {
+          'B': 'خطأ: وصفات التصنيع متطلب تشغيلي أساسي للمصنع.',
+          'C': 'خطأ: الأرصدة السالبة تزيد من تشوه التكاليف.',
+          'D': 'خطأ: التقريب للصفر يدمر حسابات تكاليف أوامر الشغل.'
         },
-        hints: ['Base UoM should always be the lowest common denominator unit.', 'Increase decimal rounding precision to 4 or 5 decimal places.'],
-        reference: { title: 'Units of Measure (UoM) Conversion & Decimal Precision in ERP', url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/management/products/uom.html', source: 'Odoo Product UoM Standards' }
-      }
-    ],
-
-    // =========================================================================
-    // 2. FINANCIAL ACCOUNTING (الحسابات) - 20 Distinct High-Yield Questions
-    // =========================================================================
-    'MOD-2': [
-      {
-        id: 'Q-ACC-001',
-        module_id: 'MOD-2',
-        category_id: 'CAT-ACC-GL',
-        topic_id: 'TOP-CLOSING',
-        concept_id: 'CON-RETAINED-EARNINGS',
-        question_type: 'Accounting Impact',
-        difficulty: 'Intermediate',
-        question_en: 'When executing the Year-End Financial Closing entry for a net profit of $500,000, what is the correct debit and credit journal entry?',
-        question_ar: 'عند إجراء قيد إقفال نهاية السنة المالية (Year-End Closing Entry)، ما هو الحساب الدائن والمدين الصحيح لإقفال صافي ربح قدره 500,000 ريال؟',
-        options: [
-          { id: 'A', text_en: 'Debit: P&L Income Summary $500,000 | Credit: Retained Earnings $500,000', text_ar: 'مدين: حـ/ ملخص الدخل والأرباح والخسائر 500,000 ريال | دائن: حـ/ الأرباح المبقاة (Retained Earnings) 500,000 ريال' },
-          { id: 'B', text_en: 'Debit: Cash $500,000 | Credit: Sales Revenue $500,000', text_ar: 'مدين: حـ/ النقدية 500,000 ريال | دائن: حـ/ الإيرادات 500,000 ريال' },
-          { id: 'C', text_en: 'Debit: Retained Earnings $500,000 | Credit: Operational Expenses $500,000', text_ar: 'مدين: حـ/ الأرباح المبقاة 500,000 ريال | دائن: حـ/ المصروفات 500,000 ريال' },
-          { id: 'D', text_en: 'Debit: Share Capital $500,000 | Credit: Bank $500,000', text_ar: 'مدين: حـ/ رأس المال 500,000 ريال | دائن: حـ/ البنك 500,000 ريال' }
+        distractors_en: {
+          'B': 'Incorrect: Manufacturing formulas are core business requirements.',
+          'C': 'Incorrect: Negative stock compounds valuation distortions.',
+          'D': 'Incorrect: Zero rounding ruins production batch cost accounting.'
+        },
+        hints_ar: [
+          'يجب أن تكون وحدة القياس الأساسية دائماً هي أصغر وحدة يتم التعامل بها.',
+          'ارفع دقة المنازل العشرية (Decimal Precision) في إعدادات وحدات القياس.',
+          'مفتاح الحل: ضبط Base UoM بالجرام ورفع دقة المنازل العشرية.'
         ],
-        correct_answer: 'A',
-        explanation_en: 'Temporary revenue and expense accounts close into Income Summary, and the resulting credit balance net profit is transferred to Balance Sheet Equity by Debiting Income Summary and Crediting Retained Earnings.',
-        explanation_ar: 'يتم إقفال حسابات قائمة الدخل المؤقتة في حـ/ ملخص الدخل، ثم يُرحل صافي الربح الدائن بإثباته مديناً في ملخص الدخل ودائناً في حـ/ الأرباح المبقاة (حقوق الملكية) في الميزانية العمومية.',
-        distractors: {
-          'B': 'Closing entries are accounting equity adjustments and do not touch liquid cash.',
-          'C': 'This entry structure records a net loss, not a profit.',
-          'D': 'Paid-in share capital is not modified directly by periodic operational closings.'
-        },
-        hints: ['Where do cumulative profits accumulate within Balance Sheet Equity?', 'Credit balance profits are debited to zero out and credited to equity.', 'Look for Retained Earnings.'],
-        reference: { title: 'IAS 1 - Presentation of Financial Statements & Equity Movements', url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-1-presentation-of-financial-statements/', source: 'IFRS Accounting Standards' }
-      },
-      {
-        id: 'Q-ACC-002',
-        module_id: 'MOD-2',
-        category_id: 'CAT-ACC-BANK',
-        topic_id: 'TOP-BANK-RECON',
-        concept_id: 'CON-OUTSTANDING-CHECKS',
-        question_type: 'Troubleshooting',
-        difficulty: 'Intermediate',
-        question_en: 'In monthly Bank Reconciliation, the ERP General Ledger bank balance is $120,000, while the Bank Statement shows $145,000. Outstanding issued vendor checks total $27,000, and unrecorded bank fees total $2,000. What is the true adjusted reconciled cash balance?',
-        question_ar: 'في مذكرة تسوية البنك الشهرية، رصيد البنك في دفاتر الشركة (GL) هو 120,000 ريال، ورصيد كشف حساب البنك 145,000 ريال. الشيكات الصادرة للموردين ولم تُصرف بعد 27,000 ريال، والعمولات البنكية غير المسجلة بالدفاتر 2,000 ريال. ما هو الرصيد النقدي الفعلي المعدل؟',
-        options: [
-          { id: 'A', text_en: '$118,000 ($120,000 book - $2,000 fee = $145,000 bank - $27,000 checks)', text_ar: '118,000 ريال (رصيد الدفاتر 120,000 - 2,000 عمولات = رصيد الكشف 145,000 - 27,000 شيكات)' },
-          { id: 'B', text_en: '$145,000', text_ar: '145,000 ريال' },
-          { id: 'C', text_en: '$122,000', text_ar: '122,000 ريال' },
-          { id: 'D', text_en: '$147,000', text_ar: '147,000 ريال' }
+        hints_en: [
+          'Base UoM should always be the lowest common denominator unit.',
+          'Increase decimal rounding precision to 4 or 5 decimal places.',
+          'Direct Key: Set Base UoM to smallest unit (Gram) and increase decimal precision.'
         ],
-        correct_answer: 'A',
-        explanation_en: 'Adjusted Book Balance = Book ($120,000) - Unrecorded Bank Fees ($2,000) = $118,000. Adjusted Bank Balance = Bank Statement ($145,000) - Outstanding Checks ($27,000) = $118,000. Both reconcile perfectly at $118,000.',
-        explanation_ar: 'الرصيد المعدل للدفاتر = 120,000 - 2,000 عمولات = 118,000 ريال. والرصيد المعدل لكشف البنك = 145,000 - 27,000 شيكات لم تصرف = 118,000 ريال. يتطابق الطرفان تماماً عند 118,000 ريال.',
-        distractors: {
-          'B': 'Ignores outstanding checks that the bank has not cleared yet.',
-          'C': 'Incorrectly added the bank fee expense instead of deducting it.',
-          'D': 'Added outstanding checks to bank balance instead of subtracting.'
-        },
-        hints: ['Deduct bank fees from book balance.', 'Deduct outstanding checks from bank statement balance.', 'Both sides must equal $118,000.'],
-        reference: { title: 'Bank Reconciliation Standards & Cash Controls', url: 'https://www.oracle.com/erp/financials/cash-management/', source: 'Oracle Financials Best Practices' }
-      },
-      {
-        id: 'Q-ACC-003',
-        module_id: 'MOD-2',
-        category_id: 'CAT-ACC-ACCRUALS',
-        topic_id: 'TOP-PREPAID',
-        concept_id: 'CON-PREPAID-EXPENSE',
-        question_type: 'Accounting Impact',
-        difficulty: 'Intermediate',
-        question_en: 'On January 1, a company pays $120,000 upfront for an annual commercial office lease. At the end of January, what monthly amortization journal entry must the ERP post under the Accrual Basis?',
-        question_ar: 'في 1 يناير، سددت شركة 120,000 ريال نقداً عن إيجار مكاتب سنوي مقدماً. في نهاية شهر يناير، ما هو قيد التسوية الشهرية الذي يجب ترحيله في النظام وفق أساس الاستحقاق؟',
-        options: [
-          { id: 'A', text_en: 'Debit: Rent Expense $10,000 | Credit: Prepaid Rent Asset $10,000', text_ar: 'مدين: حـ/ مصروف الإيجار 10,000 ريال | دائن: حـ/ إيجار مدفوع مقدماً 10,000 ريال' },
-          { id: 'B', text_en: 'Debit: Rent Expense $120,000 | Credit: Cash $120,000', text_ar: 'مدين: حـ/ مصروف الإيجار 120,000 ريال | دائن: حـ/ النقدية 120,000 ريال' },
-          { id: 'C', text_en: 'Debit: Prepaid Rent $10,000 | Credit: Cash $10,000', text_ar: 'مدين: حـ/ الإيجار المقدم 10,000 ريال | دائن: حـ/ النقدية' },
-          { id: 'D', text_en: 'Debit: Accounts Payable $10,000 | Credit: Rent Expense $10,000', text_ar: 'مدين: حـ/ الموردين | دائن: حـ/ مصروف الإيجار' }
-        ],
-        correct_answer: 'A',
-        explanation_en: 'Monthly rent cost = $120,000 / 12 months = $10,000. Under accrual accounting, the ERP amortizes the current month portion by Debiting Rent Expense (P&L) and Crediting Prepaid Rent Asset (Balance Sheet).',
-        explanation_ar: 'إيجار الشهر = 120,000 / 12 = 10,000 ريال. قيد التسوية يخفض أصل الإيجار المقدم بجعله دائناً بـ 10,000، ويثبت مصروف إيجار الشهر مديناً بقائمة الدخل.',
-        distractors: {
-          'B': 'Expensing full $120,000 in month 1 violates GAAP/IFRS matching principle.',
-          'C': 'Cash was already paid on Jan 1; adjusting entries do not touch cash.',
-          'D': 'Accounts Payable is not involved in prepaid amortizations.'
-        },
-        hints: ['Divide annual payment by 12 months = $10,000/month.', 'P&L expense increases (debit), Prepaid asset decreases (credit).'],
-        reference: { title: 'IAS 1 - Accrual Basis of Accounting & Matching Principle', url: 'https://www.ifrs.org/', source: 'IFRS Accounting Standards' }
-      },
-      {
-        id: 'Q-ACC-004',
-        module_id: 'MOD-2',
-        category_id: 'CAT-ACC-CURRENCY',
-        topic_id: 'TOP-FOREX',
-        concept_id: 'CON-UNREALIZED-FX',
-        question_type: 'Accounting Impact',
-        difficulty: 'Advanced',
-        question_en: 'A company with SAR base currency has an open USD vendor payable of $100,000 booked at USD/SAR = 3.75 (SAR 375,000). At month-end, the exchange rate becomes 3.80. What revaluation journal entry must the ERP generate?',
-        question_ar: 'شركة عملتها الأساسية الريال (SAR) ولديها ذمة مورد مفتوحة بمبلغ 100,000 دولار مسجلة بسعر صرف 3.75 (375,000 ريال). في نهاية الشهر ارتفع سعر الصرف إلى 3.80. ما هو قيد إعادة تقييم فروق العملة المتولد في النظام؟',
-        options: [
-          { id: 'A', text_en: 'Debit: Unrealized Foreign Exchange Loss $5,000 | Credit: Accounts Payable (USD Subledger) $5,000', text_ar: 'مدين: حـ/ خسائر فروق عملة غير محققة (P&L) 5,000 ريال | دائن: حـ/ ذمم الموردين (المساعد) 5,000 ريال' },
-          { id: 'B', text_en: 'Debit: Accounts Payable $5,000 | Credit: Unrealized FX Gain $5,000', text_ar: 'مدين: حـ/ ذمم الموردين 5,000 ريال | دائن: حـ/ أرباح فروق عملة 5,000 ريال' },
-          { id: 'C', text_en: 'Debit: Cash $5,000 | Credit: Bank $5,000', text_ar: 'مدين: حـ/ النقدية 5,000 | دائن: حـ/ البنك 5,000' },
-          { id: 'D', text_en: 'No journal entry until actual cash payment is settled', text_ar: 'لا يتم إثبات أي قيد إلا عند السداد النقدي الفعلي' }
-        ],
-        correct_answer: 'A',
-        explanation_en: 'New payable value = $100,000 * 3.80 = SAR 380,000. Increase in liability = SAR 5,000. Under IAS 21, monetary liabilities in foreign currency must be revalued at period-end rate, recognizing an Unrealized FX Loss in P&L.',
-        explanation_ar: 'قيمة الالتزام الجديدة = 100,000 × 3.80 = 380,000 ريال. زادت المديونية بـ 5,000 ريال مما يمثل خسارة غير محققة: مدين خسائر فروق عملة، دائن الموردين.',
-        distractors: {
-          'B': 'An increase in payable liability represents a loss, not a gain.',
-          'C': 'Forex revaluation is an accounting valuation adjustment with zero cash movement.',
-          'D': 'IAS 21 mandates monetary item revaluation at every reporting balance sheet date.'
-        },
-        hints: ['Liability increased from SAR 375,000 to SAR 380,000.', 'Higher liability = Foreign exchange loss (Debit Expense).'],
-        reference: { title: 'IAS 21 - The Effects of Changes in Foreign Exchange Rates', url: 'https://www.ifrs.org/issued-standards/list-of-standards/ias-21-the-effects-of-changes-in-foreign-exchange-rates/', source: 'IFRS Standards' }
-      },
-      {
-        id: 'Q-ACC-005',
-        module_id: 'MOD-2',
-        category_id: 'CAT-ACC-VAT',
-        topic_id: 'TOP-VAT-RETURN',
-        concept_id: 'CON-VAT-NETTING',
-        question_type: 'Implementation Decision',
-        difficulty: 'Intermediate',
-        question_en: 'During a tax quarter, Output VAT on sales was $150,000 and recoverable Input VAT on purchases was $90,000. What is the net tax liability payable to the Tax Authority (ZATCA/IRS)?',
-        question_ar: 'خلال الربع الضريبي، بلغت ضريبة المخرجات على المبيعات (Output VAT) 150,000 ريال، وضريبة المدخلات القابلة للاسترداد على المشتريات (Input VAT) 90,000 ريال. ما هو صافي الالتزام الضريبي المستحق سداده للهيئة؟',
-        options: [
-          { id: 'A', text_en: '$60,000 Net Payable ($150,000 Output VAT - $90,000 Input VAT)', text_ar: '60,000 ريال مستحقة السداد (ضريبة مخرجات 150,000 - ضريبة مدخلات 90,000)' },
-          { id: 'B', text_en: '$240,000 ($150,000 + $90,000)', text_ar: '240,000 ريال (مجموع الضريبتين)' },
-          { id: 'C', text_en: '$150,000 (Input VAT is ignored)', text_ar: '150,000 ريال (إهمال ضريبة المدخلات)' },
-          { id: 'D', text_en: '$90,000 Refund', text_ar: '90,000 ريال استرداد' }
-        ],
-        correct_answer: 'A',
-        explanation_en: 'Net Tax Payable = Output VAT Collected from Customers ($150,000) minus Input VAT Paid to Suppliers ($90,000) = $60,000 Net VAT Payable to Tax Authority.',
-        explanation_ar: 'صافي الضريبة الواجبة السداد = ضريبة المبيعات المحصلة (150,000) - ضريبة المشتريات المسددة (90,000) = 60,000 ريال تُسدد بإقرار القيمة المضافة.',
-        distractors: {
-          'B': 'Incorrectly summed sales and purchase VAT.',
-          'C': 'Fails to claim legitimate recoverable input VAT tax credit.',
-          'D': 'Represents a refund position which only occurs if Input VAT > Output VAT.'
-        },
-        hints: ['Net Tax = Output VAT minus Input VAT.', '150,000 - 90,000 = 60,000 payable.'],
-        reference: { title: 'ZATCA VAT Executive Regulations & Net Tax Filing', url: 'https://zatca.gov.sa/', source: 'ZATCA Tax Authority' }
+        reference: {
+          title_ar: 'دليل إدارة وحدات القياس UoM ودقة المنازل العشرية في الـ ERP',
+          title_en: 'Units of Measure (UoM) Conversion & Decimal Precision in ERP',
+          url: 'https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/management/products/uom.html',
+          source_ar: 'توثيق إدارة المنتجات والقياسات العالمية',
+          source_en: 'Odoo Product UoM Standards'
+        }
       }
     ]
   };
@@ -748,25 +1009,68 @@ const CHALLENGE_BANK_DATA = (function () {
   }
 
   function formatModuleQuestions(qList, isAr, requestedModuleId) {
-    return qList.map(q => ({
-      id: q.id,
-      module_id: requestedModuleId || q.module_id,
-      category_id: q.category_id,
-      topic_id: q.topic_id,
-      concept_id: q.concept_id,
-      question_type: q.question_type,
-      difficulty: q.difficulty,
-      question: isAr ? q.question_ar : q.question_en,
-      options: q.options.map(opt => ({
+    return qList.map(q => {
+      // Pick Arabic vs English hints properly
+      const hints = isAr ? (q.hints_ar || q.hints || []) : (q.hints_en || q.hints || []);
+      // Pick Arabic vs English distractors properly
+      const distractors = isAr ? (q.distractors_ar || q.distractors || {}) : (q.distractors_en || q.distractors || {});
+      // Pick Arabic vs English reference properly
+      const reference = {
+        title: isAr ? (q.reference?.title_ar || q.reference?.title || '') : (q.reference?.title_en || q.reference?.title || ''),
+        url: q.reference?.url || '',
+        source: isAr ? (q.reference?.source_ar || q.reference?.source || '') : (q.reference?.source_en || q.reference?.source || '')
+      };
+
+      const rawOptions = (q.options || []).map(opt => ({
         id: opt.id,
-        text: isAr ? opt.text_ar : opt.text_en
-      })),
-      correct_answer: q.correct_answer,
-      explanation: isAr ? q.explanation_ar : q.explanation_en,
-      distractors: q.distractors || {},
-      hints: q.hints || [],
-      reference: q.reference || {}
-    }));
+        text: isAr ? (opt.text_ar || opt.text) : (opt.text_en || opt.text),
+        _isCorrect: opt.id === q.correct_answer,
+        _origId: opt.id
+      }));
+
+      // Fisher-Yates Random Shuffling of Options
+      const shuffledOptions = [...rawOptions];
+      for (let i = shuffledOptions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = shuffledOptions[i];
+        shuffledOptions[i] = shuffledOptions[j];
+        shuffledOptions[j] = temp;
+      }
+
+      const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+      const newDistractors = {};
+      let newCorrectLetter = 'A';
+
+      const finalOptions = shuffledOptions.map((opt, idx) => {
+        const newLetter = letters[idx];
+        if (opt._isCorrect) {
+          newCorrectLetter = newLetter;
+        } else if (distractors[opt._origId]) {
+          newDistractors[newLetter] = distractors[opt._origId];
+        }
+        return {
+          id: newLetter,
+          text: opt.text
+        };
+      });
+
+      return {
+        id: q.id,
+        module_id: requestedModuleId || q.module_id,
+        category_id: q.category_id,
+        topic_id: q.topic_id,
+        concept_id: q.concept_id,
+        question_type: q.question_type,
+        difficulty: q.difficulty,
+        question: isAr ? (q.question_ar || q.question) : (q.question_en || q.question),
+        options: finalOptions,
+        correct_answer: newCorrectLetter,
+        explanation: isAr ? (q.explanation_ar || q.explanation) : (q.explanation_en || q.explanation),
+        distractors: newDistractors,
+        hints: hints,
+        reference: reference
+      };
+    });
   }
 
   function generateCurated10Questions(moduleId, isAr, poolIndex = 0) {
@@ -774,7 +1078,6 @@ const CHALLENGE_BANK_DATA = (function () {
     const mod = modules.find(m => String(m.id) === String(moduleId)) || { name_en: moduleId, name_ar: moduleId };
     const modName = isAr ? (mod.name_ar || mod.name_en) : (mod.name_en || mod.name_ar);
 
-    // Highly realistic, concrete questions with SPECIFIC non-generic options!
     const questions = [
       {
         type: 'Accounting Impact',
@@ -789,180 +1092,120 @@ const CHALLENGE_BANK_DATA = (function () {
           { id: 'D', en: `No journal entries are ever generated from this subledger`, ar: `لا تتولد أي قيود محاسبية من هذا الأستاذ المساعد إطلاقاً` }
         ],
         exp_en: `Operational subledgers in ERP map directly to general ledger control and clearing accounts to maintain continuous financial integration.`,
-        exp_ar: `الأستاذ المساعد في الـ ERP يرتبط بحسابات مراقبة ووساطة بالأستاذ العام لترحيل الأثر المالي فورياً ودقيقاً.`
-      },
-      {
-        type: 'Troubleshooting',
-        diff: 'Advanced',
-        q_en: `A month-end reconciliation variance appears between the ${mod.name_en} subledger and General Ledger balance. What is the first audit step?`,
-        q_ar: `ظهر فارق تسوية في نهاية الشهر بين رصيد الأستاذ المساعد لموديول ${modName} وحساب المراقبة في الأستاذ العام. ما هو الإجراء التشخيصي الأول؟`,
-        correct: 'A',
-        opts: [
-          { id: 'A', en: `Run the Subledger-to-GL Reconciliation report to identify direct manual journal entries or unposted draft batches.`, ar: `استخراج تقرير مطابقة الأستاذ المساعد مع العام لتحديد القيود اليدوية المباشرة أو الحركات المعلقة.` },
-          { id: 'B', en: `Post a blind lump-sum adjustment to P&L without investigating root causes.`, ar: `إدخال قيد تسوية عمياء في حساب الأرباح والخسائر دون فحص الأسباب.` },
-          { id: 'C', en: `Delete previous months historical batches.`, ar: `حذف الحركات التاريخية للشهور السابقة.` },
-          { id: 'D', en: `Change the functional base currency of the database.`, ar: `تغيير العملة الأساسية لقاعدة البيانات.` }
+        exp_ar: `الأستاذ المساعد في الـ ERP يرتبط بحسابات مراقبة ووساطة بالأستاذ العام لترحيل الأثر المالي فورياً ودقيقاً.`,
+        dist_ar: {
+          'B': 'خطأ: العمليات التشغيلية الآجلة لا تمس رأس المال أو النقدية المباشرة.',
+          'C': 'خطأ: إيرادات المبيعات لا ترتبط بقيود الإهلاك التشغيلي.',
+          'D': 'خطأ: كافة الأساتذة المساعدة في الـ ERP متكاملة مالياً مع الأستاذ العام.'
+        },
+        dist_en: {
+          'B': 'Incorrect: Accrued operational transactions do not touch liquid cash or equity.',
+          'C': 'Incorrect: Sales revenue does not match operational depreciation.',
+          'D': 'Incorrect: Subledgers are fully integrated with General Ledger.'
+        },
+        hints_ar: [
+          'تذكر التوجيه المحاسبي المزدوج بين الأستاذ المساعد والأستاذ العام.',
+          'المصروف أو الأصل يُجعل مديناً، وحساب الوساطة أو المورد يُجعل دائناً.',
+          'مفتاح الحل: مدين المصروف/الأصل، دائن وسيط الاستحقاق/الموردين.'
         ],
-        exp_en: `Subledger reconciliation reports compare document lines with control account postings to isolate unposted batches or unauthorized manual journals.`,
-        exp_ar: `تقرير المطابقة يقارن تفاصيل فواتير وحركات الموديول بحساب المراقبة لكشف القيود اليدوية المخالفة أو الحركات غير المرحلة.`
-      },
-      {
-        type: 'Process Decision',
-        diff: 'Intermediate',
-        q_en: `To enforce internal governance and Segregation of Duties (SoD) in ${mod.name_en}, which rule must be configured?`,
-        q_ar: `لتطبيق قواعد الحوكمة الداخلية وفصل المهام (SoD) في موديول ${modName}، أي قاعدة صلاحيات يجب تفعيلها؟`,
-        correct: 'A',
-        opts: [
-          { id: 'A', en: `Enforce multi-tier approval where the document creator cannot validate, approve, or post their own transaction.`, ar: `تفعيل مسار موافقات متعدد المستويات يمنع منشئ المستند من اعتماده أو ترحيله بنفسه.` },
-          { id: 'B', en: `Grant all operational users super-administrator bypass rights.`, ar: `منح كافة الموظفين صلاحية المدير العام لتجاوز الفحوصات.` },
-          { id: 'C', en: `Rely only on verbal phone confirmations without system audit logs.`, ar: `الاعتماد على الموافقات الشفهية دون توثيق بالنظام.` },
-          { id: 'D', en: `Disable user logins during business hours.`, ar: `إلغاء تسجيل الدخول أثناء ساعات الدوام.` }
-        ],
-        exp_en: `Segregation of Duties prevents fraud and operational error by requiring independent review before financial commitments are posted.`,
-        exp_ar: `مبدأ فصل المهام يمنع التلاعب والأخطاء عبر فرض مراجعة واعتماد مستقل من مسؤول مخول قبل الترحيل المالي.`
-      },
-      {
-        type: 'Implementation Decision',
-        diff: 'Intermediate',
-        q_en: `During data migration and Go-Live preparation for ${mod.name_en}, which step guarantees data integrity?`,
-        q_ar: `أثناء مرحلة ترحيل البيانات وافتتاح موديول ${modName} (Go-Live)، ما هي الخطوة التي تضمن صحة ومطابقة الأرصدة؟`,
-        correct: 'A',
-        opts: [
-          { id: 'A', en: `Reconcile opening master balances against audited legacy financial statements and execute User Acceptance Testing (UAT).`, ar: `مطابقة الأرصدة الافتتاحية مع القوائم المالية المدققة السابقة وتنفيذ اختبارات قبول المستخدم (UAT).` },
-          { id: 'B', en: `Import raw unverified legacy spreadsheets directly into the live production database.`, ar: `استيراد ملفات الإكسل القديمة دون تدقيق مباشرة في النظام الحي.` },
-          { id: 'C', en: `Skip opening balances and start all subledgers from zero.`, ar: `بدء كافة الحركات من الصفر وإهمال الأرصدة السابقة.` },
-          { id: 'D', en: `Disable data validation checks to speed up import.`, ar: `إلغاء قيود التحقق البرمجية لتسريع الاستيراد.` }
-        ],
-        exp_en: `Opening balance reconciliation and rigorous UAT guarantee smooth cutover with zero disruption to daily business operations.`,
-        exp_ar: `مطابقة الأرصدة الافتتاحية واختبارات القبول (UAT) تضمن سلامة التدشين والانتقال دون انقطاع العمليات.`
-      },
-      {
-        type: 'Business Analysis',
-        diff: 'Advanced',
-        q_en: `Which performance metric (KPI) is most vital to monitor performance and service levels in ${mod.name_en}?`,
-        q_ar: `ما هو أهم مؤشر أداء رئيسي (KPI) لمراقبة جودة وكفاءة العمليات في موديول ${modName}؟`,
-        correct: 'A',
-        opts: [
-          { id: 'A', en: `Transaction processing cycle time, variance rate against standard budget, and SLA adherence percentage.`, ar: `زمن دورة إنجاز المعاملة، نسبة الانحراف عن الموازنة المعيارية، ونسبة الالتزام بمستوى الخدمة (SLA).` },
-          { id: 'B', en: `Number of characters in user passwords.`, ar: `عدد الأحرف في كلمات مرور المستخدمين.` },
-          { id: 'C', en: `Total number of mouse clicks per day.`, ar: `عدد النقرات اليومية للماوس.` },
-          { id: 'D', en: `Color themes chosen by employees.`, ar: `ألوان واجهة المستخدم المختارة.` }
-        ],
-        exp_en: `Cycle time and variance analytics directly correlate with operational productivity and financial return on investment.`,
-        exp_ar: `قياس زمن دورة العمليات ونسب الانحراف يرتبط مباشرة بالإنتاجية والعائد الاستثماري للنظام.`
-      },
-      {
-        type: 'Scenario',
-        diff: 'Intermediate',
-        q_en: `A user attempts to post a transaction in ${mod.name_en} but the ERP rejects it with "Fiscal Period Closed". What is the proper procedure?`,
-        q_ar: `حاول موظف ترحيل حركة في موديول ${modName} ورفضها النظام برسالة "الفترة المحاسبية مغلقة". ما هو الإجراء النظامي؟`,
-        correct: 'A',
-        opts: [
-          { id: 'A', en: `Post the transaction in the current open fiscal period or request authorized period reopening approval from Finance.`, ar: `ترحيل المعاملة في الفترة المحاسبية المفتوحة الحالية أو رفع طلب رسمي للمالية لفتح الفترة استثنائياً.` },
-          { id: 'B', en: `Use database SQL commands to bypass security and force the closed period entry.`, ar: `استخدام أوامر SQL لتجاوز حماية النظام وتعديل الفترة قسراً.` },
-          { id: 'C', en: `Delete the prior fiscal year closing entry.`, ar: `حذف قيد إقفال السنة السابقة.` },
-          { id: 'D', en: `Disable accounting period controls permanently.`, ar: `إلغاء قفل الفترات المحاسبية نهائياً.` }
-        ],
-        exp_en: `Accounting period locks protect published financial statements from retroactive corruption; adjustments must follow governance protocols.`,
-        exp_ar: `إقفال الفترات يحمي القوائم المعتمدة من التعديل؛ وأي حركة استثنائية تتطلب موافقة مالية رسمية.`
-      },
-      {
-        type: 'Multiple Choice',
-        diff: 'Beginner',
-        q_en: `What is the primary Master Data entity maintained in ${mod.name_en}?`,
-        q_ar: `ما هي البيانات الأساسية (Master Data) الرئيسية التي يقوم عليها موديول ${modName}؟`,
-        correct: 'A',
-        opts: [
-          { id: 'A', en: `Core operational records, categories, accounting mapping rules, and transactional partner cards.`, ar: `بطاقات السجلات التشغيلية الأساسية، الفئات، قواعد التوجيه المحاسبي، وبطاقات الأطراف المعنية.` },
-          { id: 'B', en: `Temporary web browser cache cookies.`, ar: `ملفات تعريف الارتباط المؤقتة للمتصفح.` },
-          { id: 'C', en: `Random test strings.`, ar: `نصوص اختبار عشوائية.` },
-          { id: 'D', en: `Printer driver software.`, ar: `برامج تشغيل الطابعات.` }
-        ],
-        exp_en: `Master data forms the foundational backbone enabling consistent transaction processing and reporting across the enterprise.`,
-        exp_ar: `البيانات الأساسية تشكل العمود الفقري لضمان اتساق المعاملات والتقارير عبر مختلف إدارات المنشأة.`
-      },
-      {
-        type: 'Troubleshooting',
-        diff: 'Advanced',
-        q_en: `How can an enterprise prevent duplicate records (e.g. duplicate tax IDs or serial numbers) in ${mod.name_en}?`,
-        q_ar: `كيف تمنع المنشأة تكرار السجلات والبطاقات الأساسية (مثل تكرار الأرقام الضريبية أو التسلسلية) في موديول ${modName}؟`,
-        correct: 'A',
-        opts: [
-          { id: 'A', en: `Enable Unique Constraint validation rules and mandatory field deduplication checks at database and UI levels.`, ar: `تفعيل قيود التحقق الفريدة (Unique Constraints) والفحص الآلي لمنع التكرار على مستوى الحقول وقاعدة البيانات.` },
-          { id: 'B', en: `Allow unrestricted duplicate data entry.`, ar: `السماح بالتكرار العشوائي للبيانات.` },
-          { id: 'C', en: `Delete all master records at the end of each week.`, ar: `حذف كافة السجلات الأساسية نهاية كل أسبوع.` },
-          { id: 'D', en: `Manually append random numbers to duplicate names.`, ar: `إضافة أرقام عشوائية يدوياً للأسماء المكررة.` }
-        ],
-        exp_en: `Unique constraint rules prevent transactional confusion, double-counting, and tax compliance violations.`,
-        exp_ar: `قيود الحقول الفريدة تمنع ازدواجية المعاملات، تكرار الفواتير، ومخالفات الإقرارات الضريبية.`
-      },
-      {
-        type: 'Process Decision',
-        diff: 'Intermediate',
-        q_en: `When an approver is unavailable during an automated workflow in ${mod.name_en}, what mechanism maintains continuity?`,
-        q_ar: `عند غياب المسؤول عن اعتماد معاملة في المسار الآلي لموديول ${modName}، ما هي الآلية التي تضمن استمرار العمل دون توقف؟`,
-        correct: 'A',
-        opts: [
-          { id: 'A', en: `Automated SLA Escalation and Delegation Rules that route pending tasks to a designated deputy with full audit logging.`, ar: `قواعد التصعيد والتفويض التلقائي (Delegation & Escalation Rules) التي تحول الطلب للمفوض البديل مع توثيق السجل.` },
-          { id: 'B', en: `Halt the transaction indefinitely until the employee returns.`, ar: `تجميد المعاملة إلى أجل غير مسمى حتى عودة الموظف.` },
-          { id: 'C', en: `Auto-approve all pending financial vouchers without verification.`, ar: `الموافقة التلقائية العمياء على كافة المعاملات المالية.` },
-          { id: 'D', en: `Cancel the entire department workflow.`, ar: `إلغاء مسار العمل للقسم بالكامل.` }
-        ],
-        exp_en: `Delegation and escalation matrices eliminate workflow bottlenecks while preserving accountability and audit trails.`,
-        exp_ar: `مصفوفة التفويض والتصعيد تمنع تعطل الأعمال مع الحفاظ على الرقابة وتوثيق كافة إجراءات الاعتماد.`
-      },
-      {
-        type: 'Accounting Impact',
-        diff: 'Expert',
-        q_en: `What is the financial statement difference between capitalizing expenditures vs expensing them immediately in ${mod.name_en}?`,
-        q_ar: `ما هو الأثر على القوائم المالية بين رسملة المصروفات (Capitalization) وتحميلها كمصروف فوري في موديول ${modName}؟`,
-        correct: 'A',
-        opts: [
-          { id: 'A', en: `Capitalization increases Balance Sheet Assets and depreciates over useful life; expensing reduces current period Net Profit immediately on the P&L.`, ar: `الرسملة تزيد أصول الميزانية العمومية وتوزع التكلفة عبر الإهلاك؛ بينما المصروف الفوري يخفض صافي ربح الفترة الحالية مباشرة بقائمة الدخل.` },
-          { id: 'B', en: `Capitalization immediately reduces cash to zero.`, ar: `الرسملة تخفض النقدية إلى الصفر فورياً.` },
-          { id: 'C', en: `Expensing increases current period operating revenue.`, ar: `المصروف الفوري يزيد إيراد التشغيل.` },
-          { id: 'D', en: `There is zero financial reporting difference between the two methods.`, ar: `لا يوجد أي فرق محاسبي في القوائم المالية بين الطريقتين.` }
-        ],
-        exp_en: `Capital expenditures (CapEx) build long-term assets amortized over time, whereas operational expenses (OpEx) hit the current income statement immediately.`,
-        exp_ar: `المصاريف الرأسمالية (CapEx) تبني أصولاً طويلة الأجل تستهلك دورياً، بينما المصاريف التشغيلية (OpEx) تخصم من أرباح الفترة فوراً.`
+        hints_en: [
+          'Recall standard subledger-to-GL integration entries.',
+          'Expense/Asset is debited, Clearing/Payable is credited.',
+          'Direct Key: Debit Operating Expense/Asset, Credit Clearing/Payables.'
+        ]
       }
     ];
 
-    return questions.map((q, idx) => ({
-      id: `Q-${String(mod.id || 'MOD').toUpperCase()}-P${poolIndex + 1}-${String(idx + 1).padStart(3, '0')}`,
-      module_id: moduleId,
-      category_id: `CAT-${idx + 1}`,
-      topic_id: `TOP-${idx + 1}`,
-      concept_id: `CON-${idx + 1}`,
-      question_type: q.type,
-      difficulty: q.diff,
-      question: isAr ? q.q_ar : q.q_en,
-      options: q.opts.map(o => ({
+    return questions.map((q, idx) => {
+      const distMap = isAr ? q.dist_ar : q.dist_en;
+      const rawOptions = q.opts.map(o => ({
         id: o.id,
-        text: isAr ? o.ar : o.en
-      })),
-      correct_answer: q.correct,
-      explanation: isAr ? q.exp_ar : q.exp_en,
-      distractors: {
-        'B': isAr ? 'خطأ: توجيه محاسبي أو إجرائي غير سليم يسبب اختلال في القوائم.' : 'Incorrect: Non-compliant ledger or workflow direction.',
-        'C': isAr ? 'خطأ: يخالف المعايير الرقابية ومبادئ الحوكمة.' : 'Incorrect: Violates standard governance principles.',
-        'D': isAr ? 'خطأ: غير مطابق لمسار العمليات المعتمد.' : 'Incorrect: Does not match standard ERP procedure.'
-      },
-      hints: [
-        isAr ? 'تذكر الأثر على القوائم المالية والدورة المستندية القياسية.' : 'Consider the standard financial statement impact and workflow rules.',
-        isAr ? 'استبعد الخيارات التي تخالف مبادئ الرقابة أو التوجيه المحاسبي.' : 'Eliminate choices that conflict with standard accounting controls.',
-        isAr ? 'مفتاح الحل: الإجراء الذي يضمن الدقة المحاسبية والامتثال الكامل.' : 'Direct Key: Choose the option ensuring financial compliance and auditability.'
-      ],
-      reference: {
-        title: `ERP Architecture & Standards for ${mod.name_en}`,
-        url: 'https://www.ifrs.org/',
-        source: 'IFRS & ERP Standards'
+        text: isAr ? o.ar : o.en,
+        _isCorrect: o.id === q.correct,
+        _origId: o.id
+      }));
+
+      // Fisher-Yates Shuffle
+      const shuffled = [...rawOptions];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = shuffled[i];
+        shuffled[i] = shuffled[j];
+        shuffled[j] = temp;
       }
+
+      const letters = ['A', 'B', 'C', 'D'];
+      const newDist = {};
+      let newCorrect = 'A';
+
+      const finalOpts = shuffled.map((o, optIdx) => {
+        const letter = letters[optIdx];
+        if (o._isCorrect) newCorrect = letter;
+        else if (distMap[o._origId]) newDist[letter] = distMap[o._origId];
+        return { id: letter, text: o.text };
+      });
+
+      return {
+        id: `Q-${String(mod.id || 'MOD').toUpperCase()}-P${poolIndex + 1}-${String(idx + 1).padStart(3, '0')}`,
+        module_id: moduleId,
+        category_id: `CAT-${idx + 1}`,
+        topic_id: `TOP-${idx + 1}`,
+        concept_id: `CON-${idx + 1}`,
+        question_type: q.type,
+        difficulty: q.diff,
+        question: isAr ? q.q_ar : q.q_en,
+        options: finalOpts,
+        correct_answer: newCorrect,
+        explanation: isAr ? q.exp_ar : q.exp_en,
+        distractors: newDist,
+        hints: isAr ? q.hints_ar : q.hints_en,
+        reference: {
+          title: isAr ? `دليل المعايير التشغيلية والرقابية لـ ${modName}` : `ERP Architecture & Standards for ${mod.name_en}`,
+          url: 'https://www.ifrs.org/',
+          source: isAr ? 'المعايير القياسية للأنظمة المالية والتشغيلية' : 'IFRS & ERP Standards'
+        }
+      };
+    });
+  }
+
+  function shuffleQuestion(q) {
+    if (!q || !Array.isArray(q.options) || q.options.length <= 1) return q;
+    const cloned = JSON.parse(JSON.stringify(q));
+    const origCorrect = cloned.correct_answer;
+    const origDistractors = cloned.distractors || {};
+
+    const raw = cloned.options.map(opt => ({
+      ...opt,
+      _isCorrect: opt.id === origCorrect,
+      _origId: opt.id
     }));
+
+    for (let i = raw.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = raw[i];
+      raw[i] = raw[j];
+      raw[j] = temp;
+    }
+
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const newDist = {};
+    let newCorrect = 'A';
+
+    cloned.options = raw.map((opt, idx) => {
+      const letter = letters[idx];
+      if (opt._isCorrect) newCorrect = letter;
+      else if (origDistractors[opt._origId]) newDist[letter] = origDistractors[opt._origId];
+      return { id: letter, text: opt.text };
+    });
+
+    cloned.correct_answer = newCorrect;
+    cloned.distractors = newDist;
+    return cloned;
   }
 
   return {
     getQuestionsForModule,
-    resolveModuleKey
+    resolveModuleKey,
+    shuffleQuestion
   };
 })();
