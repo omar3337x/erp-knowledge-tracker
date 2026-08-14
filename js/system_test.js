@@ -1257,6 +1257,95 @@ const SystemTest = (function () {
   // ---------------------------------------------------------------------------
   // 4. DIAGNOSTIC RUNNER WITH DEPENDENCY GRAPH & ROOT CAUSE ANALYSIS
   // ---------------------------------------------------------------------------
+  async function runSingleTest(test, sharedContext) {
+    let skippedReason = null;
+    if (test.dependencies && test.dependencies.length > 0) {
+      for (let depId of test.dependencies) {
+        const depResult = _results[depId];
+        if (!depResult || depResult.status === 'FAIL' || depResult.status === 'SKIPPED') {
+          skippedReason = `Upstream dependency "${depId}" ${!depResult ? 'was not run' : depResult.status.toLowerCase()}.`;
+          break;
+        }
+      }
+    }
+
+    if (skippedReason) {
+      _results[test.id] = {
+        id: test.id,
+        domain: test.domain,
+        name_en: test.name_en,
+        name_ar: test.name_ar,
+        severity: test.severity,
+        description_en: test.description_en,
+        description_ar: test.description_ar,
+        status: 'SKIPPED',
+        duration_ms: 0,
+        expected: test.description_en,
+        actual: `Skipped: ${skippedReason}`,
+        rootCause: `Parent dependency failure prevented execution.`,
+        remediation: `Fix upstream dependency "${test.dependencies.join(', ')}" first.`,
+        timestamp: new Date().toISOString()
+      };
+      log('WARN', test.domain, `[SKIPPED] ${test.name_en} — ${skippedReason}`);
+      return;
+    }
+
+    const testStart = Date.now();
+    try {
+      const out = await Promise.race([
+        test.run(sharedContext),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Test timeout exceeded (10s)')), 10000))
+      ]);
+
+      const duration = Date.now() - testStart;
+      const status = (out && out.status) ? out.status : 'PASS';
+
+      _results[test.id] = {
+        id: test.id,
+        domain: test.domain,
+        name_en: test.name_en,
+        name_ar: test.name_ar,
+        severity: test.severity,
+        description_en: test.description_en,
+        description_ar: test.description_ar,
+        status: status,
+        duration_ms: duration,
+        expected: out.expected || test.description_en,
+        actual: out.actual || 'Check completed successfully.',
+        data: DiagnosticRedactor.sanitize(out.data || null),
+        rootCause: out.rootCause || null,
+        remediation: out.remediation || null,
+        warning: out.warning || null,
+        timestamp: new Date().toISOString()
+      };
+
+      if (status === 'PASS') log('PASS', test.domain, `${test.name_en} (${duration}ms): ${out.actual}`);
+      else if (status === 'WARN') log('WARN', test.domain, `${test.name_en} (${duration}ms): ${out.actual}`);
+      else if (status === 'FAIL') log('FAIL', test.domain, `${test.name_en} (${duration}ms): ${out.actual}`, out.rootCause);
+
+    } catch (err) {
+      const duration = Date.now() - testStart;
+      _results[test.id] = {
+        id: test.id,
+        domain: test.domain,
+        name_en: test.name_en,
+        name_ar: test.name_ar,
+        severity: test.severity,
+        description_en: test.description_en,
+        description_ar: test.description_ar,
+        status: 'FAIL',
+        duration_ms: duration,
+        expected: test.description_en,
+        actual: `Exception caught: ${err.message}`,
+        rootCause: `Unhandled runtime exception in diagnostic test runner: ${err.message}`,
+        remediation: `Inspect error stack trace and check service availability.`,
+        error: err.stack,
+        timestamp: new Date().toISOString()
+      };
+      log('FAIL', test.domain, `${test.name_en} threw an error: ${err.message}`, err.stack);
+    }
+  }
+
   async function runDiagnostics(filterDomain = null) {
     if (_isRunning) return;
     _isRunning = true;
@@ -1273,7 +1362,7 @@ const SystemTest = (function () {
       ? _registry.filter(t => t.domain === filterDomain)
       : _registry;
 
-    log('INFO', 'SYSTEM', `Starting Enterprise Diagnostic Scan (${testsToRun.length} registered test suites)...`);
+    log('INFO', 'SYSTEM', `Starting Parallel Wave Diagnostic Scan (${testsToRun.length} registered test suites)...`);
 
     const sharedContext = {
       pingLatency: 0,
@@ -1286,113 +1375,54 @@ const SystemTest = (function () {
       reviews: null
     };
 
-    updateUIProgress(0, I18n.getLang() === 'ar' ? 'بدء الفحص التشخيصي...' : 'Initializing diagnostic scan...');
+    const isAr = I18n.getLang() === 'ar';
+    updateUIProgress(5, isAr ? 'بدء الفحص التشخيصي الموازي...' : 'Initializing parallel diagnostic scan...');
 
-    for (let i = 0; i < testsToRun.length; i++) {
-      const test = testsToRun[i];
-      const percent = Math.round(((i) / testsToRun.length) * 100);
-      const isAr = I18n.getLang() === 'ar';
-      const stepName = isAr ? test.name_ar : test.name_en;
-
-      updateUIProgress(percent, `${isAr ? 'فحص' : 'Running'}: ${stepName} (${i + 1}/${testsToRun.length})...`);
-
-      // Check dependencies
-      let skippedReason = null;
-      if (test.dependencies && test.dependencies.length > 0) {
-        for (let depId of test.dependencies) {
-          const depResult = _results[depId];
-          if (!depResult || depResult.status === 'FAIL' || depResult.status === 'SKIPPED') {
-            skippedReason = `Upstream dependency "${depId}" ${!depResult ? 'was not run' : depResult.status.toLowerCase()}.`;
-            break;
-          }
-        }
+    // If running single domain, execute sequentially
+    if (filterDomain && filterDomain !== 'ALL') {
+      for (let i = 0; i < testsToRun.length; i++) {
+        const test = testsToRun[i];
+        updateUIProgress(Math.round(((i + 1) / testsToRun.length) * 100), `${isAr ? 'فحص' : 'Running'}: ${isAr ? test.name_ar : test.name_en}...`);
+        await runSingleTest(test, sharedContext);
+      }
+    } else {
+      // FULL SCAN: Parallel Wave Execution Architecture
+      // Wave 0: Gateway connectivity probe
+      const wave0 = testsToRun.filter(t => t.domain === 'NETWORK');
+      for (let t of wave0) {
+        updateUIProgress(10, `${isAr ? 'فحص الشبكة' : 'Checking Network'}: ${isAr ? t.name_ar : t.name_en}...`);
+        await runSingleTest(t, sharedContext);
       }
 
-      if (skippedReason) {
-        _results[test.id] = {
-          id: test.id,
-          domain: test.domain,
-          name_en: test.name_en,
-          name_ar: test.name_ar,
-          severity: test.severity,
-          description_en: test.description_en,
-          description_ar: test.description_ar,
-          status: 'SKIPPED',
-          duration_ms: 0,
-          expected: test.description_en,
-          actual: `Skipped: ${skippedReason}`,
-          rootCause: `Parent dependency failure prevented execution.`,
-          remediation: `Fix upstream dependency "${test.dependencies.join(', ')}" first.`,
-          timestamp: new Date().toISOString()
-        };
-        log('WARN', test.domain, `[SKIPPED] ${test.name_en} — ${skippedReason}`);
-        continue;
+      // Wave 1: Authentication & User integrity
+      updateUIProgress(25, isAr ? 'فحص المصادقة وصلاحيات الجلسة...' : 'Validating Session & Auth...');
+      const wave1 = testsToRun.filter(t => t.domain === 'AUTH');
+      for (let t of wave1) {
+        await runSingleTest(t, sharedContext);
       }
 
-      // Execute Test
-      const testStart = Date.now();
-      try {
-        const out = await Promise.race([
-          test.run(sharedContext),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Test timeout exceeded (10s)')), 10000))
-        ]);
+      // Wave 2: Concurrent API Schema Contracts (Executed in parallel via Promise.all)
+      updateUIProgress(45, isAr ? 'فحص عقود الـ APIs بالتوازي...' : 'Testing API Schema Contracts in parallel...');
+      const wave2 = testsToRun.filter(t => t.domain === 'API');
+      await Promise.all(wave2.map(t => runSingleTest(t, sharedContext)));
 
-        const duration = Date.now() - testStart;
-        const status = (out && out.status) ? out.status : 'PASS';
-
-        _results[test.id] = {
-          id: test.id,
-          domain: test.domain,
-          name_en: test.name_en,
-          name_ar: test.name_ar,
-          severity: test.severity,
-          description_en: test.description_en,
-          description_ar: test.description_ar,
-          status: status,
-          duration_ms: duration,
-          expected: out.expected || test.description_en,
-          actual: out.actual || 'Check completed successfully.',
-          data: DiagnosticRedactor.sanitize(out.data || null),
-          rootCause: out.rootCause || null,
-          remediation: out.remediation || null,
-          warning: out.warning || null,
-          timestamp: new Date().toISOString()
-        };
-
-        if (status === 'PASS') log('PASS', test.domain, `${test.name_en} (${duration}ms): ${out.actual}`);
-        else if (status === 'WARN') log('WARN', test.domain, `${test.name_en} (${duration}ms): ${out.actual}`);
-        else if (status === 'FAIL') log('FAIL', test.domain, `${test.name_en} (${duration}ms): ${out.actual}`, out.rootCause);
-
-      } catch (err) {
-        const duration = Date.now() - testStart;
-        _results[test.id] = {
-          id: test.id,
-          domain: test.domain,
-          name_en: test.name_en,
-          name_ar: test.name_ar,
-          severity: test.severity,
-          description_en: test.description_en,
-          description_ar: test.description_ar,
-          status: 'FAIL',
-          duration_ms: duration,
-          expected: test.description_en,
-          actual: `Exception caught: ${err.message}`,
-          rootCause: `Unhandled runtime exception in diagnostic test runner: ${err.message}`,
-          remediation: `Inspect error stack trace and check service availability.`,
-          error: err.stack,
-          timestamp: new Date().toISOString()
-        };
-        log('FAIL', test.domain, `${test.name_en} threw an error: ${err.message}`, err.stack);
+      // Wave 3: Data Integrity & Modules Matrix
+      updateUIProgress(70, isAr ? 'فحص تكامل البيانات ومصفوفة الموديولات...' : 'Validating Data Integrity & Module Matrix...');
+      const wave3 = testsToRun.filter(t => t.domain === 'DATA' || t.domain === 'MODULES');
+      for (let t of wave3) {
+        await runSingleTest(t, sharedContext);
       }
 
-      // Small yield to let browser paint
-      await new Promise(r => setTimeout(r, 10));
+      // Wave 4: Concurrent In-Memory Tests (Pages, AI, Cache, I18N, Routing, DOM, Security)
+      updateUIProgress(85, isAr ? 'فحص الواجهة والـ AI والترجمة والأمان...' : 'Testing Pages, AI, Cache, I18N & Security...');
+      const wave4 = testsToRun.filter(t => ['PAGES', 'AI', 'CACHE', 'I18N', 'ROUTING', 'FRONTEND', 'SECURITY'].includes(t.domain));
+      await Promise.all(wave4.map(t => runSingleTest(t, sharedContext)));
     }
 
     _scanDuration = Date.now() - scanStart;
     _isRunning = false;
 
-    updateUIProgress(100, I18n.getLang() === 'ar' ? `اكتمل الفحص التشخيصي الشامل (${_scanDuration}ms)` : `Diagnostic Scan Completed in ${_scanDuration}ms`);
+    updateUIProgress(100, isAr ? `اكتمل الفحص التشخيصي الموازي بنجاح (${_scanDuration}ms)` : `Diagnostic Scan Completed in ${_scanDuration}ms`);
     log('INFO', 'SYSTEM', `Scan Finished in ${_scanDuration}ms. Health Score: ${getHealthScore()}%`);
 
     renderDashboard();

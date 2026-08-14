@@ -21,34 +21,61 @@ const Modules = (function () {
       ${UI.skeleton('table')}
     `;
 
-    let allTopics;
-    // PERF: Read from prefetchAll batch cache (topics:{}) — 0ms if batch already done
-    const cachedTopics = API.cacheGet('topics:{}', 'topics');
-    if (cachedTopics && Array.isArray(cachedTopics)) {
-      allTopics = cachedTopics;
-    } else {
-      // Batch still in-flight: poll up to 3s in 300ms increments, then fallback to direct call
-      let waited = 0;
-      while (waited < 3000) {
-        await new Promise(r => setTimeout(r, 300));
-        waited += 300;
-        const poll = API.cacheGet('topics:{}', 'topics');
-        if (poll && Array.isArray(poll)) { allTopics = poll; break; }
-      }
-      if (!allTopics) {
-        try {
-          allTopics = await API.topics({});
-        } catch (err) {
-          container.innerHTML = UI.errorState(err);
-          return;
-        }
+    let allTopics = API.cacheGet('topics:{}', 'topics');
+    if (!allTopics || !Array.isArray(allTopics)) {
+      try {
+        allTopics = await API.topics({});
+      } catch (err) {
+        container.innerHTML = UI.errorState(err);
+        return;
       }
     }
 
-    const topics = allTopics.filter(t => t.module_id === moduleId);
-    const stats   = computeStats(topics);
+    const topics = (allTopics || []).filter(t => String(t.module_id) === String(moduleId));
+    const stats  = computeStats(topics);
+    const isAr   = I18n.getLang() === 'ar';
+
+    // Calculate module health level
+    let healthColor = 'var(--rust)';
+    let healthLabel = isAr ? 'يحتاج إلى تركيز (Needs Focus)' : 'Needs Focus';
+    if (stats.progress >= 75) {
+      healthColor = 'var(--teal)';
+      healthLabel = isAr ? 'ممتاز ومكتمل (Mastered)' : 'Excellent';
+    } else if (stats.progress >= 40) {
+      healthColor = 'var(--brass)';
+      healthLabel = isAr ? 'قيد التطوير (In Progress)' : 'In Progress';
+    }
 
     container.innerHTML = `
+      <!-- Module Learning Health Indicator Bar -->
+      <div class="card" style="margin-bottom:20px; padding:18px 22px; border-left:4px solid ${healthColor}; background:var(--surface);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+          <div>
+            <div style="font-size:12px; color:var(--ink-soft); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">
+              ${isAr ? 'مؤشر الصحة التعليمية للموديول' : 'Module Learning Health Indicator'}
+            </div>
+            <div style="font-size:17px; font-weight:700; color:var(--ink); margin-top:2px;">
+              ${I18n.localizedName(mod)} • <span style="color:${healthColor}; font-size:14px;">● ${healthLabel}</span>
+            </div>
+          </div>
+          <div style="text-align:${isAr ? 'left' : 'right'};">
+            <span style="font-size:22px; font-weight:800; color:${healthColor};">${stats.progress}%</span>
+            <span style="font-size:12px; color:var(--ink-soft); display:block;">${isAr ? 'نسبة الإتقان العام' : 'Overall Mastery'}</span>
+          </div>
+        </div>
+        
+        <div style="height:8px; width:100%; background:var(--line-soft); border-radius:4px; overflow:hidden; margin-bottom:14px;">
+          <div style="width:${stats.progress}%; height:100%; background:${healthColor}; transition:width 0.4s ease;"></div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; font-size:12.5px; color:var(--ink-soft);">
+          <div>📚 ${isAr ? 'إجمالي المواضيع:' : 'Total Topics:'} <strong style="color:var(--ink);">${topics.length}</strong></div>
+          <div>🏆 ${isAr ? 'متقن:' : 'Mastered:'} <strong style="color:var(--teal);">${stats.mastered}</strong></div>
+          <div>📖 ${isAr ? 'قيد التعلم:' : 'Learning:'} <strong style="color:var(--brass);">${stats.learning}</strong></div>
+          <div>🎯 ${isAr ? 'فجوات معرفية:' : 'Knowledge Gaps:'} <strong style="color:var(--rust);">${stats.gaps}</strong></div>
+        </div>
+      </div>
+
       <div class="grid grid-kpi" style="margin-bottom:20px;">
         <div class="card kpi-card"><div class="kpi-label">${I18n.t('module.moduleProgress')}</div><div class="kpi-value brass">${stats.progress}%</div></div>
         <div class="card kpi-card"><div class="kpi-label">${I18n.t('module.totalTopics')}</div><div class="kpi-value">${topics.length}</div></div>

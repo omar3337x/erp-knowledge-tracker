@@ -120,16 +120,30 @@ const AIChat = (function () {
     }
   }
 
+  function getActiveContext() {
+    let route = 'dashboard';
+    let params = {};
+    if (typeof Router !== 'undefined') {
+      const decoded = Router.decodeHash ? Router.decodeHash() : (Router.getRoute ? Router.getRoute() : null);
+      if (decoded && typeof decoded === 'object') {
+        route = decoded.route || 'dashboard';
+        params = decoded.params || {};
+      } else if (typeof decoded === 'string') {
+        route = decoded;
+      }
+    }
+    return { route, params, moduleId: params.id || null, categoryId: params.categoryId || null, topicId: params.topicId || null };
+  }
+
   function updateContextBadge() {
     const badge = document.getElementById('ai-chat-context-badge');
     if (!badge) return;
     const isAr = I18n.getLang() === 'ar';
 
-    const route = Router.getRoute ? Router.getRoute() : 'dashboard';
-    const params = Router.getParams ? Router.getParams() : {};
-    const modId = params.id || 'MOD-1';
+    const ctxInfo = getActiveContext();
+    const modId = ctxInfo.moduleId || 'MOD-1';
 
-    const ctx = AIService.buildModuleContext(modId);
+    const ctx = AIService.buildModuleContext(modId, ctxInfo.categoryId, ctxInfo.topicId);
     badge.textContent = `📍 ${ctx.module_name} (${ctx.user_level})`;
   }
 
@@ -175,8 +189,12 @@ const AIChat = (function () {
     box.appendChild(loadingDiv);
     box.scrollTop = box.scrollHeight;
 
-    const params = Router.getParams ? Router.getParams() : {};
-    const res = await AIService.ask('tutor', text, { moduleId: params.id || 'MOD-1' });
+    const ctxInfo = getActiveContext();
+    const res = await AIService.ask('tutor', text, {
+      moduleId: ctxInfo.moduleId || 'MOD-1',
+      categoryId: ctxInfo.categoryId,
+      topicId: ctxInfo.topicId
+    });
 
     if (loadingDiv.parentNode) loadingDiv.parentNode.removeChild(loadingDiv);
 

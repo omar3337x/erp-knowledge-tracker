@@ -155,18 +155,8 @@ const API = (function () {
   // PERF: Active Controllers for cancelable requests
   const activeControllers = new Map();
 
-  // PERF: Sequential Request Queueing to prevent parallel GAS fetch collisions (302 -> 404 echo errors)
-  let _requestQueue = Promise.resolve();
-
   function rawCall(action, payload, attempt, options) {
-    // PERF: High-priority user interactive auth actions execute IMMEDIATELY without waiting in queue
-    if (action === 'login' || action === 'signup' || action === 'logout') {
-      return _executeRawCall(action, payload, attempt, options);
-    }
-    const run = () => _executeRawCall(action, payload, attempt, options);
-    const p = _requestQueue.then(run, run);
-    _requestQueue = p.catch(() => {});
-    return p;
+    return _executeRawCall(action, payload, attempt, options);
   }
 
   async function _executeRawCall(action, payload, attempt, options) {
@@ -303,6 +293,34 @@ const API = (function () {
     return promise;
   }
 
+  /**
+   * PERF: Stale-While-Revalidate (SWR) Pattern
+   * Returns cached data immediately (0ms), triggers fresh background fetch,
+   * and invokes onFreshData callback if new data differs from stale data.
+   */
+  function swr(action, payload, onFreshData, options) {
+    const key = dedupeKey(action, payload);
+    const cached = cacheGet(key, action);
+
+    const fetchPromise = rawCall(action, payload, 1, options)
+      .then(freshData => {
+        cacheSet(key, freshData, action);
+        if (typeof onFreshData === 'function') {
+          onFreshData(freshData);
+        }
+        return freshData;
+      })
+      .catch(err => {
+        if (cached !== null) return cached;
+        throw err;
+      });
+
+    if (cached !== null) {
+      return Promise.resolve(cached);
+    }
+    return fetchPromise;
+  }
+
   /* ------------------------------------------------------------------ */
   /* PERF: Batch Requests (combines multiple read actions in 1 payload) */
   /* ------------------------------------------------------------------ */
@@ -414,7 +432,7 @@ const API = (function () {
     ssGet, ssSet,
     warmup, startWarmupQueue, stopWarmupQueue, prefetchAll,
     startKeepalive, stopKeepalive,
-    call, rawCall, batch,
+    call, rawCall, batch, swr,
 
     // Auth
     signup        : (p) => rawCall('signup', Object.assign({ language: (window.I18n ? I18n.getLang() : 'en') }, p)),

@@ -186,9 +186,11 @@ function doPost(e) {
   }
 }
 
-function handleRequest(action, payload, token) {
-  resetRequestCache();
-  ensureSchema(); // no-op fast path (single PropertiesService read) once migrated
+function handleRequest(action, payload, token, isBatchSubRequest) {
+  if (!isBatchSubRequest) {
+    resetRequestCache();
+    ensureSchema(); // no-op fast path (single PropertiesService read) once migrated
+  }
 
   var needsLock = !!WRITE_ACTIONS[action];
   var lock = null;
@@ -1487,7 +1489,7 @@ function actionBatch(user, payload, token) {
   for (var i = 0; i < requests.length; i++) {
     var req = requests[i];
     if (!req || !req.action) continue;
-    var res = handleRequest(req.action, req.payload || {}, token);
+    var res = handleRequest(req.action, req.payload || {}, token, true);
     try {
       var parsed = JSON.parse(res.getContent());
       results[req.action] = parsed.data;

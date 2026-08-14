@@ -20,14 +20,30 @@ const AIService = (function () {
     'MOD-10': { domain_en: 'Law Firm & Legal Case Management', domain_ar: 'المحاماة والقضايا والعملاء', key_concepts: ['Legal Cases', 'Court Hearings', 'Client Contracts', 'Time Billing', 'Legal Documents', 'Case Expense Tracking'] }
   };
 
+  const _aiResponseCache = new Map();
+
   /**
    * Dynamically builds a privacy-safe, non-sensitive context payload for a module.
    */
   function buildModuleContext(moduleId, categoryId, topicId) {
     const modules = State.modulesCache || (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
-    const foundMod = modules.find(m => String(m.id).toLowerCase() === String(moduleId || 'MOD-1').toLowerCase()) || modules[0] || { id: 'MOD-1', name_en: 'Inventory', name_ar: 'المخزون' };
+    
+    // Flexible module matching by ID, slug, or index
+    let foundMod = modules.find(m => String(m.id).toLowerCase() === String(moduleId || '').toLowerCase());
+    if (!foundMod && moduleId) {
+      foundMod = modules.find(m => String(m.name_en).toLowerCase() === String(moduleId).toLowerCase() || String(m.name_ar).toLowerCase() === String(moduleId).toLowerCase());
+    }
+    if (!foundMod) {
+      foundMod = modules[0] || { id: 'MOD-1', name_en: 'Inventory', name_ar: 'المخزون' };
+    }
 
-    const topics = (State.allTopics || []).filter(t => t.module_id === foundMod.id);
+    // Retrieve all topics from State or cached data
+    const cachedTopics = API.cacheGet('topics:{}', 'topics') || [];
+    const allTopics = (Array.isArray(State.allTopics) && State.allTopics.length)
+      ? State.allTopics
+      : (Array.isArray(cachedTopics) && cachedTopics.length ? cachedTopics : []);
+
+    const topics = allTopics.filter(t => String(t.module_id) === String(foundMod.id));
     const gaps = topics.filter(t => t.status !== 'Mastered' && t.status !== 'Practiced');
     const mastered = topics.filter(t => t.status === 'Mastered');
 
@@ -48,7 +64,8 @@ const AIService = (function () {
     else if (masteredRatio > 0.4) userLevel = 'Advanced';
     else if (masteredRatio > 0.15) userLevel = 'Intermediate';
 
-    const profile = MODULE_PROFILES[foundMod.id] || MODULE_PROFILES['MOD-1'];
+    const modIdx = modules.indexOf(foundMod) + 1;
+    const profile = MODULE_PROFILES[foundMod.id] || MODULE_PROFILES[`MOD-${modIdx}`] || MODULE_PROFILES['MOD-1'];
 
     return {
       module_id: foundMod.id,
@@ -56,22 +73,31 @@ const AIService = (function () {
       category_id: categoryId || '',
       category_name: categoryObj ? I18n.localizedName(categoryObj) : '',
       topic_id: topicId || '',
-      topic_name: topicObj ? topicObj.topic : '',
+      topic_name: topicObj ? (topicObj.topic || topicObj.title_ar || topicObj.title_en || '') : '',
       domain_profile: I18n.getLang() === 'ar' ? profile.domain_ar : profile.domain_en,
       key_concepts: profile.key_concepts.join(', '),
       total_topics: topics.length,
       mastered_count: mastered.length,
-      knowledge_gaps: gaps.map(g => g.topic).slice(0, 5).join('; ') || 'None',
+      knowledge_gaps: gaps.map(g => g.topic || g.title_ar || g.title_en || '').filter(Boolean).slice(0, 5).join('; ') || 'None',
       user_level: userLevel,
       language: I18n.getLang()
     };
   }
 
   /**
-   * Calls backend `askAI` action with built context.
+   * Calls backend `askAI` action with built context and client-side LRU response caching.
    */
   async function ask(tool, promptText, options = {}) {
     const context = buildModuleContext(options.moduleId, options.categoryId, options.topicId);
+    const cacheKey = `${tool}:${context.module_id}:${(promptText || '').trim()}:${I18n.getLang()}`;
+
+    if (!options.forceFresh && _aiResponseCache.has(cacheKey)) {
+      const cached = _aiResponseCache.get(cacheKey);
+      if (Date.now() - cached.ts < 30 * 60 * 1000) { // 30 min cache
+        return cached.res;
+      }
+      _aiResponseCache.delete(cacheKey);
+    }
     
     try {
       const res = await API.rawCall('askAI', {
@@ -82,12 +108,14 @@ const AIService = (function () {
       });
 
       if (res && (res.text || res.parsed)) {
-        return {
+        const responseData = {
           success: true,
           text: res.text || '',
           parsed: res.parsed || null,
           tool: tool
         };
+        _aiResponseCache.set(cacheKey, { res: responseData, ts: Date.now() });
+        return responseData;
       }
       return { success: false, error: 'Empty AI response' };
     } catch (err) {
