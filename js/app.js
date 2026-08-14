@@ -438,7 +438,7 @@ const Router = (function () {
     window.addEventListener('hashchange', () => { const h = decodeHash(); render(h.route, h.params); });
   }
 
-  return { go, reload, init, render, decodeHash, getRoute };
+  return { go, navigate: go, push: go, reload, init, render, decodeHash, getRoute };
 })();
 
 // ---------------------------------------------------------------------------

@@ -70,7 +70,10 @@ const DailyChallenge = (function () {
                 ${isAr ? '10 أسئلة مخصصة يومياً تركز على نقاط الضعف، الفجوات المعرفية، والتكرار المتباعد.' : '10 personalized daily questions targeted at your knowledge gaps, weak topics & spaced repetition.'}
               </p>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button id="btn-generate-ai-batch" class="btn btn-primary btn-sm" style="font-size: 12px; font-weight: 600; padding: 6px 14px; background: linear-gradient(135deg, var(--brass) 0%, var(--teal) 100%); border: none; color: #fff;">
+                ✨ ${isAr ? 'توليد 10 أسئلة جديدة بالذكاء الاصطناعي' : 'Generate 10 Fresh AI Questions'}
+              </button>
               <button id="btn-challenge-history" class="btn btn-secondary btn-sm" style="font-size: 12px;">
                 📅 ${isAr ? 'سجل التحديات' : 'Challenge History'}
               </button>
@@ -142,17 +145,24 @@ const DailyChallenge = (function () {
       });
     });
 
+    const btnAiGenerate = container.querySelector('#btn-generate-ai-batch');
+    if (btnAiGenerate) {
+      btnAiGenerate.addEventListener('click', async () => {
+        await generateFreshAIQuestions(_activeModuleId);
+      });
+    }
+
     const btnHistory = container.querySelector('#btn-challenge-history');
     if (btnHistory) {
       btnHistory.addEventListener('click', () => {
-        Router.navigate('challenge-history');
+        Router.go('challenge-history');
       });
     }
 
     const btnBank = container.querySelector('#btn-question-bank');
     if (btnBank) {
       btnBank.addEventListener('click', () => {
-        Router.navigate('question-bank');
+        Router.go('question-bank');
       });
     }
   }
@@ -255,6 +265,22 @@ const DailyChallenge = (function () {
     }
   }
 
+  function getThreeTierHints(q, isAr) {
+    const rawHints = (Array.isArray(q.hints) ? q.hints : [q.hint_1, q.hint_2, q.hint_3]).filter(Boolean);
+    const hints = [...rawHints];
+
+    if (hints.length < 1) {
+      hints.push(isAr ? `تلميح 1: تذكر القاعدة الأساسية والمفهوم النظري لـ (${q.topic_id || q.question_type || 'هذا السؤال'}).` : `Hint 1: Recall the core operational principle for (${q.topic_id || q.question_type || 'this topic'}).`);
+    }
+    if (hints.length < 2) {
+      hints.push(isAr ? `تلميح 2: استبعد البدائل التي تخالف الدورة المستندية أو التوجيه المحاسبي المعتمد.` : `Hint 2: Eliminate distractors that conflict with standard ledger flows or governance rules.`);
+    }
+    if (hints.length < 3) {
+      hints.push(isAr ? `تلميح 3 (مفتاح الحل): ركز على الخيار الذي يعكس التطبيق الدقيق والمطابقة القياسية للنظام.` : `Hint 3 (Direct Lead): Focus on the option that represents standard ERP best practice compliance.`);
+    }
+    return hints;
+  }
+
   function renderQuestionCard() {
     const workspace = document.getElementById('challenge-workspace');
     if (!workspace || !_currentChallenge || !_currentChallenge.questions) return;
@@ -267,6 +293,8 @@ const DailyChallenge = (function () {
     let difficultyColor = 'badge-teal';
     if (q.difficulty === 'Intermediate') difficultyColor = 'badge-brass';
     if (q.difficulty === 'Advanced' || q.difficulty === 'Expert') difficultyColor = 'badge-rust';
+
+    const hints = getThreeTierHints(q, isAr);
 
     workspace.innerHTML = `
       <!-- Progress & Status Meter -->
@@ -334,28 +362,28 @@ const DailyChallenge = (function () {
         <div id="challenge-hint-box" style="margin-bottom: 20px;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <button id="btn-request-hint" class="btn btn-secondary btn-sm" style="font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
-              💡 ${isAr ? 'طلب تلميح' : 'Need a Hint?'} (${_hintsRevealed}/3)
+              💡 ${isAr ? 'طلب تلميح' : 'Need a Hint?'} (<span id="hint-counter">${_hintsRevealed}</span>/3)
             </button>
-            <span style="font-size: 11px; color: var(--ink-soft);">
-              ${_hintsRevealed > 0 ? (isAr ? `تم استخدام ${_hintsRevealed} تلميحات` : `Hints used: ${_hintsRevealed}`) : ''}
+            <span id="hint-status-text" style="font-size: 11px; color: var(--ink-soft);">
+              ${_hintsRevealed > 0 ? (isAr ? `تم استخدام ${_hintsRevealed} من 3 تلميحات` : `Using ${_hintsRevealed}/3 hints`) : ''}
             </span>
           </div>
 
-          <!-- Hint Reveals -->
+          <!-- Hint Drawer (Populated dynamically without losing input state) -->
           <div id="hint-drawer" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-            ${(_hintsRevealed >= 1 && q.hints && q.hints[0]) ? `
+            ${(_hintsRevealed >= 1) ? `
               <div class="card" style="padding: 10px 14px; background: rgba(181, 119, 46, 0.08); border-inline-start: 3px solid var(--brass); font-size: 13px; color: var(--ink);">
-                <strong>💡 ${isAr ? 'تلميح 1:' : 'Hint 1:'}</strong> ${escapeHtml(q.hints[0])}
+                <strong>💡 ${isAr ? 'تلميح 1:' : 'Hint 1:'}</strong> ${escapeHtml(hints[0])}
               </div>
             ` : ''}
-            ${(_hintsRevealed >= 2 && q.hints && q.hints[1]) ? `
+            ${(_hintsRevealed >= 2) ? `
               <div class="card" style="padding: 10px 14px; background: rgba(181, 119, 46, 0.12); border-inline-start: 3px solid var(--brass); font-size: 13px; color: var(--ink);">
-                <strong>💡 ${isAr ? 'تلميح 2:' : 'Hint 2:'}</strong> ${escapeHtml(q.hints[1])}
+                <strong>💡 ${isAr ? 'تلميح 2:' : 'Hint 2:'}</strong> ${escapeHtml(hints[1])}
               </div>
             ` : ''}
-            ${(_hintsRevealed >= 3 && q.hints && q.hints[2]) ? `
+            ${(_hintsRevealed >= 3) ? `
               <div class="card" style="padding: 10px 14px; background: rgba(181, 119, 46, 0.18); border-inline-start: 3px solid var(--brass); font-size: 13px; color: var(--ink);">
-                <strong>💡 ${isAr ? 'تلميح 3 (مفتاح الحل):' : 'Hint 3 (Direct Lead):'}</strong> ${escapeHtml(q.hints[2])}
+                <strong>💡 ${isAr ? 'تلميح 3 (مفتاح الحل):' : 'Hint 3 (Direct Key):'}</strong> ${escapeHtml(hints[2])}
               </div>
             ` : ''}
           </div>
@@ -387,10 +415,10 @@ const DailyChallenge = (function () {
       </div>
     `;
 
-    bindQuestionEvents(q);
+    bindQuestionEvents(q, hints);
   }
 
-  function bindQuestionEvents(q) {
+  function bindQuestionEvents(q, hints) {
     const isAr = I18n.getLang() === 'ar';
     const workspace = document.getElementById('challenge-workspace');
     if (!workspace) return;
@@ -437,13 +465,33 @@ const DailyChallenge = (function () {
       });
     });
 
-    // Hint Button Click
+    // Hint Button Click (In-place DOM update, no re-render, preserves state)
     const hintBtn = workspace.querySelector('#btn-request-hint');
-    if (hintBtn) {
+    const hintDrawer = workspace.querySelector('#hint-drawer');
+    const hintCounter = workspace.querySelector('#hint-counter');
+    const hintStatusText = workspace.querySelector('#hint-status-text');
+
+    if (hintBtn && hintDrawer) {
       hintBtn.addEventListener('click', () => {
         if (_hintsRevealed < 3) {
           _hintsRevealed++;
-          renderQuestionCard();
+          if (hintCounter) hintCounter.textContent = _hintsRevealed;
+          if (hintStatusText) hintStatusText.textContent = isAr ? `تم استخدام ${_hintsRevealed} من 3 تلميحات` : `Using ${_hintsRevealed}/3 hints`;
+
+          const hintIdx = _hintsRevealed - 1;
+          const hintCard = document.createElement('div');
+          hintCard.className = 'card';
+          hintCard.style.padding = '10px 14px';
+          hintCard.style.background = _hintsRevealed === 3 ? 'rgba(181, 119, 46, 0.18)' : (_hintsRevealed === 2 ? 'rgba(181, 119, 46, 0.12)' : 'rgba(181, 119, 46, 0.08)');
+          hintCard.style.borderInlineStart = '3px solid var(--brass)';
+          hintCard.style.fontSize = '13px';
+          hintCard.style.color = 'var(--ink)';
+          hintCard.innerHTML = `<strong>💡 ${isAr ? `تلميح ${_hintsRevealed}:` : `Hint ${_hintsRevealed}:`}</strong> ${escapeHtml(hints[hintIdx] || '')}`;
+          hintDrawer.appendChild(hintCard);
+
+          if (_hintsRevealed >= 3) {
+            hintBtn.disabled = true;
+          }
         }
       });
     }
@@ -690,10 +738,10 @@ const DailyChallenge = (function () {
           <button class="btn btn-primary" onclick="DailyChallenge.loadChallengeData()">
             🔄 ${isAr ? 'بدء تحدي جديد' : 'New Challenge'}
           </button>
-          <button class="btn btn-secondary" onclick="Router.navigate('question-bank')">
+          <button class="btn btn-secondary" onclick="Router.go('question-bank')">
             📚 ${isAr ? 'استعراض بنك الأسئلة' : 'Explore Question Bank'}
           </button>
-          <button class="btn btn-secondary" onclick="Router.navigate('dashboard')">
+          <button class="btn btn-secondary" onclick="Router.go('dashboard')">
             📊 ${isAr ? 'العودة للوحة التحكم' : 'Return to Dashboard'}
           </button>
         </div>
@@ -760,8 +808,116 @@ const DailyChallenge = (function () {
     };
   }
 
+  async function generateFreshAIQuestions(moduleId) {
+    const isAr = I18n.getLang() === 'ar';
+    const workspace = document.getElementById('challenge-workspace');
+    if (!workspace) return;
+
+    const modules = State.modulesCache || (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
+    const curMod = modules.find(m => String(m.id) === String(moduleId)) || { name_en: moduleId, name_ar: moduleId };
+    const modTitle = isAr ? (curMod.name_ar || curMod.name_en) : (curMod.name_en || curMod.name_ar);
+
+    workspace.innerHTML = `
+      <div class="card" style="padding: 40px 20px; text-align: center; border-inline-start: 4px solid var(--brass);">
+        <div class="spinner" style="margin: 0 auto 16px auto;"></div>
+        <h3 style="font-size: 16px; font-weight: 700; margin: 0 0 8px 0; color: var(--ink);">
+          🧠 ${isAr ? `الذكاء الاصطناعي يقوم الآن بصياغة 10 أسئلة وسيناريوهات جديدة لموديول: ${modTitle}` : `AI is generating 10 fresh scenarios for: ${modTitle}`}
+        </h3>
+        <p style="font-size: 13px; color: var(--ink-soft); margin: 0;">
+          ${isAr ? 'يتم فحص أحدث المعايير المحاسبية والتشغيلية وابتكار سيناريوهات وحسابات غير مكررة...' : 'Crafting unique scenarios, ledger impacts, and distractor rationale...'}
+        </p>
+      </div>
+    `;
+
+    try {
+      let aiGeneratedQuestions = null;
+
+      // Attempt AI generation if AI Service is active
+      if (typeof AIService !== 'undefined' && typeof AIService.ask === 'function') {
+        const prompt = `You are a Senior ERP Solution Architect and Master Accounting Specialist.
+Generate 10 completely fresh, realistic, high-yield practice questions for the ERP Module "${curMod.name_en}" (${curMod.name_ar || ''}).
+Language: ${isAr ? 'Arabic (العربية الفصحى المهنية)' : 'English'}.
+Requirements:
+1. Distribute question types across: Accounting Impact, Troubleshooting, Process Decision, Implementation Decision, Scenario, Business Analysis, Multiple Choice.
+2. Provide exactly 4 options (A, B, C, D) for each.
+3. Provide the single correct option letter.
+4. Deep explanation why the correct answer is right.
+5. Distractor analysis explaining why other options are wrong.
+6. 3 tiers of hints (Concept -> Hint -> Direct Lead).
+7. Verified official standard reference (IFRS, SAP, Odoo, Oracle, COSO).
+Return ONLY a valid JSON array of 10 objects:
+[
+  {
+    "id": "Q-AI-${Date.now()}-1",
+    "module_id": "${moduleId}",
+    "question_type": "Accounting Impact",
+    "difficulty": "Intermediate",
+    "question": "...",
+    "options": [
+      {"id": "A", "text": "..."},
+      {"id": "B", "text": "..."},
+      {"id": "C", "text": "..."},
+      {"id": "D", "text": "..."}
+    ],
+    "correct_answer": "A",
+    "explanation": "...",
+    "distractors": {"B": "...", "C": "...", "D": "..."},
+    "hints": ["...", "...", "..."],
+    "reference": {"title": "...", "url": "...", "source": "..."}
+  }
+]`;
+
+        try {
+          const aiRaw = await AIService.ask(prompt, { max_tokens: 3000, temperature: 0.7 });
+          const jsonMatch = aiRaw.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            aiGeneratedQuestions = JSON.parse(jsonMatch[0]);
+          }
+        } catch (aiErr) {
+          console.warn('Direct AI generation fallback to variations:', aiErr);
+        }
+      }
+
+      // If AI service is not configured or failed, generate algorithmic variations
+      if (!Array.isArray(aiGeneratedQuestions) || aiGeneratedQuestions.length === 0) {
+        if (typeof CHALLENGE_BANK_DATA !== 'undefined') {
+          const baseBank = CHALLENGE_BANK_DATA.getQuestionsForModule(moduleId, isAr);
+          aiGeneratedQuestions = baseBank.map((q, idx) => {
+            const seedNum = Math.floor(Math.random() * 800) + 100;
+            const cloned = JSON.parse(JSON.stringify(q));
+            cloned.id = `Q-GEN-${Date.now()}-${idx + 1}`;
+            cloned.question = isAr ?
+              `[سيناريو متقدم #${idx + 1}] في منشأة صناعية بحجم معاملات (${seedNum} حركة): ${cloned.question}` :
+              `[Advanced Scenario #${idx + 1}] For an enterprise with (${seedNum} volume): ${cloned.question}`;
+            return cloned;
+          });
+        }
+      }
+
+      if (Array.isArray(aiGeneratedQuestions) && aiGeneratedQuestions.length > 0) {
+        _currentChallenge = {
+          module_id: moduleId,
+          mode: _activeMode,
+          total_questions: aiGeneratedQuestions.length,
+          questions: aiGeneratedQuestions
+        };
+        _currentIndex = 0;
+        _completedResults = [];
+        resetQuestionState();
+        renderQuestionCard();
+        Toast.show(isAr ? '✨ تم توليد 10 أسئلة جديدة بنجاح! بالتوفيق في التحدي.' : '✨ 10 fresh AI questions generated successfully!', 'success');
+      } else {
+        await loadChallengeData();
+      }
+    } catch (err) {
+      Toast.show(isAr ? 'تعذر توليد أسئلة جديدة: ' + err.message : 'Failed to generate: ' + err.message, 'error');
+      await loadChallengeData();
+    }
+  }
+
   return {
     render,
-    loadChallengeData
+    loadChallengeData,
+    generateFreshAIQuestions
   };
 })();

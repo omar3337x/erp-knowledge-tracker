@@ -60,7 +60,7 @@ const TopicDrill = (function () {
       document.getElementById('topic-drill-content').innerHTML = `
         <div class="card" style="padding: 30px; text-align: center;">
           <p style="color: var(--ink-soft);">${isAr ? 'يرجى اختيار موضوع لبدء التدريب المركز.' : 'Please select a topic to start mastery drill.'}</p>
-          <button class="btn btn-primary" onclick="Router.navigate('topics')">${isAr ? 'استعراض المواضيع' : 'Browse Topics'}</button>
+          <button class="btn btn-primary" onclick="Router.go('topics')">${isAr ? 'استعراض المواضيع' : 'Browse Topics'}</button>
         </div>
       `;
     }
@@ -131,7 +131,7 @@ const TopicDrill = (function () {
             <h3 style="font-size: 16px; font-weight: 700; color: var(--ink); margin: 0;">
               🧠 ${isAr ? 'أسئلة تدريبية مباشرة على هذا الموضوع' : 'Practice Questions on this Topic'}
             </h3>
-            <button class="btn btn-primary btn-sm" onclick="Router.navigate('daily-challenge')">
+            <button class="btn btn-primary btn-sm" onclick="Router.go('daily-challenge')">
               ${isAr ? 'بدء التحدي الشامل' : 'Start Full Challenge'}
             </button>
           </div>
