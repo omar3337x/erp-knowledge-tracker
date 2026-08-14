@@ -23,6 +23,16 @@ const SystemTest = (function () {
   let _searchQuery = '';
   let _activeTab = 'OVERVIEW'; // OVERVIEW, PAGES, MODULES, DOMAINS, EXPLORER, CONSOLE
 
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   // Install global runtime error listener to catch real frontend exceptions
   if (typeof window !== 'undefined') {
     window.addEventListener('error', function (e) {
