@@ -230,6 +230,7 @@ const I18N_DICT = {
       MODULE_NOT_FOUND: 'Module not found.', ADMIN_REQUIRED: 'Admin access required.',
       INVALID_STATUS: 'Invalid status.', UNKNOWN_ACTION: 'Something went wrong.',
       SERVER_ERROR: 'Server error. Please try again.', NETWORK_ERROR: 'Network error contacting the API.',
+      SERVICE_UNAVAILABLE: 'Google Apps Script service is temporarily warming up or unavailable. Please try again in a few seconds.',
       NOT_CONFIGURED: 'API_URL is not configured. Edit config.js after deploying Code.gs.',
       ERROR: 'Something went wrong.'
     }
@@ -456,6 +457,7 @@ const I18N_DICT = {
       MODULE_NOT_FOUND: 'الموديول غير موجود.', ADMIN_REQUIRED: 'يتطلب صلاحية مدير.',
       INVALID_STATUS: 'حالة غير صالحة.', UNKNOWN_ACTION: 'حدث خطأ ما.',
       SERVER_ERROR: 'خطأ في الخادم. يرجى المحاولة مرة أخرى.', NETWORK_ERROR: 'خطأ في الشبكة أثناء الاتصال بالـ API.',
+      SERVICE_UNAVAILABLE: 'خدمة Google Apps Script قيد الإحماء أو غير متاحة مؤقتاً. يرجى المحاولة بعد لحظات.',
       NOT_CONFIGURED: 'لم يتم إعداد API_URL. عدّل config.js بعد نشر Code.gs.',
       ERROR: 'حدث خطأ ما.'
     }

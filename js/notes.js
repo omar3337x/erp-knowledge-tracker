@@ -1091,6 +1091,7 @@ const Notes = (function () {
     const tagsHtml = (note.tags || []).map(t => `<span class="tag-badge">#${escapeHtml(t)}</span>`).join(' ');
     const pinBadge = note.pinned ? `<span class="pinned-badge">📌 ${I18n.t('common.pinned')}</span>` : '';
     const safeContent = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(note.content) : escapeHtml(note.content);
+    const imgHtml = note.image_url ? `<div style="margin-top:12px;"><img src="${escapeHtml(note.image_url)}" style="max-width:100%; border-radius:var(--radius-sm); border:1px solid var(--line);" alt=""></div>` : '';
 
     const html = `
       <div class="modal-head">

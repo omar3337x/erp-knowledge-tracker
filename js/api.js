@@ -195,9 +195,6 @@ const API = (function () {
     const urlParams = new URLSearchParams();
     if (action) urlParams.append('action', action);
     if (token) urlParams.append('token', token);
-    if (payload && typeof payload === 'object' && Object.keys(payload).length > 0) {
-      try { urlParams.append('payload', JSON.stringify(payload)); } catch(e) {}
-    }
     const fetchUrl = urlParams.toString() ? `${CONFIG.API_URL}?${urlParams.toString()}` : CONFIG.API_URL;
 
     const fetchOpts = {
