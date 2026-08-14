@@ -172,9 +172,36 @@ const DailyChallenge = (function () {
     `;
 
     try {
-      const res = await API.getDailyChallenge(_activeModuleId, _activeMode, isAr ? 'ar' : 'en');
-      if (res && res.questions && res.questions.length > 0) {
-        _currentChallenge = res;
+      let res = null;
+      try {
+        res = await API.getDailyChallenge(_activeModuleId, _activeMode, isAr ? 'ar' : 'en');
+      } catch (netErr) {
+        res = { questions: [] };
+      }
+
+      let questions = (res && Array.isArray(res.questions)) ? [...res.questions] : [];
+
+      // Guarantee exactly 10 questions using CHALLENGE_BANK_DATA
+      if (typeof CHALLENGE_BANK_DATA !== 'undefined' && questions.length < 10) {
+        const fullBank = CHALLENGE_BANK_DATA.getQuestionsForModule(_activeModuleId, isAr);
+        const existingIds = new Set(questions.map(q => q.id));
+
+        for (let bq of fullBank) {
+          if (questions.length >= 10) break;
+          if (!existingIds.has(bq.id)) {
+            questions.push(bq);
+            existingIds.add(bq.id);
+          }
+        }
+      }
+
+      if (questions.length > 0) {
+        _currentChallenge = {
+          module_id: _activeModuleId,
+          mode: _activeMode,
+          total_questions: questions.length,
+          questions: questions
+        };
         _currentIndex = 0;
         _completedResults = [];
         resetQuestionState();

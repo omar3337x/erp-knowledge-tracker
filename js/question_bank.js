@@ -143,14 +143,42 @@ const QuestionBank = (function () {
     `;
 
     try {
-      const res = await API.getQuestionBank({
-        module_id: _filterModule,
-        difficulty: _filterDifficulty,
-        search: _searchQuery,
-        limit: 100
-      });
+      let res = null;
+      try {
+        res = await API.getQuestionBank({
+          module_id: _filterModule,
+          difficulty: _filterDifficulty,
+          search: _searchQuery,
+          limit: 100
+        });
+      } catch (e) {
+        res = { questions: [] };
+      }
 
-      _questions = (res && res.questions) ? res.questions : [];
+      let questions = (res && Array.isArray(res.questions)) ? [...res.questions] : [];
+
+      if (typeof CHALLENGE_BANK_DATA !== 'undefined') {
+        const modules = State.modulesCache || (typeof DEFAULT_MODULES !== 'undefined' ? DEFAULT_MODULES : []);
+        const targetModules = _filterModule ? [modules.find(m => m.id === _filterModule) || { id: _filterModule }] : modules;
+
+        const existingIds = new Set(questions.map(q => q.id));
+        for (let mod of targetModules) {
+          const modBank = CHALLENGE_BANK_DATA.getQuestionsForModule(mod.id, isAr);
+          for (let bq of modBank) {
+            if (!existingIds.has(bq.id)) {
+              if (_filterDifficulty && String(bq.difficulty).toLowerCase() !== _filterDifficulty.toLowerCase()) continue;
+              if (_searchQuery) {
+                const text = (bq.question + ' ' + (bq.explanation || '')).toLowerCase();
+                if (text.indexOf(_searchQuery.toLowerCase()) === -1) continue;
+              }
+              questions.push(bq);
+              existingIds.add(bq.id);
+            }
+          }
+        }
+      }
+
+      _questions = questions;
       if (countEl) countEl.textContent = `${_questions.length} ${isAr ? 'سؤال' : 'Questions'}`;
 
       if (_questions.length === 0) {
