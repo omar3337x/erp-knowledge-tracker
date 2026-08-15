@@ -94,8 +94,11 @@ const DatabaseExplorer = (function () {
         <!-- Navigation Tabs Bar -->
         <div class="card" style="padding: 0; overflow: hidden;">
           <div style="display: flex; border-bottom: 1px solid var(--line); background: var(--surface); overflow-x: auto; padding: 0 12px;" id="db-nav-tabs">
+            <button class="tab-nav-btn ${ _activeTab === 'deletion' ? 'active' : '' }" data-tab="deletion" style="padding: 12px 16px; font-size: 13px; font-weight: 600; border: none; background: none; cursor: pointer; border-bottom: 2px solid ${_activeTab === 'deletion' ? 'var(--brass)' : 'transparent'}; color: ${_activeTab === 'deletion' ? 'var(--brass-deep)' : 'var(--ink-soft)'}; white-space: nowrap;">
+              🗑️ ${isAr ? 'محلل حذف الحركات (Deletion Analyzer)' : 'Transaction Deletion Analyzer'}
+            </button>
             <button class="tab-nav-btn ${ _activeTab === 'impact' ? 'active' : '' }" data-tab="impact" style="padding: 12px 16px; font-size: 13px; font-weight: 600; border: none; background: none; cursor: pointer; border-bottom: 2px solid ${_activeTab === 'impact' ? 'var(--brass)' : 'transparent'}; color: ${_activeTab === 'impact' ? 'var(--brass-deep)' : 'var(--ink-soft)'}; white-space: nowrap;">
-              🧪 ${isAr ? 'مساعد تحليل أثر التعديل (Change Impact Analyzer)' : 'Change Impact Analyzer'}
+              🧪 ${isAr ? 'مساعد تحليل أثر التعديل (Change Impact)' : 'Change Impact Analyzer'}
             </button>
             <button class="tab-nav-btn ${ _activeTab === 'tables' ? 'active' : '' }" data-tab="tables" style="padding: 12px 16px; font-size: 13px; font-weight: 600; border: none; background: none; cursor: pointer; border-bottom: 2px solid ${_activeTab === 'tables' ? 'var(--brass)' : 'transparent'}; color: ${_activeTab === 'tables' ? 'var(--brass-deep)' : 'var(--ink-soft)'}; white-space: nowrap;">
               🗄️ ${isAr ? 'مستعرض الجداول والمجالات (406 جدول)' : 'Domain & Table Explorer'}
@@ -153,7 +156,9 @@ const DatabaseExplorer = (function () {
 
     const isAr = I18n.getLang() === 'ar';
 
-    if (_activeTab === 'impact') {
+    if (_activeTab === 'deletion') {
+      renderDeletionTab(contentEl, isAr);
+    } else if (_activeTab === 'impact') {
       renderImpactTab(contentEl, isAr);
     } else if (_activeTab === 'tables') {
       renderTablesTab(contentEl, isAr);
@@ -167,6 +172,403 @@ const DatabaseExplorer = (function () {
       renderChangeLogTab(contentEl, isAr);
     } else if (_activeTab === 'ai_chat') {
       renderAIChatTab(contentEl, isAr);
+    }
+  }
+
+  // =========================================================================
+  // TAB 0: TRANSACTION DELETION ANALYZER (New Core Feature)
+  // =========================================================================
+  let _deletionResult = null;
+  let _selectedTxType = 'SALES_RETURN';
+
+  function renderDeletionTab(container, isAr) {
+    if (!_deletionResult) {
+      _deletionResult = DatabaseExplorerEngine.analyzeTransactionDeletion('عايز أحذف حركة مرتجع مبيعات رقم 12345', 'SALES_RETURN', '12345');
+    }
+
+    container.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- Input & Quick Selectors -->
+        <div>
+          <label style="font-size: 13px; font-weight: 700; color: var(--ink); display: block; margin-bottom: 8px;">
+            🗑️ ${isAr ? 'ما الحركة التشغيلية التي ترغب في تحليل دورة حذفها وإلغائها؟' : 'Which transaction lifecycle do you want to analyze for safe deletion?'}
+          </label>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input 
+              type="text" 
+              id="db-deletion-input" 
+              class="form-control" 
+              placeholder="${isAr ? 'اكتب مثلاً: عايز أحذف مرتجع مبيعات رقم 12345، أو احذف فاتورة مبيعات 554...' : 'e.g. Delete sales return 12345, delete sales invoice 882...'}" 
+              value="${escapeHtml(_deletionResult ? _deletionResult.query : '')}"
+              style="flex: 1; min-width: 300px; font-size: 13px;"
+            />
+            <button class="btn btn-primary" id="btn-run-deletion" style="font-size: 13px; font-weight: 600;">
+              🔍 ${isAr ? 'تحليل دورة الحركة ومصفوفة الحذف' : 'Analyze Deletion Lifecycle'}
+            </button>
+          </div>
+
+          <!-- Quick Transaction Type Chips -->
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;">
+            <span style="font-size: 11px; color: var(--ink-soft); align-self: center;">${isAr ? 'أنواع الحركات:' : 'Transaction Types:'}</span>
+            <button class="btn btn-sm ${ _selectedTxType === 'SALES_RETURN' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="SALES_RETURN" data-id="12345" style="font-size: 11px;">
+              🧾 ${isAr ? 'مرتجع مبيعات (Sales Return)' : 'Sales Return'}
+            </button>
+            <button class="btn btn-sm ${ _selectedTxType === 'SALES_INVOICE' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="SALES_INVOICE" data-id="8841" style="font-size: 11px;">
+              🧾 ${isAr ? 'فاتورة مبيعات (Sales Invoice)' : 'Sales Invoice'}
+            </button>
+            <button class="btn btn-sm ${ _selectedTxType === 'PURCHASE_RETURN' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="PURCHASE_RETURN" data-id="3120" style="font-size: 11px;">
+              🛒 ${isAr ? 'مرتجع مشتريات (Purchase Return)' : 'Purchase Return'}
+            </button>
+            <button class="btn btn-sm ${ _selectedTxType === 'PURCHASE_INVOICE' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="PURCHASE_INVOICE" data-id="5420" style="font-size: 11px;">
+              🛒 ${isAr ? 'فاتورة مشتريات (Purchase Invoice)' : 'Purchase Invoice'}
+            </button>
+            <button class="btn btn-sm ${ _selectedTxType === 'STOCK_TRANSFER' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="STOCK_TRANSFER" data-id="901" style="font-size: 11px;">
+              📦 ${isAr ? 'تحويل مخزني (Stock Transfer)' : 'Stock Transfer'}
+            </button>
+            <button class="btn btn-sm ${ _selectedTxType === 'RECEIPT_PAYMENT' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="RECEIPT_PAYMENT" data-id="7712" style="font-size: 11px;">
+              🏦 ${isAr ? 'سند قبض / صرف (Receipt/Payment)' : 'Receipt/Payment'}
+            </button>
+            <button class="btn btn-sm ${ _selectedTxType === 'PHYSICAL_INVENTORY' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="PHYSICAL_INVENTORY" data-id="44" style="font-size: 11px;">
+              📋 ${isAr ? 'محضر جرد (Stock Count)' : 'Stock Count'}
+            </button>
+            <button class="btn btn-sm ${ _selectedTxType === 'MANUAL_JOURNAL' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="MANUAL_JOURNAL" data-id="2830" style="font-size: 11px;">
+              📒 ${isAr ? 'قيد يومية يدوي (Manual Journal)' : 'Manual Journal'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Deletion Analysis Results Container -->
+        <div id="db-deletion-results-container">
+          ${_deletionResult ? renderDeletionResultDetails(_deletionResult, isAr) : ''}
+        </div>
+
+      </div>
+    `;
+
+    // Bind events
+    const input = container.querySelector('#db-deletion-input');
+    const btnRun = container.querySelector('#btn-run-deletion');
+
+    const execDeletionAnalysis = (query, forcedType, forcedId) => {
+      const q = (query || input.value).trim();
+      if (!q && !forcedType) return;
+      _deletionResult = DatabaseExplorerEngine.analyzeTransactionDeletion(q, forcedType, forcedId);
+      _selectedTxType = _deletionResult.map.type_key;
+      input.value = _deletionResult.query || `حذف ${_deletionResult.map.name_ar} رقم ${_deletionResult.transaction_id}`;
+      
+      const resContainer = container.querySelector('#db-deletion-results-container');
+      if (resContainer) {
+        resContainer.innerHTML = renderDeletionResultDetails(_deletionResult, isAr);
+        bindDeletionResultEvents(resContainer, isAr);
+      }
+    };
+
+    if (btnRun) btnRun.addEventListener('click', () => execDeletionAnalysis());
+    if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') execDeletionAnalysis(); });
+
+    container.querySelectorAll('.quick-tx-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const type = chip.getAttribute('data-type');
+        const id = chip.getAttribute('data-id');
+        container.querySelectorAll('.quick-tx-chip').forEach(c => {
+          c.classList.remove('btn-primary');
+          c.classList.add('btn-secondary');
+        });
+        chip.classList.remove('btn-secondary');
+        chip.classList.add('btn-primary');
+        execDeletionAnalysis(`حذف ${type} رقم ${id}`, type, id);
+      });
+    });
+
+    const resContainer = container.querySelector('#db-deletion-results-container');
+    if (resContainer) bindDeletionResultEvents(resContainer, isAr);
+  }
+
+  function renderDeletionResultDetails(res, isAr) {
+    if (!res || !res.map) return '';
+
+    const m = res.map;
+    const txId = res.transaction_id;
+
+    return `
+      <div class="animate-fade-in" style="display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- Header Title Card -->
+        <div style="padding: 20px; background: var(--paper); border-radius: var(--radius-sm); border: 1px solid var(--line); border-inline-start: 4px solid var(--rust); display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <span style="font-size: 26px;">🗑️</span>
+              <h3 style="font-size: 17px; font-weight: 700; margin: 0; color: var(--ink);">
+                ${escapeHtml(isAr ? m.name_ar : m.name_en)} — #${escapeHtml(txId)}
+              </h3>
+              <span class="badge badge-rust" style="font-size: 11px;">
+                ⚡ Risk Level: ${escapeHtml(res.risk_level)}
+              </span>
+            </div>
+            <div style="font-size: 13px; color: var(--ink-soft); line-height: 1.6;">
+              📌 <strong>${isAr ? 'الترويسة الأساسية:' : 'Header:'}</strong> <code>${escapeHtml(m.header_table)}</code> (id=${escapeHtml(txId)}) &nbsp;•&nbsp; 
+              <strong>${isAr ? 'جدول التفاصيل:' : 'Details:'}</strong> <code>${escapeHtml(m.details_table)}</code> &nbsp;•&nbsp;
+              ${m.journal_type_id ? `<strong>${isAr ? 'نوع القيد في journal:' : 'Journal type_id:'}</strong> <code>type_id=${m.journal_type_id}</code>` : ''}
+            </div>
+          </div>
+
+          <div style="font-size: 11px; color: var(--ink-soft); background: var(--surface); padding: 5px 12px; border-radius: 4px; border: 1px solid var(--line);">
+            🔒 <strong>Source of Truth:</strong> newdatabase2026.sql (406 Tables)
+          </div>
+        </div>
+
+        <!-- 7-LAYER STRUCTURED DELETION & RELATIONSHIPS TREE -->
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+
+          <!-- LAYER 1: CORE TRANSACTION -->
+          <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--teal);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
+                🧾 1. CORE TRANSACTION (الترويسة والتفاصيل الأساسية)
+              </strong>
+              <span class="badge badge-teal" style="font-size: 10px;">🟢 CONFIRMED FROM CURRENT SCHEMA</span>
+            </div>
+            
+            <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
+              <div><strong>${escapeHtml(m.header_table)}</strong> (Header)</div>
+              <div style="color: var(--ink-soft);">└── <code>id = ${escapeHtml(txId)}</code> <span class="badge badge-teal" style="font-size: 9px; margin-inline-start: 6px;">🟢 Confirmed</span></div>
+              <div style="margin-top: 6px;"><strong>${escapeHtml(m.details_table)}</strong> (Details)</div>
+              <div style="color: var(--ink-soft);">└── <code>${escapeHtml(m.details_fk)} = ${escapeHtml(txId)}</code> <span class="badge badge-teal" style="font-size: 9px; margin-inline-start: 6px;">🟢 Confirmed</span></div>
+            </div>
+          </div>
+
+          <!-- LAYER 2: INVENTORY & BATCHES -->
+          <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--brass);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
+                📦 2. INVENTORY & BATCH MOVEMENTS (المخزون وحركات الباتشات)
+              </strong>
+              <span class="badge badge-brass" style="font-size: 10px;">🟡 INFERRED & CANDIDATE KEYS</span>
+            </div>
+            
+            <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
+              <div><strong>general_table</strong> (Operational Stock Movement)</div>
+              <div style="color: var(--ink-soft);">└── Relation: <code>link_id = ${escapeHtml(txId)}</code> OR <code>details_id IN (SELECT id FROM ${escapeHtml(m.details_table)} WHERE ${escapeHtml(m.details_fk)}=${escapeHtml(txId)})</code></div>
+              <div style="color: var(--brass-deep); font-size: 11px; margin-top: 2px;">
+                ⚠️ <em>Rule: ${isAr ? 'لا تفترض نوع محدد (type) كحقيقة مطلقة بدون مطابقة سجلات المخزن الحية.' : 'Do NOT assume static type=2 without verifying actual link_id & details_id.'}</em>
+              </div>
+
+              ${m.patches_discovery ? `
+                <div style="margin-top: 8px;"><strong>patches</strong> (Batch Tracking / Cost)</div>
+                <div style="color: var(--ink-soft);">└── Relation: <code>link_id = ${escapeHtml(txId)}</code> <span class="badge badge-brass" style="font-size: 9px; margin-inline-start: 6px;">🟡 Inferred Candidate</span></div>
+                <div style="color: var(--ink-soft); font-size: 11px;">⚠️ <em>${isAr ? 'لا يتم الحذف إلا إذا أثبت الفحص وجود سجلات باتشات مرتبطة بالمرتجع.' : 'Not deletable unless probe proves linked batch records.'}</em></div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- LAYER 3: ACCOUNTING & GENERAL LEDGER -->
+          <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--brass-deep);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
+                💰 3. ACCOUNTING & GENERAL LEDGER (الأستاذ العام والقيود المحاسبية)
+              </strong>
+              <span class="badge badge-rust" style="font-size: 10px;">🟠 HISTORICAL SCRIPT SUPPORTED</span>
+            </div>
+            
+            <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
+              <div><strong>journal</strong> (Posting Header)</div>
+              <div style="color: var(--ink-soft);">└── <code>reference = ${escapeHtml(txId)}</code> AND <code>type_id = ${m.journal_type_id || 'N/A'}</code> <span class="badge badge-rust" style="font-size: 9px; margin-inline-start: 6px;">🟠 Historical Script</span></div>
+              <div style="margin-top: 6px;"><strong>gl_trans</strong> (Double-Entry Ledger Lines)</div>
+              <div style="color: var(--ink-soft);">└── <code>type_no = Journal ID</code> AND <code>type_id = ${m.gl_trans_type_id || m.journal_type_id || 'N/A'}</code></div>
+              <div style="color: var(--teal); font-weight: 600; margin-top: 4px;">
+                └── GL Balance Condition: <code>SUM(gl_trans.amount) = 0</code> (Debit = Credit) <span class="badge badge-teal" style="font-size: 9px;">🟢 Safe Condition</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- LAYER 4: REPORTING & DASHBOARD -->
+          ${m.reporting_table ? `
+            <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--teal);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
+                  📊 4. REPORTING & DASHBOARD SUMMARIES (إحصائيات المبيعات والداشبورد)
+                </strong>
+                <span class="badge badge-teal" style="font-size: 10px;">🟢 CONFIRMED FROM CURRENT SCHEMA</span>
+              </div>
+              
+              <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
+                <div><strong>${escapeHtml(m.reporting_table)}</strong> (Daily Summaries)</div>
+                <div style="color: var(--ink-soft);">└── <code>${escapeHtml(m.reporting_fk)} = ${escapeHtml(txId)}</code> <span class="badge badge-teal" style="font-size: 9px; margin-inline-start: 6px;">🟢 Confirmed</span></div>
+                <div style="color: var(--ink-soft); font-size: 11px;">${isAr ? 'الإجراء: حذف السجل التجميعي لتصحيح تقارير صافي المبيعات والأرباح.' : 'Action: Delete summary record to recalculate daily sales aggregates.'}</div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- LAYER 5: ORIGINAL LINKED DOCUMENT -->
+          ${m.original_doc_link ? `
+            <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--ink-soft);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
+                  🔗 5. ORIGINAL LINKED DOCUMENT (المستند الأصلي المرتبط)
+                </strong>
+                <span class="badge badge-secondary" style="font-size: 10px;">🛡️ READ-ONLY (DO NOT DELETE)</span>
+              </div>
+              
+              <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
+                <div><strong>${escapeHtml(m.original_doc_link.table)}</strong> (${escapeHtml(m.original_doc_link.label_ar)})</div>
+                <div style="color: var(--ink-soft);">└── <code>valid_bill_id -> bills.id</code> <span class="badge badge-teal" style="font-size: 9px; margin-inline-start: 6px;">🟢 Confirmed</span></div>
+                <div style="color: var(--rust); font-size: 11.5px; font-weight: 600; margin-top: 4px;">
+                  🚫 <em>${isAr ? 'ممنوع حذف الفاتورة الأصلية. العلاقة تُستخدم للتحقق من أثر الإلغاء على الرصيد فقط.' : 'NEVER delete original sales bill. Link is used strictly for impact verification.'}</em>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+        </div>
+
+        <!-- RISK & SAFETY BLOCKERS CHECKLIST -->
+        <div class="card" style="padding: 18px; border: 1px solid var(--rust); background: rgba(192, 86, 62, 0.03);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <strong style="font-size: 14px; color: var(--rust); display: flex; align-items: center; gap: 8px;">
+              🔴 موانع الحذف وشروط السلامة الإلزامية (Deletion Safety Blockers):
+            </strong>
+            <span class="badge badge-rust" style="font-size: 10px;">SAFETY GATE ENFORCED</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${(res.safety_blockers || []).map(b => `
+              <div style="display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 4px;">
+                <span style="font-size: 16px;">${b.status === 'ENFORCED' ? '🛡️' : '⚠️'}</span>
+                <div>
+                  <strong style="font-size: 12.5px; color: var(--ink); display: block;">${escapeHtml(b.title_ar)}</strong>
+                  <span style="font-size: 11.5px; color: var(--ink-soft);">${escapeHtml(b.desc_ar)}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Master Data & Audit Safeguards Banner -->
+        <div style="padding: 12px 16px; background: rgba(44, 122, 107, 0.05); border: 1px solid var(--teal); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 20px;">🛡️</span>
+          <div style="font-size: 12.5px; color: var(--ink); line-height: 1.5;">
+            <strong>${isAr ? 'حماية البيانات الأساسية وسجلات الرقابة:' : 'Master Data & Audit Protection:'}</strong>
+            ${isAr 
+              ? `الجداول الأساسية (${(res.master_data_safeguards || []).join(', ')}) وسجلات التدقيق (${(res.audit_tables || []).join(', ')}) <strong>محمية تماماً ولن يتم حذفها</strong> لضمان سلامة الهيكل المحاسبي وتاريخ التدقيق.` 
+              : `Master tables (${(res.master_data_safeguards || []).join(', ')}) and audit logs (${(res.audit_tables || []).join(', ')}) are strictly preserved.`}
+          </div>
+        </div>
+
+        <!-- 8-Stage Deletion Sequence Roadmap -->
+        <div class="card" style="padding: 16px;">
+          <strong style="font-size: 13.5px; color: var(--ink); display: block; margin-bottom: 12px;">
+            🧭 ${isAr ? 'مسار المراحل الثماني لإثبات وحذف الحركة (8-Stage Deletion Pipeline):' : '8-Stage Deletion Pipeline:'}
+          </strong>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${(res.eight_stage_roadmap || []).map(p => `
+              <div style="padding: 10px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); border-inline-start: 3px solid ${p.stage === 6 || p.stage === 7 ? 'var(--rust)' : (p.stage === 8 ? 'var(--teal)' : 'var(--brass)')};">
+                <strong style="font-size: 12.5px; color: var(--ink); display: block; margin-bottom: 2px;">
+                  ${escapeHtml(isAr ? p.title_ar : p.title_en)}
+                </strong>
+                <p style="font-size: 11.5px; color: var(--ink-soft); margin: 0; line-height: 1.5;">
+                  ${escapeHtml(p.desc_ar)}
+                </p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Read-Only Dynamic Discovery & Verification Probes -->
+        <div class="card" style="padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <strong style="font-size: 13.5px; color: var(--ink); display: flex; align-items: center; gap: 6px;">
+              🔍 ${isAr ? 'استعلامات إثبات العلاقات والفحص المسبق (Dynamic Discovery Probes):' : 'Discovery Probes:'}
+            </strong>
+            <span class="badge badge-teal" style="font-size: 10px;">100% Read-Only (SELECT only)</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            ${(res.discovery_probes || []).map((q, idx) => `
+              <div style="border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden;">
+                <div style="padding: 6px 12px; background: var(--paper); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+                  <span>${escapeHtml(q.title_ar)}</span>
+                  <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${q.sql.replace(/\n/g, ' ').replace(/'/g, "\\'")}'); Toast.show('${isAr ? 'تم نسخ الاستعلام' : 'Query copied'}', 'success');" style="font-size: 11px; padding: 2px 6px;">
+                    📋 ${isAr ? 'نسخ الاستعلام' : 'Copy Query'}
+                  </button>
+                </div>
+                <pre style="margin: 0; padding: 8px 12px; background: #1e1e1e; color: #9cdcfe; font-family: monospace; font-size: 12px; white-space: pre-wrap; line-height: 1.5;"><code>${escapeHtml(q.sql)}</code></pre>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Transactional Modification SQL Wrapper -->
+        <div class="card" style="padding: 16px; border: 1px solid rgba(192, 86, 62, 0.4);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div>
+              <strong style="font-size: 13.5px; color: var(--rust); display: block;">
+                ⚠️ ${isAr ? 'سكريبت الحذف الخارجي المشروط (External Transactional SQL Wrapper):' : 'External Transactional SQL:'}
+              </strong>
+              <small style="font-size: 11px; color: var(--ink-soft);">
+                ${isAr ? 'مغلف بكبسولة START TRANSACTION للتنفيذ اليدوي خارج النظام فقط مع دعم ROLLBACK الكامل.' : 'Wrapped in START TRANSACTION for external DB execution only.'}
+              </small>
+            </div>
+
+            <button class="btn btn-secondary btn-sm" id="btn-toggle-mod-sql" style="font-size: 11px;">
+              👁️ ${isAr ? 'إظهار / إخفاء كود الـ SQL' : 'Toggle SQL'}
+            </button>
+          </div>
+
+          <div id="mod-sql-wrapper-box" style="display: none; margin-top: 10px;">
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
+              <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${res.modification_sql.replace(/\n/g, '\\n').replace(/'/g, "\\'")}'); Toast.show('${isAr ? 'تم نسخ سكريبت الحذف الصافي' : 'SQL copied'}', 'success');" style="font-size: 11px;">
+                📋 ${isAr ? 'نسخ السكريبت بالكامل (Pure SQL)' : 'Copy Full Script'}
+              </button>
+            </div>
+            <pre style="margin: 0; padding: 12px; background: #1a1a1a; color: #f8f8f2; font-family: monospace; font-size: 12px; border-radius: var(--radius-sm); white-space: pre-wrap; line-height: 1.5; border: 1px solid var(--line);"><code>${escapeHtml(res.modification_sql)}</code></pre>
+          </div>
+        </div>
+
+        <!-- Post-Deletion Verification Tool -->
+        <div class="card" style="padding: 16px; background: var(--paper); border-inline-start: 4px solid var(--teal);">
+          <strong style="font-size: 13.5px; color: var(--ink); display: block; margin-bottom: 6px;">
+            🔎 ${isAr ? 'أداة التحقق الختامي بعد الحذف (Post-Deletion Verifier):' : 'Post-Deletion Verifier:'}
+          </strong>
+          <p style="font-size: 12px; color: var(--ink-soft); margin: 0 0 10px 0;">
+            ${isAr ? 'بعد تطبيق الحذف في بيئة قاعدة البيانات الخارجية، اضغط هنا لتوليد استعلامات فحص خلو الجداول من السجلات أو الأيتام.' : 'After running deletion externally, run these probe queries to confirm 0 remaining records.'}
+          </p>
+
+          <button class="btn btn-secondary btn-sm" id="btn-run-post-verify" style="font-size: 12px;">
+            🔎 ${isAr ? 'توليد استعلامات التحقق الختامي (Verify Zero Counts)' : 'Generate Zero-Count Probes'}
+          </button>
+
+          <div id="post-verify-box" style="display: none; margin-top: 12px;">
+            <pre style="margin: 0; padding: 10px; background: #1e1e1e; color: #a6e22e; font-family: monospace; font-size: 12px; border-radius: var(--radius-sm); white-space: pre-wrap;"><code>SELECT '${m.header_table}' AS tbl, count(*) AS cnt FROM \`${m.header_table}\` WHERE id = ${txId}
+UNION ALL
+SELECT '${m.details_table}' AS tbl, count(*) AS cnt FROM \`${m.details_table}\` WHERE ${m.details_fk} = ${txId}
+${m.inventory_discovery ? `UNION ALL\nSELECT 'general_table' AS tbl, count(*) AS cnt FROM \`general_table\` WHERE link_id = ${txId} OR details_id IN (SELECT id FROM \`${m.details_table}\` WHERE ${m.details_fk} = ${txId})` : ''}
+${m.journal_type_id !== undefined ? `UNION ALL\nSELECT 'journal' AS tbl, count(*) AS cnt FROM \`journal\` WHERE reference = ${txId} AND type_id = ${m.journal_type_id}\nUNION ALL\nSELECT 'gl_trans' AS tbl, count(*) AS cnt FROM \`gl_trans\` WHERE type_id = ${m.gl_trans_type_id || m.journal_type_id} AND type_no IN (SELECT id FROM journal WHERE reference = ${txId})` : ''};</code></pre>
+          </div>
+        </div>
+
+      </div>
+    `;
+  }
+
+  function bindDeletionResultEvents(container, isAr) {
+    const btnToggleSql = container.querySelector('#btn-toggle-mod-sql');
+    const boxSql = container.querySelector('#mod-sql-wrapper-box');
+    if (btnToggleSql && boxSql) {
+      btnToggleSql.addEventListener('click', () => {
+        const isHidden = boxSql.style.display === 'none';
+        boxSql.style.display = isHidden ? 'block' : 'none';
+      });
+    }
+
+    const btnPostVerify = container.querySelector('#btn-run-post-verify');
+    const boxPostVerify = container.querySelector('#post-verify-box');
+    if (btnPostVerify && boxPostVerify) {
+      btnPostVerify.addEventListener('click', () => {
+        boxPostVerify.style.display = 'block';
+        Toast.show(isAr ? 'تم توليد استعلامات الفحص الختامي' : 'Verification queries generated', 'success');
+      });
     }
   }
 

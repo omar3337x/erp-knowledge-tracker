@@ -426,11 +426,539 @@ STRICT RULES:
 4. NEVER invent non-existent table or column names. Only refer to tables proven in newdatabase2026.sql.`;
   }
 
+  /**
+   * Comprehensive Dynamic Transaction Deletion Maps & Playbooks
+   * Source of Truth: newdatabase2026.sql + Historical Accounting Logic
+   * Principle: NEVER TRUST STATIC MAPPING AS ABSOLUTE FACT WITHOUT DISCOVERY & PROOF
+   */
+  const TRANSACTION_DELETION_MAPS = {
+    SALES_RETURN: {
+      type_key: 'SALES_RETURN',
+      name_ar: 'مرتجع مبيعات (Sales Return)',
+      name_en: 'Sales Return',
+      triggers_ar: ['مرتجع مبيعات', 'مرتجع المبيعات', 'حذف مرتجع', 'bills_returned', 'bill_details_returned'],
+      triggers_en: ['sales return', 'delete return', 'bills_returned', 'return invoice'],
+      header_table: 'bills_returned',
+      details_table: 'bill_details_returned',
+      details_fk: 'bill_id',
+      inventory_discovery: {
+        table: 'general_table',
+        candidate_keys: ['link_id', 'details_id', 'product_id', 'store_id', 'quantity_type', 'type'],
+        suggested_type: 2,
+        notes_ar: 'يتم فحص العلاقة ديناميكياً عبر link_id = :ID أو details_id المطابقة لبنود المرتجع مع مطابقة store_id و product_id.'
+      },
+      patches_discovery: {
+        table: 'patches',
+        candidate_keys: ['link_id', 'product_id', 'store_id'],
+        suggested_type: 57,
+        notes_ar: 'لا يُعتبر جدول الباتشات إلزامياً إلا إذا أثبت الفحص المسبق وجود سجلات باتشات مرتبطة بالمرتجع.'
+      },
+      journal_type_id: 57,   // Historical script supported
+      gl_trans_type_id: 57,  // Historical script supported
+      reporting_table: 'sales_dashboard_daily_summaries',
+      reporting_fk: 'return_id',
+      original_doc_link: { table: 'bills', fk_column: 'valid_bill_id', label_ar: 'فاتورة المبيعات الأصلية المرتبطة (للفحص فقط - لا تُحذف)' },
+      master_data_safeguards: ['products', 'customers', 'stores', 'chart_master', 'branches'],
+      audit_tables: ['audit_trail', 'a_logs'],
+      risk_level: 'CRITICAL',
+      impact_layers: [
+        {
+          table: 'bills_returned',
+          role_ar: 'ترويسة حركة مرتجع المبيعات (Return Header)',
+          role_en: 'Return Header',
+          relation_ar: 'الجدول الأساسي (Primary ID: bills_returned.id)',
+          filter_sql: 'id = :ID',
+          impact_level: 'CRITICAL',
+          action_ar: 'حذف في الخطوة الأخيرة بعد حذف القيود والتفاصيل',
+          confidence: CONFIDENCE_LEVELS.CONFIRMED,
+          source_type: 'CURRENT_SCHEMA'
+        },
+        {
+          table: 'bill_details_returned',
+          role_ar: 'بنود وتفاصيل أصناف المرتجع (Return Details)',
+          role_en: 'Return Details',
+          relation_ar: 'bill_details_returned.bill_id = :ID',
+          filter_sql: 'bill_id = :ID',
+          impact_level: 'CRITICAL',
+          action_ar: 'حذف قبل ترويسة المرتجع',
+          confidence: CONFIDENCE_LEVELS.CONFIRMED,
+          source_type: 'CURRENT_SCHEMA'
+        },
+        {
+          table: 'general_table',
+          role_ar: 'حركة المخزون التشغيلية (Inventory Movement)',
+          role_en: 'Inventory Movement',
+          relation_ar: 'link_id = :ID AND (details_id IN details OR type probe)',
+          filter_sql: 'link_id = :ID',
+          impact_level: 'HIGH',
+          action_ar: 'حذف / تسوية حركة الدخول للمخزن بعد إثبات العلاقة عبر link_id و details_id',
+          confidence: CONFIDENCE_LEVELS.INFERRED,
+          source_type: 'CANDIDATE_DISCOVERY',
+          rule_ar: '⚠️ لا تفترض type=2 كحقيقة مطلقة بدون التحقق من سجلات general_table الحية.'
+        },
+        {
+          table: 'patches',
+          role_ar: 'حركات الباتشات وتكلفة الصلاحية (Patches / Cost)',
+          role_en: 'Patches / Cost',
+          relation_ar: 'link_id = :ID AND (type = 57 OR product match)',
+          filter_sql: 'link_id = :ID',
+          impact_level: 'HIGH',
+          action_ar: 'حذف فقط إذا أثبت استعلام الفحص وجود باتشات مرتبطة بالمرتجع',
+          confidence: CONFIDENCE_LEVELS.INFERRED,
+          source_type: 'CANDIDATE_DISCOVERY'
+        },
+        {
+          table: 'journal',
+          role_ar: 'ترويسة قيد اليومية بالأستاذ العام (GL Header)',
+          role_en: 'Journal Header',
+          relation_ar: 'reference = :ID AND type_id = 57',
+          filter_sql: 'reference = :ID AND type_id = 57',
+          impact_level: 'CRITICAL',
+          action_ar: 'حذف بعد حذف خطوط gl_trans المقابلة',
+          confidence: CONFIDENCE_LEVELS.HISTORICAL,
+          source_type: 'HISTORICAL_SCRIPT'
+        },
+        {
+          table: 'gl_trans',
+          role_ar: 'خطوط القيد المحاسبي المزدوج (GL Lines)',
+          role_en: 'GL Lines',
+          relation_ar: 'type_no = journal.id AND type_id = 57',
+          filter_sql: 'type_no = (SELECT id FROM journal WHERE reference = :ID AND type_id = 57 LIMIT 1)',
+          impact_level: 'CRITICAL',
+          action_ar: 'حذف خطوط القيد المزدوج أولاً (شرط إلزامي: توازن القيد Sum=0)',
+          confidence: CONFIDENCE_LEVELS.HISTORICAL,
+          source_type: 'HISTORICAL_SCRIPT'
+        },
+        {
+          table: 'sales_dashboard_daily_summaries',
+          role_ar: 'تجميعات ومؤشرات لوحة المبيعات (Reporting Summary)',
+          role_en: 'Reporting Summary',
+          relation_ar: 'return_id = :ID',
+          filter_sql: 'return_id = :ID',
+          impact_level: 'MEDIUM',
+          action_ar: 'حذف السجل التجميعي لتصحيح إحصائيات الداشبورد',
+          confidence: CONFIDENCE_LEVELS.CONFIRMED,
+          source_type: 'CURRENT_SCHEMA'
+        },
+        {
+          table: 'bills',
+          role_ar: 'فاتورة المبيعات الأصلية المرتبطة (Original Invoice)',
+          role_en: 'Original Sales Invoice',
+          relation_ar: 'valid_bill_id = bills.id',
+          filter_sql: 'id = (SELECT valid_bill_id FROM bills_returned WHERE id = :ID LIMIT 1)',
+          impact_level: 'READ_ONLY',
+          action_ar: 'فحص تأثير الإلغاء على الفاتورة الأصلية وممنوع حذف الفاتورة الأصلية نهائياً',
+          confidence: CONFIDENCE_LEVELS.CONFIRMED,
+          source_type: 'CURRENT_SCHEMA'
+        },
+        {
+          table: 'audit_trail',
+          role_ar: 'سجل التتبع والمراقبة التاريخية (Audit Log)',
+          role_en: 'Audit Log',
+          relation_ar: 'type_no = :ID AND type_id = 57',
+          filter_sql: 'type_no = :ID AND type_id = 57',
+          impact_level: 'AUDIT',
+          action_ar: 'يُوصى بشدة بالاحتفاظ به كدليل تدقيق وعدم حذفه',
+          confidence: CONFIDENCE_LEVELS.INFERRED,
+          source_type: 'AUDIT_SAFEGUARD'
+        }
+      ]
+    },
+    SALES_INVOICE: {
+      type_key: 'SALES_INVOICE',
+      name_ar: 'فاتورة مبيعات (Sales Invoice)',
+      name_en: 'Sales Invoice',
+      triggers_ar: ['فاتورة مبيعات', 'فاتورة المبيعات', 'حذف فاتورة', 'bills', 'bill_details'],
+      triggers_en: ['sales invoice', 'delete invoice', 'delete bill', 'bills'],
+      header_table: 'bills',
+      details_table: 'bill_details',
+      details_fk: 'bill_id',
+      inventory_discovery: { table: 'general_table', candidate_keys: ['link_id', 'details_id', 'product_id', 'store_id'], suggested_type: 0 },
+      journal_type_id: 45,
+      gl_trans_type_id: 45,
+      reporting_table: 'sales_dashboard_daily_summaries',
+      reporting_fk: 'bill_id',
+      master_data_safeguards: ['products', 'customers', 'stores', 'chart_master', 'branches'],
+      audit_tables: ['audit_trail', 'a_logs'],
+      risk_level: 'CRITICAL',
+      impact_layers: [
+        { table: 'bills', role_ar: 'ترويسة الفاتورة', role_en: 'Invoice Header', relation_ar: 'Primary ID', filter_sql: 'id = :ID', impact_level: 'CRITICAL', action_ar: 'حذف كآخر خطوة', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'bill_details', role_ar: 'بنود أصناف الفاتورة', role_en: 'Invoice Lines', relation_ar: 'bill_id = :ID', filter_sql: 'bill_id = :ID', impact_level: 'CRITICAL', action_ar: 'حذف قبل الترويسة', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'general_table', role_ar: 'حركة صرف المخزون', role_en: 'Stock Out', relation_ar: 'link_id = :ID', filter_sql: 'link_id = :ID', impact_level: 'HIGH', action_ar: 'حذف حركة الصرف بعد إثبات العلاقة', confidence: CONFIDENCE_LEVELS.INFERRED, source_type: 'CANDIDATE_DISCOVERY' },
+        { table: 'journal', role_ar: 'ترويسة قيد اليومية (type_id=45)', role_en: 'Journal Header', relation_ar: 'reference = :ID AND type_id = 45', filter_sql: 'reference = :ID AND type_id = 45', impact_level: 'CRITICAL', action_ar: 'حذف بعد تفريغ gl_trans', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' },
+        { table: 'gl_trans', role_ar: 'خطوط قيد اليومية (GL Lines)', role_en: 'GL Lines', relation_ar: 'type_no = journal.id AND type_id = 45', filter_sql: 'type_no = (SELECT id FROM journal WHERE reference = :ID AND type_id = 45 LIMIT 1)', impact_level: 'CRITICAL', action_ar: 'حذف خطوط القيد (Sum=0)', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' },
+        { table: 'sales_dashboard_daily_summaries', role_ar: 'إحصائيات الداشبورد', role_en: 'Dashboard Summary', relation_ar: 'bill_id = :ID', filter_sql: 'bill_id = :ID', impact_level: 'MEDIUM', action_ar: 'حذف الإحصائية التجميعية', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' }
+      ]
+    },
+    PURCHASE_INVOICE: {
+      type_key: 'PURCHASE_INVOICE',
+      name_ar: 'فاتورة مشتريات (Purchase Invoice)',
+      name_en: 'Purchase Invoice',
+      triggers_ar: ['فاتورة مشتريات', 'فاتورة الشراء', 'حذف مشتريات', 'purchases', 'purchases_details'],
+      triggers_en: ['purchase invoice', 'delete purchase', 'purchases'],
+      header_table: 'purchases',
+      details_table: 'purchases_details',
+      details_fk: 'purchase_id',
+      inventory_discovery: { table: 'general_table', candidate_keys: ['link_id', 'details_id', 'product_id', 'store_id'], suggested_type: 3 },
+      journal_type_id: 5,
+      gl_trans_type_id: 5,
+      reporting_table: 'purchases',
+      master_data_safeguards: ['products', 'suppliers', 'stores', 'chart_master', 'branches'],
+      audit_tables: ['audit_trail', 'a_logs'],
+      risk_level: 'CRITICAL',
+      impact_layers: [
+        { table: 'purchases', role_ar: 'ترويسة فاتورة المشتريات', role_en: 'Purchase Header', relation_ar: 'Primary ID', filter_sql: 'id = :ID', impact_level: 'CRITICAL', action_ar: 'حذف بعد التفاصيل', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'purchases_details', role_ar: 'بنود أصناف المشتريات', role_en: 'Purchase Details', relation_ar: 'purchase_id = :ID', filter_sql: 'purchase_id = :ID', impact_level: 'CRITICAL', action_ar: 'حذف قبل الترويسة', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'purchase_costs', role_ar: 'التكاليف الإضافية للشراء', role_en: 'Additional Costs', relation_ar: 'purchase_id = :ID', filter_sql: 'purchase_id = :ID', impact_level: 'HIGH', action_ar: 'حذف التكاليف المرتبطة', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'general_table', role_ar: 'حركة استلام المخزون (Inbound)', role_en: 'Stock In', relation_ar: 'link_id = :ID', filter_sql: 'link_id = :ID', impact_level: 'HIGH', action_ar: 'حذف حركة الاستلام بعد إثبات العلاقة', confidence: CONFIDENCE_LEVELS.INFERRED, source_type: 'CANDIDATE_DISCOVERY' },
+        { table: 'journal', role_ar: 'ترويسة قيد المشتريات', role_en: 'Journal Header', relation_ar: 'reference = :ID AND type_id = 5', filter_sql: 'reference = :ID AND type_id = 5', impact_level: 'CRITICAL', action_ar: 'حذف بعد تفريغ gl_trans', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' },
+        { table: 'gl_trans', role_ar: 'سطور قيد المشتريات (GL Lines)', role_en: 'GL Lines', relation_ar: 'type_no = journal.id AND type_id = 5', filter_sql: 'type_no = (SELECT id FROM journal WHERE reference = :ID AND type_id = 5 LIMIT 1)', impact_level: 'CRITICAL', action_ar: 'حذف خطوط القيد المزدوج', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' }
+      ]
+    },
+    PURCHASE_RETURN: {
+      type_key: 'PURCHASE_RETURN',
+      name_ar: 'مرتجع مشتريات (Purchase Return)',
+      name_en: 'Purchase Return',
+      triggers_ar: ['مرتجع مشتريات', 'مرتجع المورد', 'purchases_returns'],
+      triggers_en: ['purchase return', 'purchases_returns'],
+      header_table: 'purchases_returns',
+      details_table: 'purchases_returns_details',
+      details_fk: 'purchase_id',
+      inventory_discovery: { table: 'general_table', candidate_keys: ['link_id', 'details_id', 'product_id', 'store_id'] },
+      journal_type_id: 56,
+      gl_trans_type_id: 56,
+      reporting_table: 'purchases_returns',
+      original_doc_link: { table: 'purchases', fk_column: 'valid_purchases_id', label_ar: 'فاتورة المشتريات الأصلية (للفحص فقط)' },
+      master_data_safeguards: ['products', 'suppliers', 'stores', 'chart_master'],
+      audit_tables: ['audit_trail', 'a_logs'],
+      risk_level: 'CRITICAL',
+      impact_layers: [
+        { table: 'purchases_returns', role_ar: 'ترويسة مرتجع المشتريات', role_en: 'Header', relation_ar: 'Primary ID', filter_sql: 'id = :ID', impact_level: 'CRITICAL', action_ar: 'حذف بعد التفاصيل', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'purchases_returns_details', role_ar: 'بنود مرتجع المشتريات', role_en: 'Details', relation_ar: 'purchase_id = :ID', filter_sql: 'purchase_id = :ID', impact_level: 'CRITICAL', action_ar: 'حذف قبل الترويسة', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'general_table', role_ar: 'حركة خروج المخزون للمورد', role_en: 'Stock Out', relation_ar: 'link_id = :ID', filter_sql: 'link_id = :ID', impact_level: 'HIGH', action_ar: 'حذف حركة الخروج بعد إثبات العلاقة', confidence: CONFIDENCE_LEVELS.INFERRED, source_type: 'CANDIDATE_DISCOVERY' },
+        { table: 'journal', role_ar: 'ترويسة قيد مرتجع المشتريات', role_en: 'Journal', relation_ar: 'reference = :ID AND type_id = 56', filter_sql: 'reference = :ID AND type_id = 56', impact_level: 'CRITICAL', action_ar: 'حذف بعد gl_trans', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' },
+        { table: 'gl_trans', role_ar: 'سطور قيد المرتجع GL', role_en: 'GL Lines', relation_ar: 'type_no = journal.id AND type_id = 56', filter_sql: 'type_no = (SELECT id FROM journal WHERE reference = :ID AND type_id = 56 LIMIT 1)', impact_level: 'CRITICAL', action_ar: 'حذف سطور القيد', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' }
+      ]
+    },
+    STOCK_TRANSFER: {
+      type_key: 'STOCK_TRANSFER',
+      name_ar: 'تحويل مخزني بين الفروع/المستودعات (Stock Transfer)',
+      name_en: 'Stock Transfer',
+      triggers_ar: ['تحويل مخزني', 'تحويل بين المستودعات', 'transfers', 'transfer_details'],
+      triggers_en: ['stock transfer', 'warehouse transfer', 'transfers'],
+      header_table: 'transfers',
+      details_table: 'transfer_details',
+      details_fk: 'transfer_id',
+      inventory_discovery: { table: 'general_table', candidate_keys: ['link_id', 'details_id', 'product_id', 'store_id'] },
+      journal_type_id: 44,
+      gl_trans_type_id: 44,
+      master_data_safeguards: ['products', 'stores', 'branches', 'chart_master'],
+      audit_tables: ['audit_trail', 'a_logs'],
+      risk_level: 'HIGH',
+      impact_layers: [
+        { table: 'transfers', role_ar: 'ترويسة إذن التحويل', role_en: 'Transfer Header', relation_ar: 'Primary ID', filter_sql: 'id = :ID', impact_level: 'HIGH', action_ar: 'حذف بعد البنود', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'transfer_details', role_ar: 'أصناف وكميات التحويل', role_en: 'Transfer Details', relation_ar: 'transfer_id = :ID', filter_sql: 'transfer_id = :ID', impact_level: 'HIGH', action_ar: 'حذف قبل الترويسة', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'general_table', role_ar: 'حركات الصرف والاستلام بالمستودعين', role_en: 'Stock Movements (In/Out)', relation_ar: 'link_id = :ID', filter_sql: 'link_id = :ID', impact_level: 'HIGH', action_ar: 'حذف حركتي الصرف والاستلام', confidence: CONFIDENCE_LEVELS.INFERRED, source_type: 'CANDIDATE_DISCOVERY' },
+        { table: 'journal', role_ar: 'قيد وسيط التحويل المخزني', role_en: 'Journal (type_id=44)', relation_ar: 'reference = :ID AND type_id = 44', filter_sql: 'reference = :ID AND type_id = 44', impact_level: 'HIGH', action_ar: 'حذف بعد تفريغ gl_trans', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' },
+        { table: 'gl_trans', role_ar: 'سطور قيد التحويل (حسابات المخازن الوسيطة)', role_en: 'GL Lines', relation_ar: 'type_no = journal.id AND type_id = 44', filter_sql: 'type_no = (SELECT id FROM journal WHERE reference = :ID AND type_id = 44 LIMIT 1)', impact_level: 'HIGH', action_ar: 'حذف سطور القيد', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' }
+      ]
+    },
+    RECEIPT_PAYMENT: {
+      type_key: 'RECEIPT_PAYMENT',
+      name_ar: 'سند قبض / سند صرف مالي (Payment & Receipt Voucher)',
+      name_en: 'Payment & Receipt Voucher',
+      triggers_ar: ['سند قبض', 'سند صرف', 'إيصال استلام', 'accounting', 'cash_receipt_details'],
+      triggers_en: ['receipt voucher', 'payment voucher', 'accounting voucher'],
+      header_table: 'accounting',
+      details_table: 'cash_receipt_details',
+      details_fk: 'cash_receipt_id',
+      journal_type_id: 51,
+      gl_trans_type_id: 51,
+      master_data_safeguards: ['customers', 'suppliers', 'users', 'payment_methods', 'chart_master'],
+      audit_tables: ['audit_trail', 'a_logs'],
+      risk_level: 'HIGH',
+      impact_layers: [
+        { table: 'accounting', role_ar: 'ترويسة السند المالي', role_en: 'Voucher Header', relation_ar: 'Primary ID', filter_sql: 'id = :ID', impact_level: 'HIGH', action_ar: 'حذف كآخر خطوة', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'cash_receipt_details', role_ar: 'توزيعات السداد على الفواتير', role_en: 'Invoice Allocations', relation_ar: 'cash_receipt_id = :ID', filter_sql: 'cash_receipt_id = :ID', impact_level: 'HIGH', action_ar: 'حذف توزيعات السداد', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'journal', role_ar: 'قيد الصندوق والوسيط المالي (type_id=51)', role_en: 'Journal Header', relation_ar: 'reference = :ID AND type_id = 51', filter_sql: 'reference = :ID AND type_id = 51', impact_level: 'HIGH', action_ar: 'حذف بعد gl_trans', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' },
+        { table: 'gl_trans', role_ar: 'سطور قيد السند بالأستاذ العام', role_en: 'GL Lines', relation_ar: 'type_no = journal.id AND type_id = 51', filter_sql: 'type_no = (SELECT id FROM journal WHERE reference = :ID AND type_id = 51 LIMIT 1)', impact_level: 'HIGH', action_ar: 'حذف سطور القيد', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' }
+      ]
+    },
+    PHYSICAL_INVENTORY: {
+      type_key: 'PHYSICAL_INVENTORY',
+      name_ar: 'محضر جرد وتسوية مخزنية (Inventory Count & Adjustment)',
+      name_en: 'Physical Inventory Adjustment',
+      triggers_ar: ['تسوية مخزنية', 'محضر جرد', 'جرد المخزن', 'store_inventory'],
+      triggers_en: ['inventory count', 'stock adjustment', 'store_inventory'],
+      header_table: 'store_inventory',
+      details_table: 'store_inventory_details',
+      details_fk: 'store_inventory_id',
+      inventory_discovery: { table: 'general_table', candidate_keys: ['link_id', 'details_id', 'product_id', 'store_id'] },
+      journal_type_id: 55,
+      gl_trans_type_id: 55,
+      master_data_safeguards: ['products', 'stores', 'chart_master'],
+      audit_tables: ['audit_trail', 'a_logs'],
+      risk_level: 'HIGH',
+      impact_layers: [
+        { table: 'store_inventory', role_ar: 'ترويسة محضر الجرد', role_en: 'Count Header', relation_ar: 'Primary ID', filter_sql: 'id = :ID', impact_level: 'HIGH', action_ar: 'حذف بعد التفاصيل', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'store_inventory_details', role_ar: 'بنود وكميات الجرد الفعلي', role_en: 'Count Lines', relation_ar: 'store_inventory_id = :ID', filter_sql: 'store_inventory_id = :ID', impact_level: 'HIGH', action_ar: 'حذف قبل الترويسة', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'general_table', role_ar: 'حركات تسوية فروقات الجرد', role_en: 'Variance Movements', relation_ar: 'link_id = :ID', filter_sql: 'link_id = :ID', impact_level: 'HIGH', action_ar: 'حذف حركات التسوية بعد إثبات العلاقة', confidence: CONFIDENCE_LEVELS.INFERRED, source_type: 'CANDIDATE_DISCOVERY' },
+        { table: 'journal', role_ar: 'قيد فروقات الجرد بالأستاذ العام (type_id=55)', role_en: 'Journal', relation_ar: 'reference = :ID AND type_id = 55', filter_sql: 'reference = :ID AND type_id = 55', impact_level: 'HIGH', action_ar: 'حذف بعد gl_trans', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' },
+        { table: 'gl_trans', role_ar: 'سطور قيد التسوية (حـ/ فروقات الجرد)', role_en: 'GL Lines', relation_ar: 'type_no = journal.id AND type_id = 55', filter_sql: 'type_no = (SELECT id FROM journal WHERE reference = :ID AND type_id = 55 LIMIT 1)', impact_level: 'HIGH', action_ar: 'حذف سطور القيد', confidence: CONFIDENCE_LEVELS.HISTORICAL, source_type: 'HISTORICAL_SCRIPT' }
+      ]
+    },
+    MANUAL_JOURNAL: {
+      type_key: 'MANUAL_JOURNAL',
+      name_ar: 'قيد يومية يدوي (Manual Journal Entry)',
+      name_en: 'Manual Journal Entry',
+      triggers_ar: ['قيد يدوي', 'حذف قيد', 'journal', 'gl_trans'],
+      triggers_en: ['manual journal', 'delete journal', 'journal entry'],
+      header_table: 'journal',
+      details_table: 'gl_trans',
+      details_fk: 'type_no',
+      master_data_safeguards: ['chart_master', 'branches', 'currencies'],
+      audit_tables: ['audit_trail', 'a_logs'],
+      risk_level: 'CRITICAL',
+      impact_layers: [
+        { table: 'journal', role_ar: 'ترويسة قيد اليومية', role_en: 'Journal Header', relation_ar: 'Primary ID', filter_sql: 'id = :ID', impact_level: 'CRITICAL', action_ar: 'حذف بعد تفريغ gl_trans', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' },
+        { table: 'gl_trans', role_ar: 'سطور القيد المزدوج بالأستاذ العام', role_en: 'GL Lines', relation_ar: 'type_no = journal.id', filter_sql: 'type_no = :ID', impact_level: 'CRITICAL', action_ar: 'حذف سطور القيد والتأكد من عدم كسر ميزان المراجعة', confidence: CONFIDENCE_LEVELS.CONFIRMED, source_type: 'CURRENT_SCHEMA' }
+      ]
+    }
+  };
+
+  /**
+   * Analyzes Transaction Deletion Request and generates complete 8-stage lifecycle & discovery roadmap
+   */
+  function analyzeTransactionDeletion(inputQuery, forcedType = null, forcedId = null) {
+    const q = String(inputQuery || '').trim();
+    
+    // Extract ID from query (e.g. "حذف مرتجع 12345" -> "12345")
+    let detectedId = forcedId;
+    if (!detectedId) {
+      const matchNum = q.match(/\b\d+\b/);
+      if (matchNum) detectedId = matchNum[0];
+    }
+    if (!detectedId) detectedId = '12345'; // Default sample ID for visualization
+
+    // Match transaction map
+    let matchedMap = null;
+    if (forcedType && TRANSACTION_DELETION_MAPS[forcedType]) {
+      matchedMap = TRANSACTION_DELETION_MAPS[forcedType];
+    } else {
+      const qLower = q.toLowerCase();
+      const mapKeys = Object.keys(TRANSACTION_DELETION_MAPS);
+      for (let k of mapKeys) {
+        const m = TRANSACTION_DELETION_MAPS[k];
+        if (m.triggers_ar.some(t => qLower.includes(t.toLowerCase())) ||
+            m.triggers_en.some(t => qLower.includes(t.toLowerCase()))) {
+          matchedMap = m;
+          break;
+        }
+      }
+    }
+
+    // Default to SALES_RETURN if no specific type matched
+    if (!matchedMap) {
+      matchedMap = TRANSACTION_DELETION_MAPS.SALES_RETURN;
+    }
+
+    const isAr = I18n.getLang() === 'ar';
+    const txId = detectedId;
+
+    // Generate Dynamic Relationship Discovery Probes (Read-Only)
+    const discoveryProbes = [
+      {
+        stage: 'PROVE_HEADER_DETAILS',
+        title_ar: `1. إثبات وجود الحركة والتفاصيل في ${matchedMap.header_table} و ${matchedMap.details_table}`,
+        sql: `SELECT h.*, count(d.id) as details_count \nFROM \`${matchedMap.header_table}\` h \nLEFT JOIN \`${matchedMap.details_table}\` d ON d.${matchedMap.details_fk} = h.id \nWHERE h.id = ${txId} \nGROUP BY h.id;`,
+        confidence: CONFIDENCE_LEVELS.CONFIRMED
+      }
+    ];
+
+    if (matchedMap.inventory_discovery) {
+      discoveryProbes.push({
+        stage: 'PROVE_INVENTORY_RELATION',
+        title_ar: `2. إثبات حركة المخزون عبر Candidate Keys (link_id / details_id) في general_table`,
+        sql: `SELECT gt.id, gt.type, gt.link_id, gt.details_id, gt.store_id, gt.product_id, gt.quantity, gt.quantity_type, gt.cost \nFROM general_table gt \nWHERE gt.link_id = ${txId} \n   OR gt.details_id IN (SELECT id FROM \`${matchedMap.details_table}\` WHERE ${matchedMap.details_fk} = ${txId});`,
+        confidence: CONFIDENCE_LEVELS.INFERRED,
+        warning_ar: 'يجب مطابقة link_id و details_id للتأكد من انتماء السجلات لنفس المرتجع قبل الحذف.'
+      });
+    }
+
+    if (matchedMap.patches_discovery) {
+      discoveryProbes.push({
+        stage: 'PROVE_PATCHES_RELATION',
+        title_ar: `3. فحص سجلات الباتشات والتكلفة في patches`,
+        sql: `SELECT p.id, p.type, p.link_id, p.store_id, p.product_id, p.quantity, p.cost, p.patch_code \nFROM patches p \nWHERE p.link_id = ${txId};`,
+        confidence: CONFIDENCE_LEVELS.INFERRED
+      });
+    }
+
+    if (matchedMap.journal_type_id !== undefined) {
+      discoveryProbes.push({
+        stage: 'PROVE_ACCOUNTING_JOURNAL',
+        title_ar: `4. إثبات قيد اليومية المرتبط في journal (type_id = ${matchedMap.journal_type_id})`,
+        sql: `SELECT id, type_id, trans_date, reference, amount, memo, branch_id, is_closed \nFROM journal \nWHERE reference = ${txId} AND type_id = ${matchedMap.journal_type_id};`,
+        confidence: CONFIDENCE_LEVELS.HISTORICAL
+      });
+      discoveryProbes.push({
+        stage: 'PROVE_GL_BALANCE',
+        title_ar: `5. الفحص الحاسم لتوازن الأستاذ العام (Sum=0 / Debit=Credit)`,
+        sql: `SELECT j.id as journal_id, sum(gt.amount) as gl_balance_difference, \n       sum(case when gt.amount > 0 then gt.amount else 0 end) as total_debit, \n       sum(case when gt.amount < 0 then abs(gt.amount) else 0 end) as total_credit \nFROM gl_trans gt \nJOIN journal j ON gt.type_no = j.id \nWHERE j.reference = ${txId} AND j.type_id = ${matchedMap.journal_type_id} \nGROUP BY j.id;`,
+        confidence: CONFIDENCE_LEVELS.HISTORICAL
+      });
+    }
+
+    if (matchedMap.reporting_table) {
+      discoveryProbes.push({
+        stage: 'PROVE_REPORTING_SUMMARY',
+        title_ar: `6. فحص السجلات التجميعية في ${matchedMap.reporting_table}`,
+        sql: `SELECT * FROM \`${matchedMap.reporting_table}\` WHERE ${matchedMap.reporting_fk} = ${txId};`,
+        confidence: CONFIDENCE_LEVELS.CONFIRMED
+      });
+    }
+
+    if (matchedMap.original_doc_link) {
+      discoveryProbes.push({
+        stage: 'INSPECT_ORIGINAL_DOCUMENT',
+        title_ar: `7. فحص الفاتورة الأصلية المرتبطة عبر ${matchedMap.original_doc_link.fk_column} (للقراءة فقط)`,
+        sql: `SELECT o.* FROM \`${matchedMap.original_doc_link.table}\` o \nJOIN \`${matchedMap.header_table}\` h ON h.${matchedMap.original_doc_link.fk_column} = o.id \nWHERE h.id = ${txId};`,
+        confidence: CONFIDENCE_LEVELS.CONFIRMED
+      });
+    }
+
+    // Generate Safe Transactional Deletion SQL (Conditional Execution)
+    let modificationSql = `START TRANSACTION;\n\n`;
+    modificationSql += `-- ==========================================================================\n`;
+    modificationSql += `-- DYNAMIC SAFE DELETION SCRIPT FOR ${matchedMap.name_en} #${txId}\n`;
+    modificationSql += `-- Source of Truth: newdatabase2026.sql\n`;
+    modificationSql += `-- CAUTION: Run only after all diagnostic discovery probes pass successfully!\n`;
+    modificationSql += `-- ==========================================================================\n\n`;
+    modificationSql += `SET @TARGET_ID = ${txId};\n\n`;
+
+    if (matchedMap.journal_type_id !== undefined) {
+      modificationSql += `-- Step 1: Capture linked Journal ID\n`;
+      modificationSql += `SET @JOURNAL_ID = (SELECT id FROM journal WHERE reference = @TARGET_ID AND type_id = ${matchedMap.journal_type_id} LIMIT 1);\n\n`;
+      
+      modificationSql += `-- Step 2: Delete GL double-entry lines (Validated)\n`;
+      modificationSql += `DELETE FROM gl_trans WHERE type_no = @JOURNAL_ID AND type_id = ${matchedMap.gl_trans_type_id || matchedMap.journal_type_id};\n\n`;
+
+      modificationSql += `-- Step 3: Delete Journal posting header\n`;
+      modificationSql += `DELETE FROM journal WHERE id = @JOURNAL_ID AND type_id = ${matchedMap.journal_type_id};\n\n`;
+    }
+
+    if (matchedMap.inventory_discovery) {
+      modificationSql += `-- Step 4: Delete Inventory movements from general_table (Candidate Key: link_id & details_id)\n`;
+      modificationSql += `DELETE FROM general_table \nWHERE link_id = @TARGET_ID \n   OR details_id IN (SELECT id FROM \`${matchedMap.details_table}\` WHERE ${matchedMap.details_fk} = @TARGET_ID);\n\n`;
+    }
+
+    if (matchedMap.patches_discovery) {
+      modificationSql += `-- Step 5: Delete related patches records (if proven linked)\n`;
+      modificationSql += `DELETE FROM patches WHERE link_id = @TARGET_ID;\n\n`;
+    }
+
+    if (matchedMap.reporting_table) {
+      modificationSql += `-- Step 6: Delete reporting aggregate summary\n`;
+      modificationSql += `DELETE FROM \`${matchedMap.reporting_table}\` WHERE ${matchedMap.reporting_fk} = @TARGET_ID;\n\n`;
+    }
+
+    modificationSql += `-- Step 7: Delete transaction details\n`;
+    modificationSql += `DELETE FROM \`${matchedMap.details_table}\` WHERE ${matchedMap.details_fk} = @TARGET_ID;\n\n`;
+
+    modificationSql += `-- Step 8: Delete transaction header (Primary)\n`;
+    modificationSql += `DELETE FROM \`${matchedMap.header_table}\` WHERE id = @TARGET_ID;\n\n`;
+
+    modificationSql += `-- Step 9: In-Transaction Verification Probes\n`;
+    modificationSql += `SELECT COUNT(*) AS remaining_headers FROM \`${matchedMap.header_table}\` WHERE id = @TARGET_ID;\n`;
+    modificationSql += `SELECT COUNT(*) AS remaining_details FROM \`${matchedMap.details_table}\` WHERE ${matchedMap.details_fk} = @TARGET_ID;\n\n`;
+    modificationSql += `-- If counts are zero and no foreign key violations occurred:\n`;
+    modificationSql += `COMMIT;\n`;
+    modificationSql += `-- If any error or unexpected remaining records:\n`;
+    modificationSql += `-- ROLLBACK;\n`;
+
+    // 8-Stage Lifecycle Roadmap
+    const eightStageRoadmap = [
+      {
+        stage: 1,
+        title_ar: 'المرحلة 1: التعريف وتحديد المعرفات (1. IDENTIFY)',
+        title_en: '1. IDENTIFY',
+        desc_ar: `استخراج ترويسة الحركة (#${txId})، ومعرفات الفرع والمستودع والعميل/المورد وتاريخ الحركة.`
+      },
+      {
+        stage: 2,
+        title_ar: 'المرحلة 2: حصر الطبقات والجداول المرشحة (2. DISCOVER)',
+        title_en: '2. DISCOVER',
+        desc_ar: `حصر الجداول عبر الطبقات الـ 7 (الترويسة، التفاصيل، المخزون، الباتشات، القيود، الأستاذ العام، الداشبورد).`
+      },
+      {
+        stage: 3,
+        title_ar: 'المرحلة 3: إثبات العلاقات عبر Candidate Keys (3. PROVE RELATIONSHIPS)',
+        title_en: '3. PROVE RELATIONSHIPS',
+        desc_ar: `إثبات انتماء حركات general_table والباتشات والقيود للحركة الفعلية عبر المفاتيح المرشحة (link_id / details_id).`
+      },
+      {
+        stage: 4,
+        title_ar: 'المرحلة 4: تصنيف الاعتماديات وحماية البيانات (4. CLASSIFY DEPENDENCIES)',
+        title_en: '4. CLASSIFY DEPENDENCIES',
+        desc_ar: `فصل البيانات التابعة المؤكدة عن البيانات الأساسية المحمية (Master Data) وسجلات التدقيق التاريخية (Audit Logs).`
+      },
+      {
+        stage: 5,
+        title_ar: 'المرحلة 5: فحص موانع الحذف والسلامة المحاسبية (5. SAFETY VALIDATION)',
+        title_en: '5. SAFETY VALIDATION',
+        desc_ar: `التأكد من توازن القيد المحاسبي (Sum=0)، عدم وجود سدادات مالية نشطة، وخلو المعاملة من أقفال ZATCA أو الفترات المقفلة.`
+      },
+      {
+        stage: 6,
+        title_ar: 'المرحلة 6: ترتيب الحذف العكسي الصارم (6. GENERATE DELETION ORDER)',
+        title_en: '6. GENERATE DELETION ORDER',
+        desc_ar: `ترتيب الحذف من الأسفل للأعلى (سطور GL ➔ القيود ➔ المخزون ➔ التفاصيل ➔ الترويسة).`
+      },
+      {
+        stage: 7,
+        title_ar: 'المرحلة 7: توليد سكريبت الحذف الخارجي المحمي (7. GENERATE EXTERNAL SQL)',
+        title_en: '7. GENERATE EXTERNAL SQL',
+        desc_ar: `توليد سكريبت SQL مشروط داخل كبسولة ترانزاكشن (START TRANSACTION) للتنفيذ الخارجي فقط مع دعم ROLLBACK.`
+      },
+      {
+        stage: 8,
+        title_ar: 'المرحلة 8: التحقق الختامي وخلو الأيتام (8. POST-DELETE VERIFICATION)',
+        title_en: '8. POST-DELETE VERIFICATION',
+        desc_ar: `تشغيل استعلامات الفحص الختامية للتأكد من وصول كافة السجلات المتأثرة للصفر (0 records) بدون أيتام.`
+      }
+    ];
+
+    // Safety Blockers Checklist
+    const safetyBlockersChecklist = [
+      { id: 'GL_BALANCE', title_ar: 'توازن الأستاذ العام (GL Balance Rule)', desc_ar: 'يجب أن يكون Debit = Credit ومجموع gl_trans.amount = 0 بالضبط.', status: 'PENDING_CHECK' },
+      { id: 'INVENTORY_PROOF', title_ar: 'إثبات ارتباط المخزون (Inventory Proof)', desc_ar: 'يجب إثبات تطابق link_id و details_id في general_table قبل حذف أي حركة مخزون.', status: 'PENDING_CHECK' },
+      { id: 'PAYMENT_LOCK', title_ar: 'فحص ارتباطات السداد المالي (Payment Dependencies)', desc_ar: 'التأكد من عدم وجود سند قبض أو تسوية بنكية نشطة ترتبط بالحركة.', status: 'PENDING_CHECK' },
+      { id: 'ZATCA_STATUS', title_ar: 'حالة الربط والفوترة الإلكترونية (ZATCA / Tax)', desc_ar: 'إذا تم اعتماد المعاملة في هيئة الزكاة (sent_to_zatca=1)، لا يجوز الحذف المباشر ويجب إصدار إشعار دائن/مدين.', status: 'PENDING_CHECK' },
+      { id: 'MASTER_PROTECT', title_ar: 'حماية بطاقات التعريف والبيانات الأساسية', desc_ar: 'جداول الأصناف والعملاء والمستودعات والحسابات محمية ولا تدخل في الحذف نهائياً.', status: 'ENFORCED' }
+    ];
+
+    return {
+      query: inputQuery,
+      transaction_id: txId,
+      map: matchedMap,
+      impact_layers: matchedMap.impact_layers,
+      eight_stage_roadmap: eightStageRoadmap,
+      discovery_probes: discoveryProbes,
+      modification_sql: modificationSql,
+      safety_blockers: safetyBlockersChecklist,
+      master_data_safeguards: matchedMap.master_data_safeguards,
+      audit_tables: matchedMap.audit_tables,
+      risk_level: matchedMap.risk_level
+    };
+  }
+
   return {
     CONFIDENCE_LEVELS,
     CHANGE_SCENARIOS_KNOWLEDGE,
+    TRANSACTION_DELETION_MAPS,
     getMetadata,
     analyzeChangeIntent,
+    analyzeTransactionDeletion,
     searchTables,
     searchColumns,
     buildAIDatabasePrompt
