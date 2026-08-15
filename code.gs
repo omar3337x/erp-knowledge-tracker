@@ -55,7 +55,11 @@ var SHEET_NAMES = {
   QUESTION_ATTEMPTS: 'Question_Attempts',
   QUESTION_REVIEWS: 'Question_Reviews',
   TOPIC_PERFORMANCE: 'Topic_Performance',
-  QUESTION_REPORTS: 'Question_Reports'
+  QUESTION_REPORTS: 'Question_Reports',
+  SCRIPTS: 'Scripts',
+  SCRIPT_NOTES: 'Script_Notes',
+  SCRIPT_USAGE: 'Script_Usage',
+  SCRIPT_REPORTS: 'Script_Reports'
 };
 
 var SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 7;           // 7 days default
@@ -65,7 +69,7 @@ var STATUS_VALUES = ['Not Started', 'Learning', 'Understood', 'Practiced', 'Mast
 var PRIORITY_VALUES = ['Low', 'Medium', 'High', 'Critical'];
 var LANGUAGE_VALUES = ['en', 'ar'];
 
-var SCHEMA_VERSION_TARGET = '7';
+var SCHEMA_VERSION_TARGET = '8';
 
 // Actions that mutate data. Only these acquire the script lock — read
 // actions run without locking so parallel requests from the same page
@@ -80,6 +84,7 @@ var WRITE_ACTIONS = {
   createNote: 1, updateNote: 1, deleteNote: 1,
   refreshModuleInsights: 1, updateAISettings: 1, addFavorite: 1, removeFavorite: 1,
   submitQuestionAttempt: 1, saveQuestion: 1, reportQuestion: 1, adminUpdateQuestion: 1,
+  saveScriptNote: 1, logScriptUsage: 1, reportScript: 1, importScript: 1, saveScript: 1,
   seed: 1
 };
 
@@ -280,6 +285,14 @@ function handleRequest(action, payload, token, isBatchSubRequest) {
       case 'getTopicDrill':        return jsonResponse(withAuth(token, function(user){ return actionGetTopicDrill(user, payload); }));
       case 'reportQuestion':       return jsonResponse(withAuth(token, function(user){ return actionReportQuestion(user, payload); }));
       case 'adminUpdateQuestion':  return jsonResponse(withAuth(token, function(user){ return actionAdminUpdateQuestion(user, payload); }));
+
+      // ERP Script Knowledge & Troubleshooting Toolkit
+      case 'getScripts':           return jsonResponse(withAuth(token, function(user){ return actionGetScripts(user, payload); }));
+      case 'saveScriptNote':       return jsonResponse(withAuth(token, function(user){ return actionSaveScriptNote(user, payload); }));
+      case 'getScriptNotes':       return jsonResponse(withAuth(token, function(user){ return actionGetScriptNotes(user, payload); }));
+      case 'logScriptUsage':       return jsonResponse(withAuth(token, function(user){ return actionLogScriptUsage(user, payload); }));
+      case 'reportScript':         return jsonResponse(withAuth(token, function(user){ return actionReportScript(user, payload); }));
+      case 'importScript':         return jsonResponse(withAuth(token, function(user){ return actionImportScript(user, payload); }));
 
       // Setup
       case 'seed':                  return jsonResponse(actionSeed());
@@ -1380,7 +1393,11 @@ function createSheetsIfMissing() {
     Question_Attempts: ['id', 'question_id', 'user_id', 'module_id', 'category_id', 'topic_id', 'answer', 'correct', 'confidence', 'hints_used', 'time_spent_sec', 'user_reasoning', 'created_at'],
     Question_Reviews: ['id', 'user_id', 'question_id', 'module_id', 'topic_id', 'interval_days', 'repetition_level', 'next_review_date', 'last_reviewed_at', 'status', 'created_at'],
     Topic_Performance: ['id', 'user_id', 'module_id', 'category_id', 'topic_id', 'concept_id', 'total_questions', 'correct_count', 'wrong_count', 'accuracy_pct', 'mastery_score', 'priority', 'last_wrong_at', 'last_correct_at', 'updated_at'],
-    Question_Reports: ['id', 'question_id', 'user_id', 'reason', 'feedback_type', 'details', 'status', 'created_at']
+    Question_Reports: ['id', 'question_id', 'user_id', 'reason', 'feedback_type', 'details', 'status', 'created_at'],
+    Scripts: ['id', 'title_ar', 'title_en', 'filename', 'problem_ar', 'solution_ar', 'category_id', 'modules_json', 'difficulty', 'risk_level', 'tags_json', 'code_type', 'code', 'tables_json', 'database_compatibility', 'compatibility_reason_ar', 'compatibility_reason_en', 'validated_against', 'validated_at', 'backup_required', 'rollback_notes_ar', 'playbook_steps_json', 'fingerprint', 'views_count', 'copies_count', 'favorites_count', 'status', 'created_by', 'created_at', 'updated_at'],
+    Script_Notes: ['id', 'script_id', 'user_id', 'note_text', 'database_version', 'conditions', 'created_at', 'updated_at'],
+    Script_Usage: ['id', 'script_id', 'user_id', 'outcome', 'result_notes', 'database_version', 'executed_at', 'created_at'],
+    Script_Reports: ['id', 'script_id', 'user_id', 'reason', 'details', 'status', 'created_at']
   };
   Object.keys(schemas).forEach(function(name) {
     var sheet = spreadsheet.getSheetByName(name);
@@ -3276,4 +3293,149 @@ function getCuratedChallengeQuestions(moduleId, isAr) {
       }
     }
   ];
+}
+
+// ---------------------------------------------------------------------------
+// ERP Script Knowledge & Troubleshooting Toolkit Actions
+// ---------------------------------------------------------------------------
+
+function actionGetScripts(user, payload) {
+  var rows = readAllRows(SHEET_NAMES.SCRIPTS);
+  return successResponse({ scripts: rows });
+}
+
+function actionSaveScriptNote(user, payload) {
+  payload = payload || {};
+  if (!payload.script_id || !payload.note_text) {
+    return errorResponse('Script ID and note text are required.', 'VALIDATION_ERROR');
+  }
+
+  var notes = readAllRows(SHEET_NAMES.SCRIPT_NOTES);
+  var existing = notes.find(function(n) {
+    return n.script_id === payload.script_id && n.user_id === user.id;
+  });
+
+  var now = nowIso();
+  if (existing) {
+    updateRow(SHEET_NAMES.SCRIPT_NOTES, existing.id, {
+      note_text: payload.note_text,
+      database_version: payload.database_version || 'newdatabase2026.sql',
+      conditions: payload.conditions || '',
+      updated_at: now
+    });
+    return successResponse({ id: existing.id, updated: true });
+  } else {
+    var newId = generateId('SCN');
+    appendRow(SHEET_NAMES.SCRIPT_NOTES, {
+      id: newId,
+      script_id: payload.script_id,
+      user_id: user.id,
+      note_text: payload.note_text,
+      database_version: payload.database_version || 'newdatabase2026.sql',
+      conditions: payload.conditions || '',
+      created_at: now,
+      updated_at: now
+    });
+    return successResponse({ id: newId, created: true });
+  }
+}
+
+function actionGetScriptNotes(user, payload) {
+  payload = payload || {};
+  var notes = readAllRows(SHEET_NAMES.SCRIPT_NOTES);
+  var userNotes = notes.filter(function(n) {
+    if (payload.script_id) return n.script_id === payload.script_id && n.user_id === user.id;
+    return n.user_id === user.id;
+  });
+  return successResponse({ notes: userNotes });
+}
+
+function actionLogScriptUsage(user, payload) {
+  payload = payload || {};
+  if (!payload.script_id) {
+    return errorResponse('Script ID is required.', 'VALIDATION_ERROR');
+  }
+
+  var newId = generateId('SCU');
+  var now = nowIso();
+  appendRow(SHEET_NAMES.SCRIPT_USAGE, {
+    id: newId,
+    script_id: payload.script_id,
+    user_id: user.id,
+    outcome: payload.outcome || 'worked',
+    result_notes: payload.result_notes || '',
+    database_version: payload.database_version || 'newdatabase2026.sql',
+    executed_at: payload.executed_at || now,
+    created_at: now
+  });
+
+  return successResponse({ id: newId, recorded: true });
+}
+
+function actionReportScript(user, payload) {
+  payload = payload || {};
+  if (!payload.script_id || !payload.reason) {
+    return errorResponse('Script ID and report reason are required.', 'VALIDATION_ERROR');
+  }
+
+  var newId = generateId('SCRP');
+  appendRow(SHEET_NAMES.SCRIPT_REPORTS, {
+    id: newId,
+    script_id: payload.script_id,
+    user_id: user.id,
+    reason: payload.reason,
+    details: payload.details || '',
+    status: 'Pending',
+    created_at: nowIso()
+  });
+
+  return successResponse({ id: newId, reported: true });
+}
+
+function actionImportScript(user, payload) {
+  payload = payload || {};
+  if (user.role !== 'admin') {
+    return errorResponse('Only administrators can import scripts.', 'UNAUTHORIZED');
+  }
+  if (!payload.title_ar || !payload.code) {
+    return errorResponse('Title and code are required.', 'VALIDATION_ERROR');
+  }
+
+  var newId = generateId('SCR');
+  var now = nowIso();
+  var row = {
+    id: newId,
+    title_ar: payload.title_ar,
+    title_en: payload.title_en || payload.title_ar,
+    filename: payload.filename || (newId + '.sql'),
+    problem_ar: payload.problem_ar || '',
+    solution_ar: payload.solution_ar || '',
+    category_id: payload.category_id || 'CAT-DATA-FIX',
+    modules_json: JSON.stringify(payload.modules || ['MOD-1']),
+    difficulty: payload.difficulty || 'Intermediate',
+    risk_level: payload.risk_level || 'MEDIUM',
+    tags_json: JSON.stringify(payload.tags || []),
+    code_type: payload.code_type || 'sql',
+    code: payload.code,
+    tables_json: JSON.stringify(payload.tables || []),
+    database_compatibility: payload.database_compatibility || 'GREEN',
+    compatibility_reason_ar: payload.compatibility_reason_ar || '',
+    compatibility_reason_en: payload.compatibility_reason_en || '',
+    validated_against: 'newdatabase2026.sql',
+    validated_at: now,
+    backup_required: !!payload.backup_required,
+    rollback_notes_ar: payload.rollback_notes_ar || '',
+    playbook_steps_json: JSON.stringify(payload.playbook_steps_ar || []),
+    fingerprint: payload.fingerprint || '',
+    views_count: 0,
+    copies_count: 0,
+    favorites_count: 0,
+    status: 'Active',
+    created_by: user.id,
+    created_at: now,
+    updated_at: now
+  };
+
+  appendRow(SHEET_NAMES.SCRIPTS, row);
+  return successResponse({ id: newId, script: row });
 }

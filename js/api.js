@@ -570,6 +570,28 @@ const API = (function () {
       const r = await rawCall('adminUpdateQuestion', p);
       cacheBust('getQuestionBank');
       return r;
+    },
+
+    // ERP Script Knowledge & Troubleshooting Toolkit
+    getScripts: (params) => call('getScripts', params || {}),
+    saveScriptNote: async (p) => {
+      const r = await rawCall('saveScriptNote', p);
+      cacheBust('getScriptNotes');
+      return r;
+    },
+    getScriptNotes: (scriptId) => call('getScriptNotes', { script_id: scriptId }),
+    logScriptUsage: async (p) => {
+      const r = await rawCall('logScriptUsage', p);
+      return r;
+    },
+    reportScript: async (p) => {
+      const r = await rawCall('reportScript', p);
+      return r;
+    },
+    importScript: async (p) => {
+      const r = await rawCall('importScript', p);
+      cacheBust('getScripts');
+      return r;
     }
   };
 })();

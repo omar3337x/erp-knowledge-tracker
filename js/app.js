@@ -299,7 +299,8 @@ const Router = (function () {
       dashboard: 'dashboard.title', notes: 'nav.allNotes', favorites: 'nav.favorites', 'ai-insights': 'nav.aiInsights', gaps: 'nav.knowledgeGaps', review: 'nav.reviewCenter',
       analytics: 'analytics.title', 'system-test': 'nav.systemTest',
       profile: 'nav.myProfile', admin: 'admin.title',
-      'daily-challenge': 'nav.dailyChallenge', 'question-bank': 'nav.questionBank', 'topic-drill': 'nav.topicDrill', 'challenge-history': 'nav.challengeHistory'
+      'daily-challenge': 'nav.dailyChallenge', 'question-bank': 'nav.questionBank', 'topic-drill': 'nav.topicDrill', 'challenge-history': 'nav.challengeHistory',
+      'scripts': 'nav.scriptsToolkit', 'script-toolkit': 'nav.scriptsToolkit'
     };
     return map[route] ? (I18n.t(map[route]) || route) : I18n.t('common.notFound');
   }
@@ -350,6 +351,7 @@ const Router = (function () {
     if (route === 'daily-challenge') return DailyChallenge.render(content);
     if (route === 'question-bank') return QuestionBank.render(content);
     if (route === 'topic-drill') return TopicDrill.render(content);
+    if (route === 'scripts' || route === 'script-toolkit') return ScriptsToolkit.render(content);
     if (route === 'challenge-history') {
       content.innerHTML = UI.skeleton('table');
       try {
@@ -567,10 +569,16 @@ const App = (function () {
         topics = [];
       }
 
-      if (!topics || !topics.length) {
+      // Also search in Scripts library
+      let matchedScripts = [];
+      if (typeof ScriptEngine !== 'undefined' && typeof SCRIPTS_BANK_DATA !== 'undefined') {
+        matchedScripts = ScriptEngine.searchScripts(SCRIPTS_BANK_DATA, q).slice(0, 3);
+      }
+
+      if ((!topics || !topics.length) && matchedScripts.length === 0) {
         dropdown.innerHTML = `
           <div style="padding:12px 14px; font-size:12.5px; color:var(--ink-soft); text-align:center;">
-            ${I18n.getLang() === 'ar' ? 'لا توجد مواضيع مطابقة' : 'No matching topics found'}
+            ${I18n.getLang() === 'ar' ? 'لا توجد نتائج مطابقة' : 'No matching results found'}
           </div>
         `;
         dropdown.classList.add('active');
@@ -578,35 +586,74 @@ const App = (function () {
       }
 
       const isAr = I18n.getLang() === 'ar';
-      const topResults = topics.slice(0, 6);
+      const topResults = (topics || []).slice(0, 5);
 
-      dropdown.innerHTML = topResults.map((t, idx) => {
-        const mod = (State.modulesCache || []).find(m => m.id === t.module_id);
-        const modName = mod ? I18n.localizedName(mod) : (t.module_id || '');
-        const title = isAr ? (t.title_ar || t.title_en || '') : (t.title_en || t.title_ar || '');
-        return `
-          <div class="search-result-item" data-idx="${idx}" data-topic-id="${t.id}">
+      let resultsHtml = '';
+
+      // Render Script Matches
+      if (matchedScripts.length > 0) {
+        resultsHtml += `<div style="padding: 6px 12px; font-size: 11px; font-weight: 700; color: var(--teal); background: rgba(44,122,107,0.06); border-bottom: 1px solid var(--line);">🛠️ ${isAr ? 'سكربتات وحلول ERP مطابقة' : 'ERP Scripts & Troubleshooting'}</div>`;
+        resultsHtml += matchedScripts.map((s, idx) => `
+          <div class="search-result-item search-result-script" data-script-id="${s.id}">
             <div class="search-result-info">
-              <div class="search-result-title">${Topics.escapeHtml(title)}</div>
-              <div class="search-result-meta">${Topics.escapeHtml(modName)} • <span class="badge badge-status-${(t.status || 'not-started').toLowerCase().replace(/\s+/g, '-')}">${t.status || 'Not Started'}</span></div>
+              <div class="search-result-title">🛠️ ${escapeHtml(isAr ? s.title_ar : (s.title_en || s.title_ar))}</div>
+              <div class="search-result-meta">${escapeHtml(s.filename)} • <span class="badge ${s.database_compatibility === 'GREEN' ? 'badge-teal' : 'badge-brass'}">${s.database_compatibility}</span></div>
             </div>
             <span style="color:var(--brass); font-size:12px;">➔</span>
           </div>
-        `;
-      }).join('') + `
+        `).join('');
+      }
+
+      // Render Topic Matches
+      if (topResults.length > 0) {
+        if (matchedScripts.length > 0) {
+          resultsHtml += `<div style="padding: 6px 12px; font-size: 11px; font-weight: 700; color: var(--ink-soft); background: var(--paper); border-bottom: 1px solid var(--line);">📚 ${isAr ? 'مواضيع المعرفة' : 'Knowledge Topics'}</div>`;
+        }
+        resultsHtml += topResults.map((t, idx) => {
+          const mod = (State.modulesCache || []).find(m => m.id === t.module_id);
+          const modName = mod ? I18n.localizedName(mod) : (t.module_id || '');
+          const title = isAr ? (t.title_ar || t.title_en || '') : (t.title_en || t.title_ar || '');
+          return `
+            <div class="search-result-item" data-idx="${idx}" data-topic-id="${t.id}">
+              <div class="search-result-info">
+                <div class="search-result-title">${Topics.escapeHtml(title)}</div>
+                <div class="search-result-meta">${Topics.escapeHtml(modName)} • <span class="badge badge-status-${(t.status || 'not-started').toLowerCase().replace(/\s+/g, '-')}">${t.status || 'Not Started'}</span></div>
+              </div>
+              <span style="color:var(--brass); font-size:12px;">➔</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      resultsHtml += `
         <div class="search-dropdown-footer" id="search-view-all">
-          🔍 ${isAr ? `عرض جميع النتائج (${topics.length})` : `View all results (${topics.length})`}
+          🔍 ${isAr ? `عرض جميع النتائج (${topics.length + matchedScripts.length})` : `View all results (${topics.length + matchedScripts.length})`}
         </div>
       `;
 
+      dropdown.innerHTML = resultsHtml;
       dropdown.classList.add('active');
 
-      dropdown.querySelectorAll('.search-result-item').forEach(item => {
+      dropdown.querySelectorAll('.search-result-item:not(.search-result-script)').forEach(item => {
         item.addEventListener('click', () => {
           const tId = item.dataset.topicId;
           const targetTopic = topics.find(t => t.id === tId);
           dropdown.classList.remove('active');
           if (targetTopic) Topics.openDetailModal(targetTopic);
+        });
+      });
+
+      dropdown.querySelectorAll('.search-result-script').forEach(item => {
+        item.addEventListener('click', () => {
+          const sId = item.dataset.scriptId;
+          dropdown.classList.remove('active');
+          Router.go('scripts');
+          setTimeout(() => {
+            const script = (typeof SCRIPTS_BANK_DATA !== 'undefined') ? SCRIPTS_BANK_DATA.find(s => s.id === sId) : null;
+            if (script && typeof ScriptsToolkit !== 'undefined') {
+              ScriptsToolkit.openScriptWorkbench(script);
+            }
+          }, 100);
         });
       });
 
@@ -618,6 +665,29 @@ const App = (function () {
         });
       }
     }
+
+    // Global Keyboard Shortcuts (Ctrl+K, Ctrl+Shift+C, Esc)
+    window.addEventListener('keydown', (e) => {
+      // Ctrl+K -> Focus Search
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        search.focus();
+        search.select();
+      }
+      // Ctrl+Shift+C -> Copy Code
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+        if (typeof ScriptsToolkit !== 'undefined' && ScriptsToolkit.copyPureCode) {
+          ScriptsToolkit.copyPureCode();
+        }
+      }
+      // Esc -> Close dropdown or modal
+      if (e.key === 'Escape') {
+        dropdown.classList.remove('active');
+        if (typeof ScriptsToolkit !== 'undefined') {
+          ScriptsToolkit.closeScriptWorkbench();
+        }
+      }
+    });
 
     const debouncedLiveSearch = UI.debounce((val) => doLiveSearch(val), 200);
 

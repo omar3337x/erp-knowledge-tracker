@@ -136,9 +136,12 @@ const Dashboard = (function () {
             ${isAr ? 'أسئلة تدريب تفاعلية مخصصة اليوم تركز على فجواتك المعرفية والمواضيع المستحقة للمراجعة.' : 'Personalized interactive practice questions tailored to your knowledge gaps & review queue.'}
           </p>
         </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <button class="btn btn-primary" onclick="Router.go('daily-challenge')" style="padding:10px 20px; font-weight:600; font-size:13px;">
-            🚀 ${isAr ? 'بدء تحدي اليوم' : 'Start Today\'s Challenge'}
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="Router.go('daily-challenge')" style="padding:10px 18px; font-weight:600; font-size:13px;">
+            🧠 ${isAr ? 'بدء تحدي اليوم' : 'Daily Challenge'}
+          </button>
+          <button class="btn btn-secondary" onclick="Router.go('scripts')" style="padding:10px 16px; font-size:13px; color:var(--teal); font-weight:600;">
+            🛠️ ${isAr ? 'مكتبة السكربتات' : 'Script Toolkit'}
           </button>
           <button class="btn btn-secondary" onclick="Router.go('question-bank')" style="padding:10px 16px; font-size:13px;">
             📚 ${isAr ? 'بنك الأسئلة' : 'Question Bank'}
