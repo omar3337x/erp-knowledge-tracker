@@ -176,12 +176,16 @@ const DatabaseExplorer = (function () {
   }
 
   // =========================================================================
-  // TAB 0: TRANSACTION DELETION ANALYZER (New Core Feature)
+  // TAB 0: TRANSACTION DELETION ANALYZER (Full Dynamic Coverage & Live Graph)
   // =========================================================================
   let _deletionResult = null;
   let _selectedTxType = 'SALES_RETURN';
+  let _currentOpMode = 'ANALYZE_ONLY'; // 'ANALYZE_ONLY' | 'CHANGE' | 'DELETE'
 
   function renderDeletionTab(container, isAr) {
+    const registry = DatabaseExplorerEngine.getRegistry();
+    const allFamKeys = Object.keys(registry);
+
     if (!_deletionResult) {
       _deletionResult = DatabaseExplorerEngine.analyzeTransactionDeletion('عايز أحذف حركة مرتجع مبيعات رقم 12345', 'SALES_RETURN', '12345');
     }
@@ -189,58 +193,90 @@ const DatabaseExplorer = (function () {
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 20px;">
         
-        <!-- Input & Quick Selectors -->
+        <!-- Operation Mode Switcher & Re-Scan Banner -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: var(--paper); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 12px; font-weight: 700; color: var(--ink);">⚙️ ${isAr ? 'نمط العملية المطلوب:' : 'Operation Mode:'}</span>
+            <div class="btn-group" style="display: flex; gap: 4px;">
+              <button class="btn btn-sm ${ _currentOpMode === 'ANALYZE_ONLY' ? 'btn-primary' : 'btn-secondary' } op-mode-btn" data-mode="ANALYZE_ONLY" style="font-size: 11px;">
+                🔍 ${isAr ? 'دراسة وتحليل فقط (Analyze)' : 'Analyze Only'}
+              </button>
+              <button class="btn btn-sm ${ _currentOpMode === 'CHANGE' ? 'btn-primary' : 'btn-secondary' } op-mode-btn" data-mode="CHANGE" style="font-size: 11px;">
+                🧪 ${isAr ? 'تعديل آمن (Change)' : 'Safe Change'}
+              </button>
+              <button class="btn btn-sm ${ _currentOpMode === 'DELETE' ? 'btn-primary' : 'btn-secondary' } op-mode-btn" data-mode="DELETE" style="font-size: 11px;">
+                🗑️ ${isAr ? 'حذف آمن (Delete)' : 'Safe Delete'}
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic Schema Re-Scanner Trigger -->
+          <button class="btn btn-secondary btn-sm" id="btn-re-scan-schema" style="font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px;">
+            🔄 ${isAr ? 'إعادة فحص واكتشاف الحركات في الداتا بيز' : 'Re-Scan Schema for Transactions'}
+          </button>
+        </div>
+
+        <!-- Input & Search -->
         <div>
           <label style="font-size: 13px; font-weight: 700; color: var(--ink); display: block; margin-bottom: 8px;">
-            🗑️ ${isAr ? 'ما الحركة التشغيلية التي ترغب في تحليل دورة حذفها وإلغائها؟' : 'Which transaction lifecycle do you want to analyze for safe deletion?'}
+            ${_currentOpMode === 'DELETE' ? '🗑️ ' : (_currentOpMode === 'CHANGE' ? '🧪 ' : '🔍 ')} 
+            ${isAr ? 'ما الحركة التشغيلية التي ترغب في فحصها أو تنفيذ العملية عليها؟' : 'Which transaction lifecycle do you want to inspect or execute against?'}
           </label>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
             <input 
               type="text" 
               id="db-deletion-input" 
               class="form-control" 
-              placeholder="${isAr ? 'اكتب مثلاً: عايز أحذف مرتجع مبيعات رقم 12345، أو احذف فاتورة مبيعات 554...' : 'e.g. Delete sales return 12345, delete sales invoice 882...'}" 
-              value="${escapeHtml(_deletionResult ? _deletionResult.query : '')}"
+              placeholder="${isAr ? 'اكتب باللغة الطبيعية مثلاً: عايز أحذف مرتجع مبيعات رقم 12345، أو احذف أمر تصنيع 40، أو احذف حركة وقود 12...' : 'e.g. Delete sales return 12345, delete manufacturing order 40, delete fuel log 12...'}" 
+              value="${escapeHtml(_deletionResult ? (_deletionResult.intent.raw_query || '') : '')}"
               style="flex: 1; min-width: 300px; font-size: 13px;"
             />
             <button class="btn btn-primary" id="btn-run-deletion" style="font-size: 13px; font-weight: 600;">
-              🔍 ${isAr ? 'تحليل دورة الحركة ومصفوفة الحذف' : 'Analyze Deletion Lifecycle'}
+              🔍 ${isAr ? 'تحليل دورة الحركة ومخطط الاعتماديات' : 'Analyze Transaction & Dependency Graph'}
             </button>
           </div>
 
-          <!-- Quick Transaction Type Chips -->
-          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;">
-            <span style="font-size: 11px; color: var(--ink-soft); align-self: center;">${isAr ? 'أنواع الحركات:' : 'Transaction Types:'}</span>
-            <button class="btn btn-sm ${ _selectedTxType === 'SALES_RETURN' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="SALES_RETURN" data-id="12345" style="font-size: 11px;">
-              🧾 ${isAr ? 'مرتجع مبيعات (Sales Return)' : 'Sales Return'}
-            </button>
-            <button class="btn btn-sm ${ _selectedTxType === 'SALES_INVOICE' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="SALES_INVOICE" data-id="8841" style="font-size: 11px;">
-              🧾 ${isAr ? 'فاتورة مبيعات (Sales Invoice)' : 'Sales Invoice'}
-            </button>
-            <button class="btn btn-sm ${ _selectedTxType === 'PURCHASE_RETURN' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="PURCHASE_RETURN" data-id="3120" style="font-size: 11px;">
-              🛒 ${isAr ? 'مرتجع مشتريات (Purchase Return)' : 'Purchase Return'}
-            </button>
-            <button class="btn btn-sm ${ _selectedTxType === 'PURCHASE_INVOICE' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="PURCHASE_INVOICE" data-id="5420" style="font-size: 11px;">
-              🛒 ${isAr ? 'فاتورة مشتريات (Purchase Invoice)' : 'Purchase Invoice'}
-            </button>
-            <button class="btn btn-sm ${ _selectedTxType === 'STOCK_TRANSFER' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="STOCK_TRANSFER" data-id="901" style="font-size: 11px;">
-              📦 ${isAr ? 'تحويل مخزني (Stock Transfer)' : 'Stock Transfer'}
-            </button>
-            <button class="btn btn-sm ${ _selectedTxType === 'RECEIPT_PAYMENT' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="RECEIPT_PAYMENT" data-id="7712" style="font-size: 11px;">
-              🏦 ${isAr ? 'سند قبض / صرف (Receipt/Payment)' : 'Receipt/Payment'}
-            </button>
-            <button class="btn btn-sm ${ _selectedTxType === 'PHYSICAL_INVENTORY' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="PHYSICAL_INVENTORY" data-id="44" style="font-size: 11px;">
-              📋 ${isAr ? 'محضر جرد (Stock Count)' : 'Stock Count'}
-            </button>
-            <button class="btn btn-sm ${ _selectedTxType === 'MANUAL_JOURNAL' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="MANUAL_JOURNAL" data-id="2830" style="font-size: 11px;">
-              📒 ${isAr ? 'قيد يومية يدوي (Manual Journal)' : 'Manual Journal'}
-            </button>
+          <!-- Filter & Dropdown for all 45 Transaction Families -->
+          <div style="margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--paper); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+            <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
+              🏷️ ${isAr ? 'اختر من الـ 45 حركة مكتشفة:' : 'Or Select from 45 Discovered Families:'}
+            </div>
+            
+            <select id="db-deletion-tx-select" class="form-control" style="max-width: 350px; font-size: 12.5px; padding: 4px 8px;">
+              ${allFamKeys.map(k => {
+                const fam = registry[k];
+                const isSel = fam.type_key === (_deletionResult ? _deletionResult.family.type_key : _selectedTxType);
+                return `<option value="${fam.type_key}" ${isSel ? 'selected' : ''}>${isAr ? fam.module_ar : fam.module} ➔ ${isAr ? fam.name_ar : fam.name_en} (${fam.header_table})</option>`;
+              }).join('')}
+            </select>
+
+            <!-- Quick Chips for Top ERP Transactions -->
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-inline-start: auto;">
+              <button class="btn btn-sm ${ _selectedTxType === 'SALES_RETURN' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="SALES_RETURN" data-id="12345" style="font-size: 11px;">
+                🧾 ${isAr ? 'مرتجع مبيعات' : 'Sales Return'}
+              </button>
+              <button class="btn btn-sm ${ _selectedTxType === 'SALES_INVOICE' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="SALES_INVOICE" data-id="8841" style="font-size: 11px;">
+                🧾 ${isAr ? 'فاتورة مبيعات' : 'Sales Invoice'}
+              </button>
+              <button class="btn btn-sm ${ _selectedTxType === 'PURCHASE_RETURN' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="PURCHASE_RETURN" data-id="3120" style="font-size: 11px;">
+                🛒 ${isAr ? 'مرتجع مشتريات' : 'Purchase Return'}
+              </button>
+              <button class="btn btn-sm ${ _selectedTxType === 'STOCK_TRANSFER' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="STOCK_TRANSFER" data-id="901" style="font-size: 11px;">
+                📦 ${isAr ? 'تحويل مخزني' : 'Stock Transfer'}
+              </button>
+              <button class="btn btn-sm ${ _selectedTxType === 'MANUFACTURING_ORDERS' ? 'btn-primary' : 'btn-secondary' } quick-tx-chip" data-type="MANUFACTURING_ORDERS" data-id="40" style="font-size: 11px;">
+                ⚙️ ${isAr ? 'أمر تصنيع MES' : 'Manufacturing'}
+              </button>
+            </div>
           </div>
         </div>
 
+        <!-- Dynamic Scanner Output Modal Placeholder -->
+        <div id="db-dynamic-scan-output-box" style="display: none; padding: 16px; background: rgba(44, 122, 107, 0.05); border: 1px solid var(--teal); border-radius: var(--radius-sm);"></div>
+
         <!-- Deletion Analysis Results Container -->
         <div id="db-deletion-results-container">
-          ${_deletionResult ? renderDeletionResultDetails(_deletionResult, isAr) : ''}
+          ${_deletionResult ? renderDeletionResultDetails(_deletionResult, isAr, _currentOpMode) : ''}
         </div>
 
       </div>
@@ -249,23 +285,68 @@ const DatabaseExplorer = (function () {
     // Bind events
     const input = container.querySelector('#db-deletion-input');
     const btnRun = container.querySelector('#btn-run-deletion');
+    const selectTx = container.querySelector('#db-deletion-tx-select');
+    const btnReScan = container.querySelector('#btn-re-scan-schema');
+    const boxReScan = container.querySelector('#db-dynamic-scan-output-box');
 
     const execDeletionAnalysis = (query, forcedType, forcedId) => {
       const q = (query || input.value).trim();
-      if (!q && !forcedType) return;
-      _deletionResult = DatabaseExplorerEngine.analyzeTransactionDeletion(q, forcedType, forcedId);
-      _selectedTxType = _deletionResult.map.type_key;
-      input.value = _deletionResult.query || `حذف ${_deletionResult.map.name_ar} رقم ${_deletionResult.transaction_id}`;
+      _deletionResult = DatabaseExplorerEngine.analyzeTransactionDeletion(q || `حذف ${forcedType}`, forcedType, forcedId);
+      _selectedTxType = _deletionResult.family.type_key;
+      input.value = _deletionResult.intent.raw_query || `حذف ${_deletionResult.family.name_ar} رقم ${_deletionResult.transaction_id}`;
       
       const resContainer = container.querySelector('#db-deletion-results-container');
       if (resContainer) {
-        resContainer.innerHTML = renderDeletionResultDetails(_deletionResult, isAr);
+        resContainer.innerHTML = renderDeletionResultDetails(_deletionResult, isAr, _currentOpMode);
         bindDeletionResultEvents(resContainer, isAr);
       }
     };
 
     if (btnRun) btnRun.addEventListener('click', () => execDeletionAnalysis());
     if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') execDeletionAnalysis(); });
+
+    if (selectTx) {
+      selectTx.addEventListener('change', (e) => {
+        execDeletionAnalysis(`حذف ${e.target.value}`, e.target.value, '12345');
+      });
+    }
+
+    container.querySelectorAll('.op-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _currentOpMode = btn.getAttribute('data-mode');
+        container.querySelectorAll('.op-mode-btn').forEach(b => {
+          b.classList.remove('btn-primary');
+          b.classList.add('btn-secondary');
+        });
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-primary');
+        execDeletionAnalysis();
+      });
+    });
+
+    if (btnReScan) {
+      btnReScan.addEventListener('click', () => {
+        const scanRes = DatabaseExplorerEngine.discoverTransactionFamiliesFromSchema();
+        boxReScan.style.display = 'block';
+        boxReScan.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <strong style="font-size: 13.5px; color: var(--teal);">
+              🔄 ${isAr ? 'نتائج الفحص التلقائي المستمر للـ 406 جدول (Live Schema Discovery):' : 'Continuous Schema Discovery Results:'}
+            </strong>
+            <button class="btn-icon" onclick="document.getElementById('db-dynamic-scan-output-box').style.display='none'" style="border:none; background:none; cursor:pointer;">✕</button>
+          </div>
+          <div style="font-size: 12.5px; color: var(--ink); line-height: 1.6;">
+            📊 <strong>${isAr ? 'إجمالي الحركات المكتشفة في الهيكل الحالي:' : 'Total Candidate Transactions:'}</strong> <code>${scanRes.total_candidates}</code> &nbsp;•&nbsp;
+            🟢 <strong>${isAr ? 'الحركات المثبتة في الـ Registry الأساسي:' : 'Confirmed Baseline:'}</strong> <code>${scanRes.confirmed_baseline.length}</code> &nbsp;•&nbsp;
+            🆕 <strong>${isAr ? 'الحركات المرشحة الجديدة المكتشفة ديناميكياً:' : 'Newly Discovered Candidates:'}</strong> <code>${scanRes.newly_discovered.length}</code>
+          </div>
+          <div style="max-height: 140px; overflow-y: auto; margin-top: 8px; font-size: 11.5px; background: var(--paper); padding: 8px; border-radius: 4px; border: 1px solid var(--line);">
+            ${scanRes.confirmed_baseline.slice(0, 15).map(c => `<div>🟢 ${c.name_ar} (<code>${c.header_table}</code> ➔ <code>${c.details_table || 'N/A'}</code>)</div>`).join('')}
+          </div>
+        `;
+        Toast.show(isAr ? `تم اكتشاف ${scanRes.total_candidates} حركة في قاعدة البيانات` : `Discovered ${scanRes.total_candidates} candidate transactions`, 'success');
+      });
+    }
 
     container.querySelectorAll('.quick-tx-chip').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -285,11 +366,12 @@ const DatabaseExplorer = (function () {
     if (resContainer) bindDeletionResultEvents(resContainer, isAr);
   }
 
-  function renderDeletionResultDetails(res, isAr) {
-    if (!res || !res.map) return '';
+  function renderDeletionResultDetails(res, isAr, opMode = 'ANALYZE_ONLY') {
+    if (!res || !res.family) return '';
 
-    const m = res.map;
+    const m = res.family;
     const txId = res.transaction_id;
+    const graph = res.dependency_graph;
 
     return `
       <div class="animate-fade-in" style="display: flex; flex-direction: column; gap: 20px;">
@@ -298,18 +380,21 @@ const DatabaseExplorer = (function () {
         <div style="padding: 20px; background: var(--paper); border-radius: var(--radius-sm); border: 1px solid var(--line); border-inline-start: 4px solid var(--rust); display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-              <span style="font-size: 26px;">🗑️</span>
+              <span style="font-size: 26px;">${opMode === 'DELETE' ? '🗑️' : (opMode === 'CHANGE' ? '🧪' : '🔍')}</span>
               <h3 style="font-size: 17px; font-weight: 700; margin: 0; color: var(--ink);">
                 ${escapeHtml(isAr ? m.name_ar : m.name_en)} — #${escapeHtml(txId)}
               </h3>
               <span class="badge badge-rust" style="font-size: 11px;">
                 ⚡ Risk Level: ${escapeHtml(res.risk_level)}
               </span>
+              <span class="badge badge-teal" style="font-size: 10px;">
+                ${escapeHtml(isAr ? m.module_ar : m.module)}
+              </span>
             </div>
             <div style="font-size: 13px; color: var(--ink-soft); line-height: 1.6;">
               📌 <strong>${isAr ? 'الترويسة الأساسية:' : 'Header:'}</strong> <code>${escapeHtml(m.header_table)}</code> (id=${escapeHtml(txId)}) &nbsp;•&nbsp; 
-              <strong>${isAr ? 'جدول التفاصيل:' : 'Details:'}</strong> <code>${escapeHtml(m.details_table)}</code> &nbsp;•&nbsp;
-              ${m.journal_type_id ? `<strong>${isAr ? 'نوع القيد في journal:' : 'Journal type_id:'}</strong> <code>type_id=${m.journal_type_id}</code>` : ''}
+              <strong>${isAr ? 'جدول التفاصيل:' : 'Details:'}</strong> <code>${escapeHtml(m.details_table || 'None')}</code> &nbsp;•&nbsp;
+              ${m.journal_type_id !== undefined ? `<strong>${isAr ? 'نوع القيد في journal:' : 'Journal type_id:'}</strong> <code>type_id=${m.journal_type_id}</code>` : ''}
             </div>
           </div>
 
@@ -318,115 +403,48 @@ const DatabaseExplorer = (function () {
           </div>
         </div>
 
-        <!-- 7-LAYER STRUCTURED DELETION & RELATIONSHIPS TREE -->
-        <div style="display: flex; flex-direction: column; gap: 14px;">
-
-          <!-- LAYER 1: CORE TRANSACTION -->
-          <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--teal);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
-                🧾 1. CORE TRANSACTION (الترويسة والتفاصيل الأساسية)
-              </strong>
-              <span class="badge badge-teal" style="font-size: 10px;">🟢 CONFIRMED FROM CURRENT SCHEMA</span>
-            </div>
-            
-            <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
-              <div><strong>${escapeHtml(m.header_table)}</strong> (Header)</div>
-              <div style="color: var(--ink-soft);">└── <code>id = ${escapeHtml(txId)}</code> <span class="badge badge-teal" style="font-size: 9px; margin-inline-start: 6px;">🟢 Confirmed</span></div>
-              <div style="margin-top: 6px;"><strong>${escapeHtml(m.details_table)}</strong> (Details)</div>
-              <div style="color: var(--ink-soft);">└── <code>${escapeHtml(m.details_fk)} = ${escapeHtml(txId)}</code> <span class="badge badge-teal" style="font-size: 9px; margin-inline-start: 6px;">🟢 Confirmed</span></div>
-            </div>
+        <!-- VISUAL LIVE TRANSACTION DEPENDENCY GRAPH -->
+        <div class="card" style="padding: 18px; border-inline-start: 4px solid var(--teal);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
+              🌐 مخطط الاعتماديات الحي للحركة (Live Transaction Dependency Graph):
+            </strong>
+            <span class="badge badge-teal" style="font-size: 10px;">Full 7-Layer Graph</span>
           </div>
 
-          <!-- LAYER 2: INVENTORY & BATCHES -->
-          <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--brass);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
-                📦 2. INVENTORY & BATCH MOVEMENTS (المخزون وحركات الباتشات)
-              </strong>
-              <span class="badge badge-brass" style="font-size: 10px;">🟡 INFERRED & CANDIDATE KEYS</span>
-            </div>
-            
-            <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
-              <div><strong>general_table</strong> (Operational Stock Movement)</div>
-              <div style="color: var(--ink-soft);">└── Relation: <code>link_id = ${escapeHtml(txId)}</code> OR <code>details_id IN (SELECT id FROM ${escapeHtml(m.details_table)} WHERE ${escapeHtml(m.details_fk)}=${escapeHtml(txId)})</code></div>
-              <div style="color: var(--brass-deep); font-size: 11px; margin-top: 2px;">
-                ⚠️ <em>Rule: ${isAr ? 'لا تفترض نوع محدد (type) كحقيقة مطلقة بدون مطابقة سجلات المخزن الحية.' : 'Do NOT assume static type=2 without verifying actual link_id & details_id.'}</em>
-              </div>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            ${(graph && graph.graph_nodes ? graph.graph_nodes : []).map((node, idx) => `
+              <div style="display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 14px; border-inline-start: 3px solid ${node.confidence.badge === 'badge-teal' ? 'var(--teal)' : (node.confidence.badge === 'badge-brass' ? 'var(--brass)' : 'var(--rust)')};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 6px;">
+                  <strong style="font-size: 13px; color: var(--ink);">
+                    ${escapeHtml(isAr ? node.layer_name_ar : node.layer_name_en)} ➔ <code>${escapeHtml(node.table)}</code>
+                  </strong>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <span class="badge ${node.confidence.badge}" style="font-size: 9px;">${escapeHtml(node.confidence.id)}</span>
+                    <span class="badge badge-secondary" style="font-size: 9px;">Count: ${escapeHtml(node.record_count)}</span>
+                  </div>
+                </div>
 
-              ${m.patches_discovery ? `
-                <div style="margin-top: 8px;"><strong>patches</strong> (Batch Tracking / Cost)</div>
-                <div style="color: var(--ink-soft);">└── Relation: <code>link_id = ${escapeHtml(txId)}</code> <span class="badge badge-brass" style="font-size: 9px; margin-inline-start: 6px;">🟡 Inferred Candidate</span></div>
-                <div style="color: var(--ink-soft); font-size: 11px;">⚠️ <em>${isAr ? 'لا يتم الحذف إلا إذا أثبت الفحص وجود سجلات باتشات مرتبطة بالمرتجع.' : 'Not deletable unless probe proves linked batch records.'}</em></div>
-              ` : ''}
-            </div>
-          </div>
+                <div style="font-size: 12px; color: var(--ink-soft); font-family: monospace; margin-bottom: 4px;">
+                  └── Relation: <code>${escapeHtml(node.relationship)}</code>
+                </div>
 
-          <!-- LAYER 3: ACCOUNTING & GENERAL LEDGER -->
-          <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--brass-deep);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
-                💰 3. ACCOUNTING & GENERAL LEDGER (الأستاذ العام والقيود المحاسبية)
-              </strong>
-              <span class="badge badge-rust" style="font-size: 10px;">🟠 HISTORICAL SCRIPT SUPPORTED</span>
-            </div>
-            
-            <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
-              <div><strong>journal</strong> (Posting Header)</div>
-              <div style="color: var(--ink-soft);">└── <code>reference = ${escapeHtml(txId)}</code> AND <code>type_id = ${m.journal_type_id || 'N/A'}</code> <span class="badge badge-rust" style="font-size: 9px; margin-inline-start: 6px;">🟠 Historical Script</span></div>
-              <div style="margin-top: 6px;"><strong>gl_trans</strong> (Double-Entry Ledger Lines)</div>
-              <div style="color: var(--ink-soft);">└── <code>type_no = Journal ID</code> AND <code>type_id = ${m.gl_trans_type_id || m.journal_type_id || 'N/A'}</code></div>
-              <div style="color: var(--teal); font-weight: 600; margin-top: 4px;">
-                └── GL Balance Condition: <code>SUM(gl_trans.amount) = 0</code> (Debit = Credit) <span class="badge badge-teal" style="font-size: 9px;">🟢 Safe Condition</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- LAYER 4: REPORTING & DASHBOARD -->
-          ${m.reporting_table ? `
-            <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--teal);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
-                  📊 4. REPORTING & DASHBOARD SUMMARIES (إحصائيات المبيعات والداشبورد)
-                </strong>
-                <span class="badge badge-teal" style="font-size: 10px;">🟢 CONFIRMED FROM CURRENT SCHEMA</span>
-              </div>
-              
-              <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
-                <div><strong>${escapeHtml(m.reporting_table)}</strong> (Daily Summaries)</div>
-                <div style="color: var(--ink-soft);">└── <code>${escapeHtml(m.reporting_fk)} = ${escapeHtml(txId)}</code> <span class="badge badge-teal" style="font-size: 9px; margin-inline-start: 6px;">🟢 Confirmed</span></div>
-                <div style="color: var(--ink-soft); font-size: 11px;">${isAr ? 'الإجراء: حذف السجل التجميعي لتصحيح تقارير صافي المبيعات والأرباح.' : 'Action: Delete summary record to recalculate daily sales aggregates.'}</div>
-              </div>
-            </div>
-          ` : ''}
-
-          <!-- LAYER 5: ORIGINAL LINKED DOCUMENT -->
-          ${m.original_doc_link ? `
-            <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--ink-soft);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <strong style="font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
-                  🔗 5. ORIGINAL LINKED DOCUMENT (المستند الأصلي المرتبط)
-                </strong>
-                <span class="badge badge-secondary" style="font-size: 10px;">🛡️ READ-ONLY (DO NOT DELETE)</span>
-              </div>
-              
-              <div style="font-family: monospace; font-size: 12.5px; background: var(--paper); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.8;">
-                <div><strong>${escapeHtml(m.original_doc_link.table)}</strong> (${escapeHtml(m.original_doc_link.label_ar)})</div>
-                <div style="color: var(--ink-soft);">└── <code>valid_bill_id -> bills.id</code> <span class="badge badge-teal" style="font-size: 9px; margin-inline-start: 6px;">🟢 Confirmed</span></div>
-                <div style="color: var(--rust); font-size: 11.5px; font-weight: 600; margin-top: 4px;">
-                  🚫 <em>${isAr ? 'ممنوع حذف الفاتورة الأصلية. العلاقة تُستخدم للتحقق من أثر الإلغاء على الرصيد فقط.' : 'NEVER delete original sales bill. Link is used strictly for impact verification.'}</em>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 11.5px; border-top: 1px dashed var(--line); padding-top: 4px;">
+                  <span style="color: var(--ink-soft);">⚡ Action: <strong>${escapeHtml(node.impact_action)}</strong></span>
+                  <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${node.probe_sql.replace(/\n/g, ' ').replace(/'/g, "\\'")}'); Toast.show('تم نسخ استعلام الفحص', 'success');" style="font-size: 10px; padding: 2px 6px;">
+                    📋 Probe SQL
+                  </button>
                 </div>
               </div>
-            </div>
-          ` : ''}
-
+            `).join('')}
+          </div>
         </div>
 
         <!-- RISK & SAFETY BLOCKERS CHECKLIST -->
         <div class="card" style="padding: 18px; border: 1px solid var(--rust); background: rgba(192, 86, 62, 0.03);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <strong style="font-size: 14px; color: var(--rust); display: flex; align-items: center; gap: 8px;">
-              🔴 موانع الحذف وشروط السلامة الإلزامية (Deletion Safety Blockers):
+              🔴 موانع العملية وفحوصات السلامة الإلزامية (Safety Blockers Checklist):
             </strong>
             <span class="badge badge-rust" style="font-size: 10px;">SAFETY GATE ENFORCED</span>
           </div>
@@ -455,10 +473,10 @@ const DatabaseExplorer = (function () {
           </div>
         </div>
 
-        <!-- 8-Stage Deletion Sequence Roadmap -->
+        <!-- 8-Stage Pipeline Roadmap -->
         <div class="card" style="padding: 16px;">
           <strong style="font-size: 13.5px; color: var(--ink); display: block; margin-bottom: 12px;">
-            🧭 ${isAr ? 'مسار المراحل الثماني لإثبات وحذف الحركة (8-Stage Deletion Pipeline):' : '8-Stage Deletion Pipeline:'}
+            🧭 ${isAr ? 'مسار المراحل الثماني لإثبات ودراسة الحركة (8-Stage Deletion Pipeline):' : '8-Stage Deletion Pipeline:'}
           </strong>
           
           <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -499,32 +517,34 @@ const DatabaseExplorer = (function () {
           </div>
         </div>
 
-        <!-- Transactional Modification SQL Wrapper -->
-        <div class="card" style="padding: 16px; border: 1px solid rgba(192, 86, 62, 0.4);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div>
-              <strong style="font-size: 13.5px; color: var(--rust); display: block;">
-                ⚠️ ${isAr ? 'سكريبت الحذف الخارجي المشروط (External Transactional SQL Wrapper):' : 'External Transactional SQL:'}
-              </strong>
-              <small style="font-size: 11px; color: var(--ink-soft);">
-                ${isAr ? 'مغلف بكبسولة START TRANSACTION للتنفيذ اليدوي خارج النظام فقط مع دعم ROLLBACK الكامل.' : 'Wrapped in START TRANSACTION for external DB execution only.'}
-              </small>
-            </div>
+        ${opMode !== 'ANALYZE_ONLY' ? `
+          <!-- Transactional Modification SQL Wrapper -->
+          <div class="card" style="padding: 16px; border: 1px solid rgba(192, 86, 62, 0.4);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <div>
+                <strong style="font-size: 13.5px; color: var(--rust); display: block;">
+                  ⚠️ ${isAr ? 'سكريبت التنفيذ الخارجي المشروط (External Transactional SQL Wrapper):' : 'External Transactional SQL:'}
+                </strong>
+                <small style="font-size: 11px; color: var(--ink-soft);">
+                  ${isAr ? 'مغلف بكبسولة START TRANSACTION للتنفيذ اليدوي خارج النظام فقط مع دعم ROLLBACK الكامل.' : 'Wrapped in START TRANSACTION for external DB execution only.'}
+                </small>
+              </div>
 
-            <button class="btn btn-secondary btn-sm" id="btn-toggle-mod-sql" style="font-size: 11px;">
-              👁️ ${isAr ? 'إظهار / إخفاء كود الـ SQL' : 'Toggle SQL'}
-            </button>
-          </div>
-
-          <div id="mod-sql-wrapper-box" style="display: none; margin-top: 10px;">
-            <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
-              <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${res.modification_sql.replace(/\n/g, '\\n').replace(/'/g, "\\'")}'); Toast.show('${isAr ? 'تم نسخ سكريبت الحذف الصافي' : 'SQL copied'}', 'success');" style="font-size: 11px;">
-                📋 ${isAr ? 'نسخ السكريبت بالكامل (Pure SQL)' : 'Copy Full Script'}
+              <button class="btn btn-secondary btn-sm" id="btn-toggle-mod-sql" style="font-size: 11px;">
+                👁️ ${isAr ? 'إظهار / إخفاء كود الـ SQL' : 'Toggle SQL'}
               </button>
             </div>
-            <pre style="margin: 0; padding: 12px; background: #1a1a1a; color: #f8f8f2; font-family: monospace; font-size: 12px; border-radius: var(--radius-sm); white-space: pre-wrap; line-height: 1.5; border: 1px solid var(--line);"><code>${escapeHtml(res.modification_sql)}</code></pre>
+
+            <div id="mod-sql-wrapper-box" style="display: none; margin-top: 10px;">
+              <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
+                <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${res.modification_sql.replace(/\n/g, '\\n').replace(/'/g, "\\'")}'); Toast.show('${isAr ? 'تم نسخ سكريبت الحذف الصافي' : 'SQL copied'}', 'success');" style="font-size: 11px;">
+                  📋 ${isAr ? 'نسخ السكريبت بالكامل (Pure SQL)' : 'Copy Full Script'}
+                </button>
+              </div>
+              <pre style="margin: 0; padding: 12px; background: #1a1a1a; color: #f8f8f2; font-family: monospace; font-size: 12px; border-radius: var(--radius-sm); white-space: pre-wrap; line-height: 1.5; border: 1px solid var(--line);"><code>${escapeHtml(res.modification_sql)}</code></pre>
+            </div>
           </div>
-        </div>
+        ` : ''}
 
         <!-- Post-Deletion Verification Tool -->
         <div class="card" style="padding: 16px; background: var(--paper); border-inline-start: 4px solid var(--teal);">
@@ -541,9 +561,8 @@ const DatabaseExplorer = (function () {
 
           <div id="post-verify-box" style="display: none; margin-top: 12px;">
             <pre style="margin: 0; padding: 10px; background: #1e1e1e; color: #a6e22e; font-family: monospace; font-size: 12px; border-radius: var(--radius-sm); white-space: pre-wrap;"><code>SELECT '${m.header_table}' AS tbl, count(*) AS cnt FROM \`${m.header_table}\` WHERE id = ${txId}
-UNION ALL
-SELECT '${m.details_table}' AS tbl, count(*) AS cnt FROM \`${m.details_table}\` WHERE ${m.details_fk} = ${txId}
-${m.inventory_discovery ? `UNION ALL\nSELECT 'general_table' AS tbl, count(*) AS cnt FROM \`general_table\` WHERE link_id = ${txId} OR details_id IN (SELECT id FROM \`${m.details_table}\` WHERE ${m.details_fk} = ${txId})` : ''}
+${m.details_table ? `UNION ALL\nSELECT '${m.details_table}' AS tbl, count(*) AS cnt FROM \`${m.details_table}\` WHERE ${m.details_fk} = ${txId}` : ''}
+${m.inventory_discovery ? `UNION ALL\nSELECT '${m.inventory_discovery.table}' AS tbl, count(*) AS cnt FROM \`${m.inventory_discovery.table}\` WHERE link_id = ${txId} ${m.details_table ? `OR details_id IN (SELECT id FROM \`${m.details_table}\` WHERE ${m.details_fk} = ${txId})` : ''}` : ''}
 ${m.journal_type_id !== undefined ? `UNION ALL\nSELECT 'journal' AS tbl, count(*) AS cnt FROM \`journal\` WHERE reference = ${txId} AND type_id = ${m.journal_type_id}\nUNION ALL\nSELECT 'gl_trans' AS tbl, count(*) AS cnt FROM \`gl_trans\` WHERE type_id = ${m.gl_trans_type_id || m.journal_type_id} AND type_no IN (SELECT id FROM journal WHERE reference = ${txId})` : ''};</code></pre>
           </div>
         </div>
@@ -552,88 +571,63 @@ ${m.journal_type_id !== undefined ? `UNION ALL\nSELECT 'journal' AS tbl, count(*
     `;
   }
 
-  function bindDeletionResultEvents(container, isAr) {
-    const btnToggleSql = container.querySelector('#btn-toggle-mod-sql');
-    const boxSql = container.querySelector('#mod-sql-wrapper-box');
-    if (btnToggleSql && boxSql) {
-      btnToggleSql.addEventListener('click', () => {
-        const isHidden = boxSql.style.display === 'none';
-        boxSql.style.display = isHidden ? 'block' : 'none';
-      });
-    }
-
-    const btnPostVerify = container.querySelector('#btn-run-post-verify');
-    const boxPostVerify = container.querySelector('#post-verify-box');
-    if (btnPostVerify && boxPostVerify) {
-      btnPostVerify.addEventListener('click', () => {
-        boxPostVerify.style.display = 'block';
-        Toast.show(isAr ? 'تم توليد استعلامات الفحص الختامي' : 'Verification queries generated', 'success');
-      });
-    }
-  }
-
   // =========================================================================
-  // TAB 1: CHANGE IMPACT ANALYZER (Main Feature)
+  // TAB 1: CHANGE IMPACT ANALYZER (Full 45 Transaction Families)
   // =========================================================================
   function renderImpactTab(container, isAr) {
+    const registry = DatabaseExplorerEngine.getRegistry();
+    const allFamKeys = Object.keys(registry);
+
+    if (!_impactResult) {
+      _impactResult = DatabaseExplorerEngine.analyzeTransactionChange('عايز أغير كمية فاتورة مبيعات رقم 123 من 10 إلى 15');
+    }
+
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 20px;">
         
         <!-- Input & Quick Scenarios -->
         <div>
           <label style="font-size: 13px; font-weight: 700; color: var(--ink); display: block; margin-bottom: 8px;">
-            🔍 ${isAr ? 'ما التعديل أو السيناريو الذي تريد دراسته واختباره؟' : 'What data change or test scenario do you want to analyze?'}
+            🧪 ${isAr ? 'ما التعديل أو السيناريو الذي تريد دراسته واختباره؟' : 'What data change or test scenario do you want to analyze?'}
           </label>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
             <input 
               type="text" 
               id="db-impact-input" 
               class="form-control" 
-              placeholder="${isAr ? 'اكتب باللغة الطبيعية: مثلاً: عايز أغير وحدة صنف، أو عايز أغير سعر شراء صنف، أو عايز أغير رصيد عميل...' : 'e.g. Change product unit, change purchase price, modify customer balance, edit invoice...'}" 
+              placeholder="${isAr ? 'اكتب باللغة الطبيعية: مثلاً: عايز أغير كمية فاتورة مبيعات 123 من 10 إلى 15، أو غير سعر شراء صنف 55 من 20 إلى 25...' : 'e.g. Change sales invoice 123 quantity from 10 to 15, change purchase price from 20 to 25...'}" 
+              value="${escapeHtml(_impactResult ? (_impactResult.intent.raw_query || '') : '')}"
               style="flex: 1; min-width: 300px; font-size: 13px;"
             />
             <button class="btn btn-primary" id="btn-run-impact" style="font-size: 13px; font-weight: 600;">
-              🧪 ${isAr ? 'تحليل الأثر والمخاطر' : 'Analyze Impact'}
+              🧪 ${isAr ? 'تحليل الأثر وتوليد خطة التغيير' : 'Analyze Change Impact'}
             </button>
           </div>
 
           <!-- Quick Scenario Buttons -->
           <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;">
             <span style="font-size: 11px; color: var(--ink-soft); align-self: center;">${isAr ? 'أمثلة سريعة:' : 'Quick Examples:'}</span>
-            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="عايز أغير وحدة صنف" style="font-size: 11px;">
-              📦 ${isAr ? 'تغيير وحدة صنف (كرتونة / قطعة)' : 'Change Product Unit'}
+            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="عايز أغير كمية فاتورة مبيعات رقم 123 من 10 إلى 15" style="font-size: 11px;">
+              🧾 ${isAr ? 'تعديل كمية فاتورة مبيعات (+5)' : 'Change Invoice Qty'}
             </button>
-            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="عايز أغير سعر شراء صنف" style="font-size: 11px;">
-              💰 ${isAr ? 'تعديل سعر شراء وتكلفة الصنف' : 'Change Purchase Cost'}
+            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="عايز أغير سعر شراء صنف في فاتورة مشتريات 540 من 100 إلى 120" style="font-size: 11px;">
+              🛒 ${isAr ? 'تعديل سعر شراء في فاتورة' : 'Change Purchase Cost'}
             </button>
-            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="عايز أغير رصيد عميل" style="font-size: 11px;">
-              👥 ${isAr ? 'تعديل رصيد ومديونية عميل' : 'Modify Customer Balance'}
+            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="عايز أغير تاريخ حركة تحويل مخزني 901" style="font-size: 11px;">
+              📦 ${isAr ? 'تعديل تاريخ تحويل مخزني' : 'Change Transfer Date'}
             </button>
-            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="عايز أعدل فاتورة مبيعات" style="font-size: 11px;">
-              🧾 ${isAr ? 'تعديل أصناف أو كمية فاتورة مبيعات' : 'Edit Sales Invoice'}
+            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="عايز أغير العميل في فاتورة مبيعات 88" style="font-size: 11px;">
+              👥 ${isAr ? 'تعديل العميل في فاتورة' : 'Change Customer on Bill'}
             </button>
-            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="عايز أعدل رصيد المخزن" style="font-size: 11px;">
-              🏢 ${isAr ? 'تعديل رصيد المخزون بالمستودع' : 'Adjust Stock Balance'}
-            </button>
-            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="تعديل قيد يومية" style="font-size: 11px;">
-              📒 ${isAr ? 'تعديل قيد في الأستاذ العام GL' : 'Modify GL Journal'}
+            <button class="btn btn-secondary btn-sm quick-scenario-btn" data-query="تعديل حساب القيد في أستاذ عام 2026" style="font-size: 11px;">
+              📒 ${isAr ? 'تعديل حساب في قيد اليومية' : 'Modify Journal Account'}
             </button>
           </div>
         </div>
 
         <!-- Impact Results Placeholder -->
         <div id="db-impact-results-container">
-          ${_impactResult ? renderImpactResultDetails(_impactResult, isAr) : `
-            <div style="padding: 40px; text-align: center; border: 2px dashed var(--line); border-radius: var(--radius-sm); background: var(--paper);">
-              <span style="font-size: 36px; display: block; margin-bottom: 10px;">🧪</span>
-              <strong style="font-size: 15px; color: var(--ink); display: block; margin-bottom: 6px;">
-                ${isAr ? 'اختر سيناريو أو اكتب طلب التعديل أعلاه لبدء الفحص' : 'Enter a change request or click an example above to run the impact analyzer'}
-              </strong>
-              <p style="font-size: 13px; color: var(--ink-soft); margin: 0; max-width: 600px; margin: 0 auto; line-height: 1.5;">
-                ${isAr ? 'سيقوم المحرك بربط طلبك بالجداول الـ 406 الحالية، وتحديد نوع البيانات (Master Data مقابل Transactions)، واستخراج الأثر المحاسبي والمخزني وقائمة التحقق الاسترشادية.' : 'The engine maps your request to the 406 verified tables, distinguishes Master Data vs Transactions, and generates read-only verification queries.'}
-              </p>
-            </div>
-          `}
+          ${_impactResult ? renderImpactResultDetails(_impactResult, isAr) : ''}
         </div>
 
       </div>
@@ -647,7 +641,7 @@ ${m.journal_type_id !== undefined ? `UNION ALL\nSELECT 'journal' AS tbl, count(*
       const q = (query || input.value).trim();
       if (!q) return;
       input.value = q;
-      _impactResult = DatabaseExplorerEngine.analyzeChangeIntent(q);
+      _impactResult = DatabaseExplorerEngine.analyzeTransactionChange(q);
       const resultsContainer = container.querySelector('#db-impact-results-container');
       if (resultsContainer) {
         resultsContainer.innerHTML = renderImpactResultDetails(_impactResult, isAr);
@@ -669,41 +663,30 @@ ${m.journal_type_id !== undefined ? `UNION ALL\nSELECT 'journal' AS tbl, count(*
   }
 
   function renderImpactResultDetails(res, isAr) {
-    if (!res || !res.scenario) {
-      return `
-        <div class="card" style="padding: 24px; text-align: center; border-inline-start: 4px solid var(--rust);">
-          <p style="font-size: 13px; color: var(--rust); margin: 0;">
-            ${isAr ? 'لم يتم العثور على جداول مطابقة في قاعدة البيانات الحالية (newdatabase2026.sql).' : 'No matching tables or entities confirmed from current schema.'}
-          </p>
-        </div>
-      `;
-    }
+    if (!res || !res.family) return '';
 
-    const sc = res.scenario;
-    const isCritical = sc.risk_level === 'CRITICAL';
-    const isHigh = sc.risk_level === 'HIGH';
-    const riskColor = isCritical ? 'var(--rust)' : (isHigh ? 'var(--brass-deep)' : 'var(--teal)');
-    const riskBadge = isCritical ? 'badge-rust' : (isHigh ? 'badge-brass' : 'badge-teal');
+    const fam = res.family;
+    const safety = res.safety_level;
+    const isCritical = safety.id === 'CRITICAL' || safety.id === 'BLOCKED';
 
     return `
-      <div class="animate-fade-in" style="display: flex; flex-direction: column; gap: 16px;">
+      <div class="animate-fade-in" style="display: flex; flex-direction: column; gap: 18px;">
         
-        <!-- Entity & Risk Header -->
-        <div style="padding: 16px; background: var(--paper); border-radius: var(--radius-sm); border: 1px solid var(--line); border-inline-start: 4px solid ${riskColor}; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+        <!-- Header Overview Card -->
+        <div style="padding: 18px; background: var(--paper); border-radius: var(--radius-sm); border: 1px solid var(--line); border-inline-start: 4px solid ${safety.color}; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
           <div>
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 24px;">🧪</span>
               <h3 style="font-size: 16px; font-weight: 700; margin: 0; color: var(--ink);">
-                ${escapeHtml(isAr ? sc.entity_ar : sc.entity_en)}
+                ${escapeHtml(isAr ? fam.name_ar : fam.name_en)} — #${escapeHtml(res.transaction_id)}
               </h3>
-              <span class="badge ${riskBadge}" style="font-size: 11px;">
-                ⚡ Risk: ${escapeHtml(sc.risk_level)}
-              </span>
-              <span class="badge badge-teal" style="font-size: 10px;">
-                ${escapeHtml(res.schema_status.label_ar)}
+              <span class="badge ${safety.badge}" style="font-size: 11px;">
+                ${escapeHtml(isAr ? safety.label_ar : safety.label_en)}
               </span>
             </div>
-            <div style="font-size: 12px; color: var(--ink-soft);">
-              📌 <strong>${isAr ? 'الجدول الرئيسي المستهدف:' : 'Primary Target Table:'}</strong> <code style="font-size: 13px; font-weight: 700; color: var(--teal);">${escapeHtml(sc.main_table)}</code>
+            <div style="font-size: 12.5px; color: var(--ink-soft); line-height: 1.5;">
+              📌 <strong>${isAr ? 'طبيعة التعديل:' : 'Change Category:'}</strong> ${escapeHtml(res.change_category_ar)} &nbsp;•&nbsp; 
+              <strong>${isAr ? 'الحقل المستهدف:' : 'Target Field:'}</strong> <code>${escapeHtml(res.target_field)}</code>
             </div>
           </div>
 
@@ -712,106 +695,133 @@ ${m.journal_type_id !== undefined ? `UNION ALL\nSELECT 'journal' AS tbl, count(*
           </div>
         </div>
 
-        <!-- Master Data vs Historical Transaction Classification -->
-        <div style="padding: 14px; background: rgba(44, 122, 107, 0.04); border: 1px solid var(--teal); border-radius: var(--radius-sm);">
-          <strong style="font-size: 13px; color: var(--teal); display: block; margin-bottom: 4px;">
-            ⚖️ ${isAr ? 'تصنيف طبيعة التغيير (Master Data vs Transaction):' : 'Change Nature Classification:'}
+        <!-- BEFORE / AFTER COMPARISON CARD -->
+        <div class="card" style="padding: 16px; border: 1px solid var(--line);">
+          <strong style="font-size: 13.5px; color: var(--ink); display: block; margin-bottom: 10px;">
+            ⚖️ ${isAr ? 'مقارنة القيمة السابقة والمطلوبة (Before / After Delta):' : 'Before / After Delta Comparison:'}
           </strong>
-          <p style="font-size: 13px; color: var(--ink); margin: 0; line-height: 1.5;">
-            ${escapeHtml(isAr ? sc.change_nature_desc_ar : sc.change_nature_desc_en)}
-          </p>
-        </div>
 
-        <!-- Impact Grid (Inventory & Accounting) -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;">
-          
-          <!-- Inventory Impact -->
-          <div style="padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm);">
-            <strong style="font-size: 13px; color: var(--ink); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-              📦 ${isAr ? 'الأثر المخزني والمستودعي:' : 'Inventory & Stock Impact:'}
-            </strong>
-            <p style="font-size: 12.5px; color: var(--ink); margin: 0 0 8px 0; line-height: 1.5;">
-              ${escapeHtml(isAr ? sc.inventory_impact_ar : sc.inventory_impact_en)}
-            </p>
-            ${(sc.related_inventory_tables && sc.related_inventory_tables.length > 0) ? `
-              <div style="font-size: 11px; color: var(--ink-soft);">
-                <strong>${isAr ? 'الجداول المتأثرة بالمخزون:' : 'Affected Inventory Tables:'}</strong>
-                ${sc.related_inventory_tables.map(t => `<code style="margin-inline-end: 4px;">${escapeHtml(t)}</code>`).join('')}
-              </div>
-            ` : ''}
-          </div>
-
-          <!-- Accounting GL Impact -->
-          <div style="padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm);">
-            <strong style="font-size: 13px; color: var(--ink); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-              💰 ${isAr ? 'الأثر المحاسبي والأستاذ العام (GL):' : 'Accounting & GL Impact:'}
-            </strong>
-            <p style="font-size: 12.5px; color: var(--ink); margin: 0 0 8px 0; line-height: 1.5;">
-              ${escapeHtml(isAr ? sc.accounting_impact_ar : sc.accounting_impact_en)}
-            </p>
-            ${(sc.related_transaction_tables && sc.related_transaction_tables.length > 0) ? `
-              <div style="font-size: 11px; color: var(--ink-soft);">
-                <strong>${isAr ? 'جداول القيود والحركات المرتبطة:' : 'Related Transaction Tables:'}</strong>
-                ${sc.related_transaction_tables.map(t => `<code style="margin-inline-end: 4px;">${escapeHtml(t)}</code>`).join('')}
-              </div>
-            ` : ''}
-          </div>
-
-        </div>
-
-        <!-- Safeguards & "Do NOT Modify Directly" Warnings -->
-        <div style="padding: 14px; background: rgba(192, 86, 62, 0.05); border: 1px solid rgba(192, 86, 62, 0.3); border-radius: var(--radius-sm); border-inline-start: 4px solid var(--rust);">
-          <strong style="font-size: 13px; color: var(--rust); display: block; margin-bottom: 6px;">
-            ⚠️ ${isAr ? 'المحاذير وما يُمنع تعديله مباشرة (Safeguards & Prohibitions):' : 'Safeguards & What NOT to Modify Directly:'}
-          </strong>
-          <ul style="margin: 0; padding-inline-start: 20px; font-size: 12.5px; color: var(--ink); line-height: 1.6;">
-            ${(sc.safeguards_ar || []).map(sfg => `<li>${escapeHtml(sfg)}</li>`).join('')}
-          </ul>
-        </div>
-
-        <!-- Read-Only Diagnostic SQL Queries -->
-        ${(sc.read_only_queries && sc.read_only_queries.length > 0) ? `
-          <div class="card" style="padding: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <strong style="font-size: 13px; color: var(--ink); display: flex; align-items: center; gap: 6px;">
-                🧰 ${isAr ? 'استعلامات الفحص والتحقق التشخيصية (Read-Only Diagnostic Queries):' : 'Read-Only Diagnostic Queries:'}
-              </strong>
-              <span class="badge badge-teal" style="font-size: 10px;">100% Safe (SELECT only)</span>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <div style="padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm);">
+              <div style="font-size: 11px; color: var(--ink-soft); margin-bottom: 4px;">⏮️ ${isAr ? 'القيمة الحالية (Before)' : 'Current Value (Before)'}</div>
+              <div style="font-size: 16px; font-weight: 700; color: var(--ink); font-family: monospace;">${escapeHtml(res.old_value)}</div>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              ${sc.read_only_queries.map((q, idx) => `
-                <div style="border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden;">
-                  <div style="padding: 6px 12px; background: var(--paper); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
-                    <span>#${idx + 1}: ${escapeHtml(q.title_ar)}</span>
-                    <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${q.sql.replace(/\n/g, ' ').replace(/'/g, "\\'")}'); Toast.show('${isAr ? 'تم نسخ الاستعلام' : 'Query copied'}', 'success');" style="font-size: 11px; padding: 2px 6px;">
-                      📋 ${isAr ? 'نسخ الاستعلام' : 'Copy'}
-                    </button>
+            <div style="padding: 12px; background: rgba(44, 122, 107, 0.05); border: 1px solid var(--teal); border-radius: var(--radius-sm);">
+              <div style="font-size: 11px; color: var(--teal); margin-bottom: 4px;">⏭️ ${isAr ? 'القيمة المطلوبة (After)' : 'Requested Value (After)'}</div>
+              <div style="font-size: 16px; font-weight: 700; color: var(--teal); font-family: monospace;">${escapeHtml(res.new_value)}</div>
+            </div>
+
+            <div style="padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm);">
+              <div style="font-size: 11px; color: var(--ink-soft); margin-bottom: 4px;">📊 ${isAr ? 'الفارق المحسوب (Delta)' : 'Calculated Delta'}</div>
+              <div style="font-size: 16px; font-weight: 700; color: ${res.delta.startsWith('+') ? 'var(--brass-deep)' : 'var(--rust)'}; font-family: monospace;">${escapeHtml(res.delta)}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VISUAL LIVE TRANSACTION DEPENDENCY GRAPH -->
+        <div class="card" style="padding: 16px; border-inline-start: 4px solid var(--teal);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <strong style="font-size: 13.5px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
+              🌐 مخطط الاعتماديات الحي للحركة (Live Transaction Dependency Graph):
+            </strong>
+            <span class="badge badge-teal" style="font-size: 10px;">Full 7-Layer Graph</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${(res.dependency_graph && res.dependency_graph.graph_nodes ? res.dependency_graph.graph_nodes : []).map(node => `
+              <div style="display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 12px; border-inline-start: 3px solid ${node.confidence.badge === 'badge-teal' ? 'var(--teal)' : (node.confidence.badge === 'badge-brass' ? 'var(--brass)' : 'var(--rust)')};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; flex-wrap: wrap; gap: 4px;">
+                  <strong style="font-size: 12.5px; color: var(--ink);">
+                    ${escapeHtml(isAr ? node.layer_name_ar : node.layer_name_en)} ➔ <code>${escapeHtml(node.table)}</code>
+                  </strong>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <span class="badge ${node.confidence.badge}" style="font-size: 9px;">${escapeHtml(node.confidence.id)}</span>
+                    <span class="badge badge-secondary" style="font-size: 9px;">Count: ${escapeHtml(node.record_count)}</span>
                   </div>
-                  <pre style="margin: 0; padding: 10px; background: #1e1e1e; color: #9cdcfe; font-family: monospace; font-size: 12px; white-space: pre-wrap; line-height: 1.5;"><code>${escapeHtml(q.sql)}</code></pre>
                 </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : ''}
-
-        <!-- 10-Step Investigation Plan -->
-        <div class="card" style="padding: 16px;">
-          <strong style="font-size: 13px; color: var(--ink); display: block; margin-bottom: 10px;">
-            📋 ${isAr ? 'خطة وخريطة العمل المقترحة قبل التطبيق (10-Step Investigation Plan):' : '10-Step Investigation Plan:'}
-          </strong>
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            ${(res.investigation_plan_10_steps || []).map(step => `
-              <div style="font-size: 12.5px; color: var(--ink); padding: 6px 10px; background: var(--paper); border-radius: var(--radius-sm); border: 1px solid var(--line); line-height: 1.4;">
-                ${escapeHtml(step)}
+                <div style="font-size: 11.5px; color: var(--ink-soft); font-family: monospace;">
+                  └── Relation: <code>${escapeHtml(node.relationship)}</code>
+                </div>
               </div>
             `).join('')}
+          </div>
+        </div>
+
+        <!-- SAFETY BLOCKERS CHECKLIST -->
+        <div class="card" style="padding: 16px; border: 1px solid var(--rust); background: rgba(192, 86, 62, 0.03);">
+          <strong style="font-size: 13.5px; color: var(--rust); display: block; margin-bottom: 10px;">
+            🔴 موانع التعديل وفحوصات الأمان الإلزامية (Change Safety Blockers):
+          </strong>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${(res.safety_blockers || []).map(b => `
+              <div style="display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 4px;">
+                <span style="font-size: 16px;">🛡️</span>
+                <div>
+                  <strong style="font-size: 12px; color: var(--ink); display: block;">${escapeHtml(b.title_ar)}</strong>
+                  <span style="font-size: 11.5px; color: var(--ink-soft);">${escapeHtml(b.desc_ar)}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 4-PART DIAGNOSTIC & TRANSACTIONAL SQL PACKAGE -->
+        <div class="card" style="padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <strong style="font-size: 13.5px; color: var(--ink);">
+              🧰 ${isAr ? 'حزمة استعلامات الفحص والتعديل المنظمة (4-Part SQL Package):' : '4-Part SQL Package:'}
+            </strong>
+            <span class="badge badge-teal" style="font-size: 10px;">External Execution Only</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            
+            <!-- 1. PREVIEW -->
+            <div style="border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden;">
+              <div style="padding: 6px 12px; background: var(--paper); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+                <span>1. PREVIEW: فحص السجل الحالي قبل التعديل</span>
+                <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${res.sql_package.preview.replace(/\n/g, ' ').replace(/'/g, "\\'")}'); Toast.show('تم نسخ استعلام الفحص', 'success');" style="font-size: 10px; padding: 2px 6px;">📋 Copy</button>
+              </div>
+              <pre style="margin: 0; padding: 8px 12px; background: #1e1e1e; color: #9cdcfe; font-family: monospace; font-size: 12px; white-space: pre-wrap;"><code>${escapeHtml(res.sql_package.preview)}</code></pre>
+            </div>
+
+            <!-- 2. VALIDATION -->
+            <div style="border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden;">
+              <div style="padding: 6px 12px; background: var(--paper); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+                <span>2. VALIDATION: التحقق من ترابط السجلات والبنود الحالية</span>
+                <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${res.sql_package.validation.replace(/\n/g, ' ').replace(/'/g, "\\'")}'); Toast.show('تم نسخ استعلام التحقق', 'success');" style="font-size: 10px; padding: 2px 6px;">📋 Copy</button>
+              </div>
+              <pre style="margin: 0; padding: 8px 12px; background: #1e1e1e; color: #9cdcfe; font-family: monospace; font-size: 12px; white-space: pre-wrap;"><code>${escapeHtml(res.sql_package.validation)}</code></pre>
+            </div>
+
+            <!-- 3. TRANSACTIONAL MODIFICATION -->
+            <div style="border: 1px solid var(--rust); border-radius: var(--radius-sm); overflow: hidden;">
+              <div style="padding: 6px 12px; background: rgba(192, 86, 62, 0.08); border-bottom: 1px solid var(--rust); font-size: 12px; font-weight: 700; color: var(--rust); display: flex; justify-content: space-between; align-items: center;">
+                <span>3. CHANGE: سكريبت التعديل المغلف بكبسولة START TRANSACTION للتنفيذ الخارجي فقط</span>
+                <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${res.sql_package.modification.replace(/\n/g, '\\n').replace(/'/g, "\\'")}'); Toast.show('تم نسخ سكريبت التعديل', 'success');" style="font-size: 10px; padding: 2px 6px;">📋 Copy SQL</button>
+              </div>
+              <pre style="margin: 0; padding: 10px 12px; background: #1a1a1a; color: #f8f8f2; font-family: monospace; font-size: 12px; white-space: pre-wrap;"><code>${escapeHtml(res.sql_package.modification)}</code></pre>
+            </div>
+
+            <!-- 4. VERIFICATION -->
+            <div style="border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden;">
+              <div style="padding: 6px 12px; background: var(--paper); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+                <span>4. VERIFICATION: التحقق الختامي بعد التعديل</span>
+                <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${res.sql_package.verification.replace(/\n/g, ' ').replace(/'/g, "\\'")}'); Toast.show('تم نسخ استعلام التأكيد', 'success');" style="font-size: 10px; padding: 2px 6px;">📋 Copy</button>
+              </div>
+              <pre style="margin: 0; padding: 8px 12px; background: #1e1e1e; color: #a6e22e; font-family: monospace; font-size: 12px; white-space: pre-wrap;"><code>${escapeHtml(res.sql_package.verification)}</code></pre>
+            </div>
+
           </div>
         </div>
 
       </div>
     `;
   }
+
+
 
   // =========================================================================
   // TAB 2: DOMAIN & TABLE EXPLORER (406 Tables)
