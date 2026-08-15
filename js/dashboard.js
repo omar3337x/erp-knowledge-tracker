@@ -140,6 +140,9 @@ const Dashboard = (function () {
           <button class="btn btn-primary" onclick="Router.go('daily-challenge')" style="padding:10px 18px; font-weight:600; font-size:13px;">
             🧠 ${isAr ? 'بدء تحدي اليوم' : 'Daily Challenge'}
           </button>
+          <button class="btn btn-secondary" onclick="Router.go('database-explorer')" style="padding:10px 16px; font-size:13px; color:var(--brass-deep); font-weight:600;">
+            🗄️ ${isAr ? 'مستكشف الداتا بيز' : 'DB Explorer'}
+          </button>
           <button class="btn btn-secondary" onclick="Router.go('scripts')" style="padding:10px 16px; font-size:13px; color:var(--teal); font-weight:600;">
             🛠️ ${isAr ? 'مكتبة السكربتات' : 'Script Toolkit'}
           </button>

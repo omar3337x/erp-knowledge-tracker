@@ -300,7 +300,8 @@ const Router = (function () {
       analytics: 'analytics.title', 'system-test': 'nav.systemTest',
       profile: 'nav.myProfile', admin: 'admin.title',
       'daily-challenge': 'nav.dailyChallenge', 'question-bank': 'nav.questionBank', 'topic-drill': 'nav.topicDrill', 'challenge-history': 'nav.challengeHistory',
-      'scripts': 'nav.scriptsToolkit', 'script-toolkit': 'nav.scriptsToolkit'
+      'scripts': 'nav.scriptsToolkit', 'script-toolkit': 'nav.scriptsToolkit',
+      'database-explorer': 'nav.dbExplorer', 'db-explorer': 'nav.dbExplorer'
     };
     return map[route] ? (I18n.t(map[route]) || route) : I18n.t('common.notFound');
   }
@@ -351,6 +352,7 @@ const Router = (function () {
     if (route === 'daily-challenge') return DailyChallenge.render(content);
     if (route === 'question-bank') return QuestionBank.render(content);
     if (route === 'topic-drill') return TopicDrill.render(content);
+    if (route === 'database-explorer' || route === 'db-explorer') return DatabaseExplorer.render(content);
     if (route === 'scripts' || route === 'script-toolkit') return ScriptsToolkit.render(content);
     if (route === 'challenge-history') {
       content.innerHTML = UI.skeleton('table');
