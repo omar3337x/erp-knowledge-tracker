@@ -1378,6 +1378,27 @@ const SystemTest = (function () {
     }
   }
 
+  function topologicalSortTests(tests) {
+    const testMap = new Map(tests.map(t => [t.id, t]));
+    const visited = new Set();
+    const result = [];
+
+    function visit(test) {
+      if (!test || visited.has(test.id)) return;
+      if (test.dependencies && test.dependencies.length > 0) {
+        for (let depId of test.dependencies) {
+          const depTest = testMap.get(depId);
+          if (depTest) visit(depTest);
+        }
+      }
+      visited.add(test.id);
+      result.push(test);
+    }
+
+    tests.forEach(t => visit(t));
+    return result;
+  }
+
   async function runDiagnostics(filterDomain = null) {
     if (_isRunning) return;
     _isRunning = true;
@@ -1394,7 +1415,7 @@ const SystemTest = (function () {
       ? _registry.filter(t => t.domain === filterDomain)
       : _registry;
 
-    log('INFO', 'SYSTEM', `Starting Parallel Wave Diagnostic Scan (${testsToRun.length} registered test suites)...`);
+    log('INFO', 'SYSTEM', `Starting Dependency-Aware Diagnostic Scan (${testsToRun.length} registered test suites)...`);
 
     const sharedContext = {
       pingLatency: 0,
@@ -1408,53 +1429,22 @@ const SystemTest = (function () {
     };
 
     const isAr = I18n.getLang() === 'ar';
-    updateUIProgress(5, isAr ? 'بدء الفحص التشخيصي الموازي...' : 'Initializing parallel diagnostic scan...');
+    updateUIProgress(5, isAr ? 'بدء الفحص التشخيصي الشامل...' : 'Initializing diagnostic scan...');
 
-    // If running single domain, execute sequentially
-    if (filterDomain && filterDomain !== 'ALL') {
-      for (let i = 0; i < testsToRun.length; i++) {
-        const test = testsToRun[i];
-        updateUIProgress(Math.round(((i + 1) / testsToRun.length) * 100), `${isAr ? 'فحص' : 'Running'}: ${isAr ? test.name_ar : test.name_en}...`);
-        await runSingleTest(test, sharedContext);
-      }
-    } else {
-      // FULL SCAN: Parallel Wave Execution Architecture
-      // Wave 0: Gateway connectivity probe
-      const wave0 = testsToRun.filter(t => t.domain === 'NETWORK');
-      for (let t of wave0) {
-        updateUIProgress(10, `${isAr ? 'فحص الشبكة' : 'Checking Network'}: ${isAr ? t.name_ar : t.name_en}...`);
-        await runSingleTest(t, sharedContext);
-      }
+    // Sort tests topologically so every prerequisite completes before dependent tests
+    const sortedTests = topologicalSortTests(testsToRun);
 
-      // Wave 1: Authentication & User integrity
-      updateUIProgress(25, isAr ? 'فحص المصادقة وصلاحيات الجلسة...' : 'Validating Session & Auth...');
-      const wave1 = testsToRun.filter(t => t.domain === 'AUTH');
-      for (let t of wave1) {
-        await runSingleTest(t, sharedContext);
-      }
-
-      // Wave 2: Concurrent API Schema Contracts (Executed in parallel via Promise.all)
-      updateUIProgress(45, isAr ? 'فحص عقود الـ APIs بالتوازي...' : 'Testing API Schema Contracts in parallel...');
-      const wave2 = testsToRun.filter(t => t.domain === 'API');
-      await Promise.all(wave2.map(t => runSingleTest(t, sharedContext)));
-
-      // Wave 3: Data Integrity & Modules Matrix
-      updateUIProgress(70, isAr ? 'فحص تكامل البيانات ومصفوفة الموديولات...' : 'Validating Data Integrity & Module Matrix...');
-      const wave3 = testsToRun.filter(t => t.domain === 'DATA' || t.domain === 'MODULES');
-      for (let t of wave3) {
-        await runSingleTest(t, sharedContext);
-      }
-
-      // Wave 4: Concurrent In-Memory Tests (Pages, AI, Cache, I18N, Routing, DOM, Security)
-      updateUIProgress(85, isAr ? 'فحص الواجهة والـ AI والترجمة والأمان...' : 'Testing Pages, AI, Cache, I18N & Security...');
-      const wave4 = testsToRun.filter(t => ['PAGES', 'AI', 'CACHE', 'I18N', 'ROUTING', 'FRONTEND', 'SECURITY'].includes(t.domain));
-      await Promise.all(wave4.map(t => runSingleTest(t, sharedContext)));
+    for (let i = 0; i < sortedTests.length; i++) {
+      const test = sortedTests[i];
+      const percent = Math.round(((i + 1) / sortedTests.length) * 100);
+      updateUIProgress(percent, `${isAr ? 'فحص' : 'Running'}: ${isAr ? test.name_ar : test.name_en}...`);
+      await runSingleTest(test, sharedContext);
     }
 
     _scanDuration = Date.now() - scanStart;
     _isRunning = false;
 
-    updateUIProgress(100, isAr ? `اكتمل الفحص التشخيصي الموازي بنجاح (${_scanDuration}ms)` : `Diagnostic Scan Completed in ${_scanDuration}ms`);
+    updateUIProgress(100, isAr ? `اكتمل الفحص التشخيصي بنجاح (${_scanDuration}ms)` : `Diagnostic Scan Completed in ${_scanDuration}ms`);
     log('INFO', 'SYSTEM', `Scan Finished in ${_scanDuration}ms. Health Score: ${getHealthScore()}%`);
 
     renderDashboard();

@@ -1,9 +1,15 @@
-/**
- * js/database_explorer.js
- * 🗄️ ERP Database Explorer & Safe Data Change Assistant
- * Frontend UI & Interactive Platform
- * Source of Truth: newdatabase2026.sql (406 Tables)
- */
+// Ensure a globally accessible Toast helper that connects with UI.toast
+if (typeof window !== 'undefined') {
+  window.Toast = window.Toast || {
+    show: function(msg, type) {
+      if (typeof UI !== 'undefined' && UI.toast) {
+        UI.toast(msg, type || 'info');
+      } else {
+        console.log(`[Toast ${type || 'info'}]: ${msg}`);
+      }
+    }
+  };
+}
 
 const DatabaseExplorer = (function () {
   let _activeTab = 'impact'; // 'impact' | 'tables' | 'columns' | 'data_maps' | 'incidents' | 'change_log' | 'ai_chat'
@@ -569,6 +575,26 @@ ${m.journal_type_id !== undefined ? `UNION ALL\nSELECT 'journal' AS tbl, count(*
 
       </div>
     `;
+  }
+
+  function bindDeletionResultEvents(container, isAr) {
+    const btnToggleSql = container.querySelector('#btn-toggle-mod-sql');
+    const boxSql = container.querySelector('#mod-sql-wrapper-box');
+    if (btnToggleSql && boxSql) {
+      btnToggleSql.addEventListener('click', () => {
+        const isHidden = boxSql.style.display === 'none';
+        boxSql.style.display = isHidden ? 'block' : 'none';
+      });
+    }
+
+    const btnPostVerify = container.querySelector('#btn-run-post-verify');
+    const boxPostVerify = container.querySelector('#post-verify-box');
+    if (btnPostVerify && boxPostVerify) {
+      btnPostVerify.addEventListener('click', () => {
+        boxPostVerify.style.display = 'block';
+        if (window.Toast) window.Toast.show(isAr ? 'تم توليد استعلامات الفحص الختامي' : 'Verification queries generated', 'success');
+      });
+    }
   }
 
   // =========================================================================

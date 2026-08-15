@@ -1,8 +1,15 @@
-/**
- * js/daily_challenge.js
- * 🧠 AI Daily ERP Challenge Engine (DataCamp-style Interactive ERP Practice)
- * Closed-loop cycle: Generate -> Practice -> Hint -> Confidence -> Feedback -> Distractor Analysis -> Spaced Repetition -> Topic Mastery
- */
+// Ensure a globally accessible Toast helper that connects with UI.toast
+if (typeof window !== 'undefined') {
+  window.Toast = window.Toast || {
+    show: function(msg, type) {
+      if (typeof UI !== 'undefined' && UI.toast) {
+        UI.toast(msg, type || 'info');
+      } else {
+        console.log(`[Toast ${type || 'info'}]: ${msg}`);
+      }
+    }
+  };
+}
 
 const DailyChallenge = (function () {
   let _currentChallenge = null;

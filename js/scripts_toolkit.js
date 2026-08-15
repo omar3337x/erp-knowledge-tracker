@@ -1,9 +1,15 @@
-/**
- * js/scripts_toolkit.js
- * 🛠️ ERP Script Knowledge & Troubleshooting Toolkit
- * Frontend UI & Interactive Workbench
- * Source of Truth: newdatabase2026.sql
- */
+// Ensure a globally accessible Toast helper that connects with UI.toast
+if (typeof window !== 'undefined') {
+  window.Toast = window.Toast || {
+    show: function(msg, type) {
+      if (typeof UI !== 'undefined' && UI.toast) {
+        UI.toast(msg, type || 'info');
+      } else {
+        console.log(`[Toast ${type || 'info'}]: ${msg}`);
+      }
+    }
+  };
+}
 
 const ScriptsToolkit = (function () {
   let _scripts = [];
