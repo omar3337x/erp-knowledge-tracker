@@ -24,6 +24,41 @@ const ScriptsToolkit = (function () {
   let _filterTable = '';
   let _onlyFavorites = false;
 
+  // In-memory storage fallback when Tracking Prevention blocks localStorage
+  const _memoryStore = {};
+
+  function safeStorageGet(key) {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        return localStorage.getItem(key);
+      }
+    } catch (e) {
+      // Storage access blocked by browser tracking prevention
+    }
+    return _memoryStore[key] || null;
+  }
+
+  function safeStorageSet(key, val) {
+    _memoryStore[key] = val;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, val);
+      }
+    } catch (e) {
+      // Ignore security errors on blocked storage
+    }
+  }
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   // Local storage keys
   const LS_FAVORITES = 'erp_scripts_favorites';
   const LS_RECENT = 'erp_scripts_recent';
@@ -38,18 +73,30 @@ const ScriptsToolkit = (function () {
 
   function loadLocalState() {
     try {
-      const favs = localStorage.getItem(LS_FAVORITES);
+      const favs = safeStorageGet(LS_FAVORITES);
       if (favs) _favorites = new Set(JSON.parse(favs));
-      const rec = localStorage.getItem(LS_RECENT);
+      const rec = safeStorageGet(LS_RECENT);
       if (rec) _recentlyUsed = JSON.parse(rec);
-      const notes = localStorage.getItem(LS_NOTES);
+      const notes = safeStorageGet(LS_NOTES);
       if (notes) _userNotes = JSON.parse(notes);
-      const usage = localStorage.getItem(LS_USAGE);
+      const usage = safeStorageGet(LS_USAGE);
       if (usage) _usageLogs = JSON.parse(usage);
-      const chk = localStorage.getItem(LS_CHECKLIST);
+      const chk = safeStorageGet(LS_CHECKLIST);
       if (chk) _checklistState = JSON.parse(chk);
     } catch (e) {
-      console.warn('Could not load local script state:', e);
+      // Fallback silently
+    }
+  }
+
+  function saveLocalState() {
+    try {
+      safeStorageSet(LS_FAVORITES, JSON.stringify(Array.from(_favorites)));
+      safeStorageSet(LS_RECENT, JSON.stringify(_recentlyUsed));
+      safeStorageSet(LS_NOTES, JSON.stringify(_userNotes));
+      safeStorageSet(LS_USAGE, JSON.stringify(_usageLogs));
+      safeStorageSet(LS_CHECKLIST, JSON.stringify(_checklistState));
+    } catch (e) {
+      // Fallback silently
     }
   }
 
